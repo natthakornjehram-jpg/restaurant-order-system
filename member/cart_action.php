@@ -2,8 +2,8 @@
 session_start();
 require_once '../includes/db.php';
 
-// 1. เช็กสิทธิ์ว่าล็อกอินอยู่ไหม
-if (!isset($_SESSION['customer_id'])) {
+// 1. เช็กสิทธิ์: ต้องล็อกอินเป็นสมาชิก หรือเป็นแขกที่สแกน QR โต๊ะมาแล้ว (ไม่บังคับให้แขกที่โต๊ะต้องสมัครสมาชิก)
+if (!isset($_SESSION['customer_id']) && !isset($_SESSION['table_id'])) {
     header("Location: ../login_customer.php");
     exit;
 }
@@ -68,23 +68,33 @@ if ($action === 'add' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // หย่อนกล่องลงตะกร้า Session
         $_SESSION['cart'][] = $cart_item;
-        
+
         // เด้งกลับไปหน้าเมนู เพื่อให้สั่งอย่างอื่นต่อ
-        header("Location: ../menu.php");
+        // ถ้าเป็นแขกที่สแกน QR โต๊ะอยู่ ต้องกลับไปหน้าเมนูของโต๊ะ (ไม่งั้น menu.php จะล้าง session โต๊ะทิ้ง)
+        if (isset($_SESSION['table_id'])) {
+            header("Location: ../qr_table/menu_dinein.php?table=" . urlencode($_SESSION['table_number'] ?? ''));
+        } else {
+            header("Location: ../menu.php");
+        }
         exit;
     }
-} 
-// 🔴 กรณี: กดปุ่ม "ลบรายการ" ในหน้า cart.php
+}
+// 🔴 กรณี: กดปุ่ม "ลบรายการ" ในหน้า cart.php / cart_dinein.php
 elseif ($action === 'remove' && isset($_GET['id'])) {
     $id = intval($_GET['id']); // $id คือลำดับของในตะกร้า (0, 1, 2...)
-    
+
     if (isset($_SESSION['cart'][$id])) {
         unset($_SESSION['cart'][$id]); // ลบของชิ้นนั้นทิ้ง
         $_SESSION['cart'] = array_values($_SESSION['cart']); // จัดเรียงลำดับใหม่ให้สวยงาม
     }
-    
-    // เด้งกลับไปหน้าตะกร้า
-    header("Location: cart.php");
+
+    // เด้งกลับไปหน้าตะกร้าที่มาจริง (จำกัดปลายทางที่อนุญาตไว้ กัน open redirect)
+    $allowed_returns = ['cart.php', '../qr_table/cart_dinein.php'];
+    $return_url = $_GET['return_url'] ?? 'cart.php';
+    if (!in_array($return_url, $allowed_returns, true)) {
+        $return_url = 'cart.php';
+    }
+    header("Location: " . $return_url);
     exit;
 }
 

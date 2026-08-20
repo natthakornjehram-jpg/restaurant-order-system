@@ -1,5 +1,7 @@
 <?php
 $nav_table_no = $_SESSION['table_number'] ?? 'ไม่ระบุ';
+$nav_order_type = $_SESSION['order_type'] ?? null;
+$nav_order_type_label = $nav_order_type === 'takeaway' ? 'กลับบ้าน' : ($nav_order_type === 'dine_in' ? 'ทานที่ร้าน' : null);
 ?>
 
 <nav class="navbar sticky-top shadow-sm" style="background-color: var(--cafe-dark);">
@@ -15,7 +17,7 @@ $nav_table_no = $_SESSION['table_number'] ?? 'ไม่ระบุ';
         <div class="d-flex align-items-center gap-2">
             
             <span class="badge rounded-pill px-3 py-2 fw-bold shadow-sm" style="background-color: var(--cafe-gold); color: var(--cafe-dark); border: 2px solid #fff;">
-                โต๊ะ <?= htmlspecialchars($nav_table_no) ?>
+                โต๊ะ <?= htmlspecialchars($nav_table_no) ?><?= $nav_order_type_label ? ' · ' . $nav_order_type_label : '' ?>
             </span>
             
             <a href="../qr_table/my_bill.php" class="btn btn-outline-light btn-sm rounded-circle shadow-sm d-flex align-items-center justify-content-center" title="การดำเนินการ" style="width: 38px; height: 38px;">

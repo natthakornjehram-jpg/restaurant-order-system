@@ -66,8 +66,22 @@ if ($stmt_order->execute()) {
 
     // 6. เคลียร์ตะกร้าทิ้งเมื่อสั่งสำเร็จ
     unset($_SESSION['cart']);
-    
-    // 7. เด้งไปหน้าดูสถานะ/ใบเสร็จ
+
+    // 7. ถ้ามาจากการสแกน QR ที่โต๊ะ (มี table_id) ให้จบรอบการสั่งของโต๊ะนี้ไปเลย
+    //    เคลียร์ session โต๊ะทิ้ง กันลูกค้ากดปุ่มย้อนกลับแล้วสั่งซ้ำ ต้องสแกนใหม่เท่านั้น
+    if ($table_id) {
+        unset($_SESSION['table_id']);
+        unset($_SESSION['table_number']);
+        unset($_SESSION['order_type']);
+
+        echo "<script>
+            alert('ขอบคุณค่ะ แล้วพบกันใหม่ 🙏');
+            window.location.replace('https://www.google.com/');
+        </script>";
+        exit;
+    }
+
+    // 8. ลูกค้าออนไลน์/สมาชิก: เด้งไปหน้าดูสถานะ/ใบเสร็จตามเดิม
     echo "<script>
         alert('ส่งคำสั่งซื้อเรียบร้อยแล้ว!');
         window.location.href = 'order_detail.php?id=" . $order_id . "';

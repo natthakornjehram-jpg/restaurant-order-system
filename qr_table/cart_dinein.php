@@ -3,11 +3,17 @@
 session_start();
 require_once '../includes/db.php';
 
-// เช็กว่าสแกนโต๊ะมาจริงไหม
-if (!isset($_SESSION['table_id'])) {
+// กันหน้านี้โดนแคชไว้ในเบราว์เซอร์ (สำคัญเวลากดปุ่มย้อนกลับหลังปิดออเดอร์ไปแล้ว)
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Pragma: no-cache");
+
+// เช็กว่าสแกนโต๊ะมาจริงไหม และเลือกประเภทออเดอร์ไว้แล้วหรือยัง
+if (!isset($_SESSION['table_id']) || !isset($_SESSION['order_type'])) {
     echo "<script>alert('กรุณาสแกน QR Code ที่โต๊ะก่อนครับ'); window.location='../index.php';</script>";
     exit;
 }
+
+$order_type = $_SESSION['order_type'];
 
 $table_no = $_SESSION['table_number'] ?? 'ไม่ระบุ';
 
@@ -89,7 +95,7 @@ include '../includes/nav_dinein.php';
             </div>
 
             <form action="../member/submit_order.php" method="POST">
-                <input type="hidden" name="order_type" value="dine_in">
+                <input type="hidden" name="order_type" value="<?= htmlspecialchars($order_type) ?>">
                 <input type="hidden" name="total_amount" value="<?= $total_raw ?>">
                 
                 <button type="submit" class="btn btn-success w-100 rounded-pill py-3 fw-bold shadow-sm fs-5" onclick="this.innerHTML='กำลังส่งออเดอร์...'; this.disabled=true; this.form.submit();">

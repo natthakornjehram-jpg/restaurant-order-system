@@ -3,12 +3,15 @@
 session_start();
 require_once '../includes/db.php';
 
+// กันหน้านี้โดนแคชไว้ในเบราว์เซอร์ (สำคัญเวลากดปุ่มย้อนกลับหลังปิดออเดอร์ไปแล้ว)
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Pragma: no-cache");
+
 // เช็กว่าสแกนโต๊ะมาจริงไหม
 if (isset($_GET['table']) && !empty($_GET['table'])) {
     $table_no = htmlspecialchars($_GET['table']);
     $_SESSION['table_number'] = $table_no;
-    $_SESSION['order_type'] = 'dine_in';
-    
+
     $stmt = $conn->prepare("SELECT table_id FROM restauranttable WHERE table_number = ?");
     $stmt->bind_param("s", $table_no);
     $stmt->execute();
@@ -16,8 +19,42 @@ if (isset($_GET['table']) && !empty($_GET['table'])) {
     if ($row = $res->fetch_assoc()) {
         $_SESSION['table_id'] = $row['table_id'];
     }
+
+    // สแกนใหม่ทุกครั้ง ให้เลือกประเภทออเดอร์ใหม่เสมอ (กันพลาดจากรอบก่อนหน้า)
+    unset($_SESSION['order_type']);
 } elseif (!isset($_SESSION['table_id'])) {
     echo "<script>alert('กรุณาสแกน QR Code ที่โต๊ะก่อนสั่งอาหารครับ'); window.location='../index.php';</script>";
+    exit;
+}
+
+// รับค่าประเภทออเดอร์จากหน้าเลือก (ทานที่ร้าน / กลับบ้าน)
+if (isset($_GET['type']) && in_array($_GET['type'], ['dine_in', 'takeaway'], true)) {
+    $_SESSION['order_type'] = $_GET['type'];
+}
+
+// ถ้ายังไม่ได้เลือกประเภทออเดอร์ ให้แสดงหน้าเลือกก่อน ยังไม่เข้าเมนู
+if (!isset($_SESSION['order_type'])) {
+    $table_no_for_choice = $_SESSION['table_number'] ?? '';
+    include '../includes/header_dinein.php';
+    ?>
+    <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/menu-dinein.css">
+    <div class="container py-5 text-center" style="max-width: 480px;">
+        <div class="mb-4 mt-4">
+            <i class="bi bi-shop" style="font-size: 3.5rem; color: var(--cafe-brown);"></i>
+            <h4 class="fw-bold mt-3">โต๊ะ <?= htmlspecialchars($table_no_for_choice) ?></h4>
+            <p class="text-muted">วันนี้ทานที่ร้าน หรือสั่งกลับบ้านดีครับ?</p>
+        </div>
+        <div class="d-grid gap-3">
+            <a href="?table=<?= urlencode($table_no_for_choice) ?>&type=dine_in" class="btn btn-lg py-3 rounded-4 fw-bold shadow-sm" style="background: var(--cafe-brown); color: #fff;">
+                <i class="bi bi-cup-hot me-2"></i>ทานที่ร้าน
+            </a>
+            <a href="?table=<?= urlencode($table_no_for_choice) ?>&type=takeaway" class="btn btn-lg py-3 rounded-4 fw-bold shadow-sm btn-outline-secondary">
+                <i class="bi bi-bag me-2"></i>สั่งกลับบ้าน
+            </a>
+        </div>
+    </div>
+    <?php
+    include '../includes/footer_dinein.php';
     exit;
 }
 

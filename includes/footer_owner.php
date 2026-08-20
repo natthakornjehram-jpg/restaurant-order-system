@@ -93,10 +93,9 @@ function playNotifySound() {
 }
 
 /**
- * 3. ระบบเช็คออเดอร์ใหม่ + บิลรอชำระใหม่ แบบเกือบเรียลไทม์ (โพลทุก 3 วินาที)
+ * 3. ระบบเช็คออเดอร์ใหม่แบบเกือบเรียลไทม์ (โพลทุก 3 วินาที)
  */
 let lastPendingCount = null;
-let lastUnpaidCount = null;
 
 function checkNewOrders() {
     fetch('api_check_update.php')
@@ -121,27 +120,7 @@ function checkNewOrders() {
             }
         }
 
-        if (lastUnpaidCount !== null && data.unpaid_count > lastUnpaidCount) {
-            playNotifySound();
-            Swal.fire({
-                icon: 'warning',
-                title: 'มีบิลรอชำระเงินใหม่!',
-                text: 'มีออเดอร์รอเก็บเงิน/รอตรวจสลิป ตรวจสอบหน้าชำระเงินด้วยครับ',
-                position: 'top-end',
-                toast: true,
-                timer: 5000,
-                showConfirmButton: false,
-                timerProgressBar: true
-            });
-
-            // รีโหลดหน้าเฉพาะตอนอยู่หน้า manage_payments.php
-            if(window.location.pathname.includes('manage_payments.php')) {
-                location.reload();
-            }
-        }
-
         lastPendingCount = data.pending_count;
-        lastUnpaidCount = data.unpaid_count;
     })
     .catch(err => console.error('API Error:', err));
 }
