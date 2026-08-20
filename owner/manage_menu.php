@@ -46,7 +46,6 @@ include '../includes/nav_owner.php';
             </button>
         </div>
     </div>
-    </div>
 
     <div class="accordion" id="menuAccordion">
         <?php 

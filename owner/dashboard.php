@@ -72,6 +72,7 @@ $pending_list_res = $conn->query($pending_list_sql);
         <div class="col-md-4">
             <a href="reports.php" class="stat-link">
                 <div class="stat-card-top border-sales shadow-sm">
+                    <span class="stat-icon"><i class="bi bi-graph-up-arrow"></i></span>
                     <span class="stat-label">ยอดขายวันนี้</span>
                     <span class="stat-value text-success">฿<?php echo number_format($daily_total, 0); ?></span>
                 </div>
@@ -80,6 +81,7 @@ $pending_list_res = $conn->query($pending_list_sql);
         <div class="col-6 col-md-4">
             <a href="manage_orders.php" class="stat-link">
                 <div class="stat-card-top border-pending shadow-sm">
+                    <span class="stat-icon"><i class="bi bi-receipt-cutoff"></i></span>
                     <span class="stat-label">คิวที่ต้องทำ</span>
                     <span class="stat-value text-warning"><?php echo $pending_orders; ?> <small class="fs-4">คิว</small></span>
                 </div>
@@ -88,6 +90,7 @@ $pending_list_res = $conn->query($pending_list_sql);
         <div class="col-6 col-md-4">
             <a href="manage_payments.php" class="stat-link">
                 <div class="stat-card-top border-unpaid shadow-sm">
+                    <span class="stat-icon"><i class="bi bi-wallet2"></i></span>
                     <span class="stat-label">รอชำระเงิน</span>
                     <span class="stat-value text-primary"><?php echo $unpaid_orders; ?> <small class="fs-4">คิว</small></span>
                 </div>
