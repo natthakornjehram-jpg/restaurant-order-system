@@ -29,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     // โฟลเดอร์เก็บรูป (ย้ายมาไว้ใต้ assets/images/ ให้สอดคล้องกับที่อื่นในระบบ)
     $target_dir = "../assets/images/logos/";
-    if (!is_dir($target_dir)) mkdir($target_dir, 0777, true);
+    if (!is_dir($target_dir)) mkdir($target_dir, 0755, true);
 
     // --- จัดการอัปโหลดรูปโลโก้ ---
     if (!empty($_FILES['logo']['name'])) {

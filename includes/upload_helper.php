@@ -24,9 +24,8 @@ function handle_image_upload(array $file, string $targetDir, string $prefix): st
         'image/webp' => 'webp',
     ];
 
-    $finfo = finfo_open(FILEINFO_MIME_TYPE);
-    $mime = finfo_file($finfo, $file['tmp_name']);
-    finfo_close($finfo);
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    $mime = $finfo->file($file['tmp_name']);
 
     if (!isset($allowed_mimes[$mime]) || @getimagesize($file['tmp_name']) === false) {
         return false;
@@ -35,7 +34,7 @@ function handle_image_upload(array $file, string $targetDir, string $prefix): st
     $ext = $allowed_mimes[$mime];
 
     if (!is_dir($targetDir)) {
-        mkdir($targetDir, 0777, true);
+        mkdir($targetDir, 0755, true);
     }
 
     $filename = $prefix . '_' . time() . '_' . uniqid() . '.' . $ext;
