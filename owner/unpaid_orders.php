@@ -32,21 +32,7 @@ $stmt->execute();
 $res = $stmt->get_result();
 ?>
 
-<style>
-    .main-content { background-color: #fcfcfc; min-height: 100vh; font-family: 'Sarabun', sans-serif; }
-    .card-unpaid { 
-        border: none; 
-        border-radius: 20px; 
-        transition: 0.3s; 
-        background: #fff;
-        border-bottom: 5px solid #e3f2fd;
-    }
-    .card-unpaid:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.05) !important; }
-    .price-tag { font-size: 2rem; color: #16a34a; font-weight: 800; }
-    .modal-content { border-radius: 25px; border: none; }
-    .btn-pay-cash { background-color: #f0fdf4; color: #16a34a; border: 1px solid #dcfce7; }
-    .btn-pay-transfer { background-color: #f0f9ff; color: #0284c7; border: 1px solid #e0f2fe; }
-</style>
+<link rel="stylesheet" href="<?= BASE_URL ?>assets/css/owner-unpaid-orders.css">
 
 <div class="main-content container-fluid pb-5" style="margin-top: 80px;">
     <div class="pt-4 pb-3 mb-4 d-flex justify-content-between align-items-center border-bottom">
@@ -138,37 +124,6 @@ $res = $stmt->get_result();
     </div>
 </div>
 
-<script>
-// Auto-Refresh หน้าจอทุก 15 วินาที
-setInterval(function(){
-    if(document.querySelectorAll('.modal.show').length === 0) {
-        location.reload();
-    }
-}, 15000);
-
-function confirmPayment(orderId, method) {
-    let methodName = (method === 'cash') ? 'เงินสด' : 'เงินโอน';
-    if (confirm('ยืนยันรับชำระเงินด้วย ' + methodName + ' ใช่หรือไม่?')) {
-        const fd = new FormData();
-        fd.append('order_id', orderId);
-        fd.append('payment_method', method);
-
-        fetch('payments.php', { 
-            method: 'POST', 
-            body: fd 
-        })
-        .then(res => res.json())
-        .then(data => {
-            if(data.success) {
-                alert('บันทึกการชำระเงินสำเร็จ!');
-                location.reload(); 
-            } else {
-                alert('เกิดข้อผิดพลาด: ' + data.error);
-            }
-        })
-        .catch(err => alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้'));
-    }
-}
-</script>
+<script src="<?= BASE_URL ?>assets/js/owner-unpaid-orders.js"></script>
 
 <?php include '../includes/footer_owner.php'; ?>
