@@ -37,76 +37,7 @@ include '../includes/header_dinein.php';
 include '../includes/nav_dinein.php'; 
 ?>
 
-<style>
-    :root { 
-        --cafe-brown: #795548; 
-        --cafe-dark: #3e2723; 
-    }
-    body { 
-        background-color: #fdfaf5; 
-        font-family: 'Sarabun', sans-serif; 
-        padding-bottom: 100px; 
-    }
-    
-    .member-badge-section {
-        background: linear-gradient(135deg, #3e2723 0%, #795548 100%);
-        border-radius: 25px; padding: 20px; color: white;
-        margin-bottom: 25px; box-shadow: 0 10px 20px rgba(62,39,35,0.15);
-    }
-
-    .scroll-horizontal {
-        display: flex; overflow-x: auto; flex-wrap: nowrap;
-        -webkit-overflow-scrolling: touch; gap: 10px; 
-        padding-bottom: 15px; padding-top: 5px;
-    }
-    .scroll-horizontal::-webkit-scrollbar { display: none; }
-
-    .menu-card { 
-        background: white; border-radius: 20px; overflow: hidden; 
-        transition: 0.3s; cursor: pointer; border: 1px solid #eee;
-    }
-    .menu-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
-    .price-normal { color: #d32f2f; font-weight: bold; font-size: 1.1rem; }
-    
-    .topping-group-title { 
-        color: var(--cafe-brown); font-weight: bold; font-size: 0.85rem; 
-        margin-top: 15px; margin-bottom: 8px; border-left: 4px solid var(--cafe-brown); 
-        padding-left: 10px; text-transform: uppercase; 
-    }
-    .topping-item { 
-        background: #f8f9fa; border-radius: 12px; padding: 12px; 
-        margin-bottom: 8px; border: 1px solid #eee; 
-    }
-
-    @keyframes popUpCart {
-        0% { bottom: -100px; transform: translateX(-50%) scale(0.8); opacity: 0; }
-        60% { bottom: 30px; transform: translateX(-50%) scale(1.05); opacity: 1; }
-        80% { bottom: 15px; transform: translateX(-50%) scale(0.95); }
-        100% { bottom: 20px; transform: translateX(-50%) scale(1); }
-    }
-    @keyframes pulseBadge {
-        0% { transform: scale(1); }
-        50% { transform: scale(1.3); }
-        100% { transform: scale(1); }
-    }
-    .floating-cart-bar {
-        position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-        width: 90%; max-width: 500px; background: var(--cafe-dark);
-        border-radius: 50px; padding: 10px 15px 10px 25px; z-index: 1000;
-        box-shadow: 0 15px 35px rgba(0,0,0,0.4);
-        display: flex; justify-content: space-between; align-items: center;
-        border: 1px solid rgba(255,255,255,0.1);
-        animation: popUpCart 0.6s cubic-bezier(0.25, 1, 0.5, 1) forwards;
-    }
-    .cart-badge {
-        position: absolute; top: -8px; right: -10px;
-        background-color: #dc3545; color: white;
-        font-size: 0.75rem; font-weight: bold;
-        padding: 4px 8px; border-radius: 50px;
-        border: 2px solid var(--cafe-dark);
-        animation: pulseBadge 0.5s ease-in-out 2;
-    }
-</style>
+<link rel="stylesheet" href="<?= BASE_URL ?>assets/css/menu-dinein.css">
 
 <div class="container py-4">
     <div class="member-badge-section d-flex justify-content-between align-items-center mt-3">
