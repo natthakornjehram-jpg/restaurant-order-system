@@ -69,15 +69,40 @@ function toggleStatus(id, type, currentStatus) {
 }
 
 /**
- * 2. ระบบ Real-time เช็คออเดอร์ใหม่
+ * 2. เสียงแจ้งเตือน (สร้างเสียงเองด้วย Web Audio API ไม่ต้องพึ่งไฟล์เสียงภายนอก)
+ */
+function playNotifySound() {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const now = ctx.currentTime;
+        [880, 1175].forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0, now + i * 0.15);
+            gain.gain.linearRampToValueAtTime(0.35, now + i * 0.15 + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.15 + 0.35);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start(now + i * 0.15);
+            osc.stop(now + i * 0.15 + 0.4);
+        });
+    } catch (e) {
+        console.warn('เล่นเสียงแจ้งเตือนไม่ได้:', e);
+    }
+}
+
+/**
+ * 3. ระบบเช็คออเดอร์ใหม่แบบเกือบเรียลไทม์ (โพลทุก 3 วินาที)
  */
 let lastPendingCount = null;
 
 function checkNewOrders() {
-    fetch('api_check_update.php') 
+    fetch('api_check_update.php')
     .then(r => r.json())
     .then(data => {
         if (lastPendingCount !== null && data.pending_count > lastPendingCount) {
+            playNotifySound();
             Swal.fire({
                 icon: 'info',
                 title: 'มีออเดอร์ใหม่เข้า!',
@@ -91,7 +116,7 @@ function checkNewOrders() {
 
             // รีโหลดหน้าเฉพาะตอนอยู่หน้า manage_orders.php
             if(window.location.pathname.includes('manage_orders.php')) {
-                location.reload(); 
+                location.reload();
             }
         }
         lastPendingCount = data.pending_count;
@@ -99,9 +124,9 @@ function checkNewOrders() {
     .catch(err => console.error('API Error:', err));
 }
 
-// เช็คทุก 7 วินาที
+// เช็คทุก 3 วินาที (เกือบเรียลไทม์ โดยไม่ต้องใช้ WebSocket)
 if (lastPendingCount === null) checkNewOrders();
-setInterval(checkNewOrders, 7000);
+setInterval(checkNewOrders, 3000);
 </script>
 </body>
 </html>
