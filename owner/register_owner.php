@@ -1,66 +1,48 @@
 <?php
 // owner/register_owner.php
 session_start();
-require_once '../includes/db.php'; 
+require_once '../includes/db.php';
 
 $success_message = "";
 $error_message = "";
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $username = trim($_POST['username']);
-    $password_input = $_POST['password']; 
+    $password_input = $_POST['password'];
     $fullname = trim($_POST['fullname']);
     $phone = trim($_POST['phone']);
     $restaurant_name = trim($_POST['restaurant_name']);
     $address = trim($_POST['address']);
 
-    // 1. ตรวจสอบชื่อซ้ำ
-    $check_stmt = $conn->prepare("SELECT user_id FROM users WHERE username = ?");
-    $check_stmt->bind_param("s", $username);
-    $check_stmt->execute();
-    
-    if ($check_stmt->get_result()->num_rows > 0) {
-        $error_message = "ชื่อผู้ใช้งานนี้มีในระบบแล้ว";
+    if (empty($username) || empty($password_input) || empty($fullname) || empty($phone) || empty($restaurant_name)) {
+        $error_message = "กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน";
     } else {
-        // --- 🌟 ส่วนตัดสินใจ Role ---
-        $check_first = $conn->query("SELECT COUNT(*) as total FROM users");
-        $row_count = $check_first->fetch_assoc();
-        
-        if ($row_count['total'] == 0) {
-            $role = 'admin'; // คนแรกของทั้งระบบจะเป็น Admin
+        // ตรวจสอบชื่อผู้ใช้ซ้ำในตาราง owner (ตารางเดียวกับที่ login.php ใช้จริง)
+        $check_stmt = $conn->prepare("SELECT owner_id FROM owner WHERE username = ?");
+        $check_stmt->bind_param("s", $username);
+        $check_stmt->execute();
+
+        if ($check_stmt->get_result()->num_rows > 0) {
+            $error_message = "ชื่อผู้ใช้งานนี้มีในระบบแล้ว";
         } else {
-            $role = 'owner'; // คนต่อๆ ไปเป็นเจ้าของร้านปกติ
-        }
-        // ------------------------------------------
+            $hashed_password = password_hash($password_input, PASSWORD_DEFAULT);
 
-        $hashed_password = password_hash($password_input, PASSWORD_DEFAULT);
-        $password_raw = $password_input; 
-        
-        $conn->begin_transaction();
+            $stmt = $conn->prepare("INSERT INTO owner (username, password, name, phone, restaurant_name, address) VALUES (?, ?, ?, ?, ?, ?)");
+            $stmt->bind_param("ssssss", $username, $hashed_password, $fullname, $phone, $restaurant_name, $address);
 
-        try {
-            // บันทึกข้อมูลผู้ใช้
-            $stmt1 = $conn->prepare("INSERT INTO users (username, password, password_raw, fullname, phone, role) VALUES (?, ?, ?, ?, ?, ?)");
-            $stmt1->bind_param("ssssss", $username, $hashed_password, $password_raw, $fullname, $phone, $role);
-            $stmt1->execute();
+            if ($stmt->execute()) {
+                $new_owner_id = $conn->insert_id;
 
-            $owner_id = $conn->insert_id;
+                // สมัครเสร็จแล้ว ล็อกอินให้เลยอัตโนมัติ (ระบบร้านเดียว ไม่ต้องรออนุมัติ)
+                session_regenerate_id(true);
+                $_SESSION['role'] = 'owner';
+                $_SESSION['owner_id'] = $new_owner_id;
 
-            // สร้างร้านค้าให้ด้วย
-            $stmt2 = $conn->prepare("INSERT INTO restaurants (owner_id, restaurant_name, address, is_online_open, status) VALUES (?, ?, ?, 1, 'approved')");
-            $stmt2->bind_param("iss", $owner_id, $restaurant_name, $address);
-            $stmt2->execute();
-
-            $conn->commit();
-            
-            if ($role == 'admin') {
-                $success_message = "คุณคือผู้ดูแลระบบ (Admin) คนแรก สมัครสำเร็จแล้ว!";
+                header("Location: dashboard.php");
+                exit;
             } else {
-                $success_message = "สมัครสมาชิกเจ้าของร้านสำเร็จ!";
+                $error_message = "เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง";
             }
-        } catch (Exception $e) {
-            $conn->rollback();
-            $error_message = "เกิดข้อผิดพลาด: " . $e->getMessage();
         }
     }
 }
@@ -74,16 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <link href="https://fonts.googleapis.com/css2?family=Mitr&family=Sarabun&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <style>
-        body { background-color: #fdfaf5; font-family: 'Sarabun', sans-serif; color: #3e2723; }
-        .reg-card { max-width: 550px; margin: 50px auto; background: white; padding: 40px; border-radius: 35px; box-shadow: 0 15px 35px rgba(62,39,35,0.1); border: 1px solid #efebe9; }
-        .btn-brown { background: #795548; color: white; border-radius: 50px; padding: 12px; border: none; width: 100%; font-weight: bold; transition: 0.3s; }
-        .btn-brown:hover { background: #3e2723; transform: translateY(-2px); color: white; }
-        h2 { font-family: 'Mitr', sans-serif; color: #3e2723; text-align: center; }
-        .form-control { border-radius: 15px; padding: 12px; border: 1px solid #d7ccc8; background-color: #fcfaf9; }
-        .form-control:focus { border-color: #795548; box-shadow: none; background: #fff; }
-        label { font-weight: bold; font-size: 0.9rem; color: #5d4037; margin-bottom: 5px; margin-left: 5px; }
-    </style>
+    <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/register-owner.css">
 </head>
 <body>
     <div class="container">
@@ -92,17 +65,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <i class="bi bi-shop-window" style="font-size: 3rem; color: #795548;"></i>
             </div>
             <h2>เปิดร้านอาหารกับเรา ☕</h2>
-            <p class="text-center text-muted mb-4 small">สมัครสมาชิกคนแรกของระบบรับสิทธิ์ Admin ทันที</p>
-            
-            <?php if($success_message): ?>
-                <div class="alert alert-success text-center rounded-4 border-0 mb-4 shadow-sm">
-                    <i class="bi bi-check-circle-fill me-2"></i> <?= $success_message ?>
-                    <br><a href="../login.php" class="fw-bold text-success text-decoration-none">เข้าสู่ระบบได้ที่นี่</a>
-                </div>
-            <?php endif; ?>
+            <p class="text-center text-muted mb-4 small">สมัครแล้วเข้าสู่ระบบจัดการร้านได้ทันที</p>
 
             <?php if($error_message): ?>
-                <div class="alert alert-danger text-center rounded-4 border-0 mb-4 shadow-sm"><?= $error_message ?></div>
+                <div class="alert alert-danger text-center rounded-4 border-0 mb-4 shadow-sm"><?= htmlspecialchars($error_message) ?></div>
             <?php endif; ?>
 
             <form method="POST">
@@ -134,7 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <textarea name="address" class="form-control" rows="2" placeholder="ที่ตั้งร้านของคุณ..." required></textarea>
                 </div>
                 <button type="submit" class="btn-brown shadow">ลงทะเบียนเข้าสู่ระบบ</button>
-                
+
                 <div class="text-center mt-3">
                     <small class="text-muted">มีบัญชีอยู่แล้ว? <a href="../login.php" class="text-decoration-none fw-bold" style="color:#795548;">เข้าสู่ระบบ</a></small>
                 </div>
