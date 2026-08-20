@@ -101,7 +101,7 @@ include '../includes/header_customer.php';
                     <?php else: ?>
                         <form action="confirm_order.php" method="POST">
                             <input type="hidden" name="final_price" value="<?= $total_raw ?>">
-                            <input type="hidden" name="order_type" value="<?= $is_online ? 'delivery' : ($is_takeaway_qr ? 'takeaway' : 'dine_in') ?>">
+                            <input type="hidden" name="order_type" value="<?= ($is_online || $is_takeaway_qr) ? 'takeaway' : 'dine_in' ?>">
                             
                             <?php if ($is_takeaway_qr): ?>
                                 <div class="mb-4">

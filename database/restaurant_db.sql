@@ -211,7 +211,7 @@ CREATE TABLE `orders` (
   `created_at` datetime DEFAULT current_timestamp(),
   `order_status` enum('pending','cooking','ready','served','canceled') DEFAULT 'pending',
   `payment_status` enum('unpaid','paid') DEFAULT 'unpaid',
-  `order_type` enum('dine_in','takeaway','delivery') DEFAULT 'dine_in',
+  `order_type` enum('dine_in','takeaway') DEFAULT 'dine_in',
   `online_customer_name` varchar(100) DEFAULT NULL,
   `online_customer_phone` varchar(20) DEFAULT NULL,
   `note` text DEFAULT NULL,
@@ -460,4 +460,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-08-20 16:26:26
+-- Dump completed on 2026-08-20 16:49:06
