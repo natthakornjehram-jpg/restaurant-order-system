@@ -10,8 +10,9 @@ function ajaxCheckout(tableId) {
 }
 
 function showQR(tableNum) {
-    // แก้เป็นโดเมนจริงของคุณ
-    const baseUrl = "http://rannaibaan.free.nf/qr_table/menu_dinein.php?table=";
+    // ใช้โดเมนที่กำลังเปิดอยู่จริง + BASE_URL (คำนวณจาก db.php) แทนการ hardcode โดเมน
+    // ทำให้ QR code ชี้ไปที่โดเมนถูกต้องเสมอ ไม่ว่าจะรันบน localhost หรือโฮสต์จริง
+    const baseUrl = window.location.origin + BASE_URL + "qr_table/menu_dinein.php?table=";
     const qrApi = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(baseUrl + tableNum)}`;
 
     document.getElementById('qrTableNum').innerText = tableNum;

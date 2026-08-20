@@ -139,6 +139,7 @@ include '../includes/nav_owner.php';
     </div>
 </div>
 
+<script>const BASE_URL = "<?= BASE_URL ?>";</script>
 <script src="<?= BASE_URL ?>assets/js/owner-manage-tables.js"></script>
 
 <?php include '../includes/footer_owner.php'; ?>
