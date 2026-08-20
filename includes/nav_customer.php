@@ -1,0 +1,119 @@
+<?php
+// nav_customer.php
+$current_page = basename($_SERVER['PHP_SELF']);
+$customer_name = $_SESSION['customer_name'] ?? 'สมาชิก';
+?>
+
+<style>
+    :root {
+        --nav-theme: #d35400;
+        --nav-hover: #a04000;
+        --btn-coffee: #605b5a;  
+        --btn-coffee-dark: #3e2723;
+    }
+    .text-theme { color: var(--nav-theme) !important; }
+    .btn-theme { 
+        background-color: var(--btn-coffee) !important; 
+        color: white !important; border: none; transition: 0.3s; 
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .btn-theme:hover { 
+        background-color: var(--btn-coffee-dark) !important; 
+        color: white !important; transform: translateY(-2px);
+    }
+    .btn-outline-theme { 
+        border: 2px solid var(--nav-theme) !important; 
+        color: var(--nav-theme) !important; 
+        background-color: transparent; transition: 0.3s; 
+    }
+    .btn-outline-theme:hover { 
+        background-color: var(--nav-theme) !important; 
+        color: white !important; 
+    }
+    .nav-menu-link {
+        color: #3b3b3b !important; padding: 8px 20px !important;
+        border-radius: 50px; transition: 0.3s;
+    }
+    .nav-menu-link:hover { color: var(--nav-theme) !important; background-color: #fdfaf5; }
+    .nav-menu-link.active-menu {
+        background-color: var(--nav-theme) !important;
+        color: white !important;
+        box-shadow: 0 4px 12px rgba(211, 84, 0, 0.25);
+    }
+</style>
+
+<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
+    <div class="container">
+        <a class="navbar-brand fw-bold text-theme" href="menu.php">
+            <i class="bi bi-shop me-2"></i> RANNAIBAAN
+        </a>
+        
+        <button class="navbar-toggler border-0 shadow-none" type="button" 
+                data-bs-toggle="collapse" data-bs-target="#navCustomer">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        
+        <div class="collapse navbar-collapse" id="navCustomer">
+            
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0 mt-2 mt-lg-0">
+                <li class="nav-item">
+                    <a class="nav-link fw-bold nav-menu-link <?= ($current_page == 'menu.php') ? 'active-menu' : '' ?>" 
+                       href="../menu.php">เมนูอาหาร</a>
+                </li>
+            </ul>
+
+           
+            <div class="d-flex align-items-center mt-3 mt-lg-0">
+                
+                <?php if (isset($_SESSION['customer_id'])): ?>
+                   
+                    
+                    <a href="member/cart.php" class="btn btn-outline-dark rounded-pill me-3 position-relative">
+                        <i class="bi bi-cart3"></i>
+                        <?php if (!empty($_SESSION['cart'])): ?>
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                                <?= count($_SESSION['cart']) ?>
+                            </span>
+                        <?php endif; ?>
+                    </a>
+
+                    <div class="dropdown">
+                        <button class="btn rounded-pill dropdown-toggle px-3 fw-bold" 
+                                style="background-color: var(--btn-coffee); color: white;"
+                                type="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-person-circle me-1"></i>
+                            <?= htmlspecialchars($customer_name) ?>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2 rounded-3">
+                            <li>
+                                <a class="dropdown-item" href="member/history.php">
+                                    <i class="bi bi-clock-history me-2"></i>ประวัติการสั่งซื้อ
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="member/profile.php">
+                                    <i class="bi bi-gear me-2"></i>ตั้งค่าโปรไฟล์
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item text-danger" href="logout.php">
+                                    <i class="bi bi-box-arrow-right me-2"></i>ออกจากระบบ
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+
+                <?php else: ?>
+                    <a href="login_customer.php" class="btn btn-theme rounded-pill px-4 me-2 fw-bold shadow-sm">
+                        เข้าสู่ระบบ
+                    </a>
+                    <a href="register_customer.php" class="btn btn-outline-theme rounded-pill px-3 small fw-bold">
+                        สมัครสมาชิก
+                    </a>
+                <?php endif; ?>
+
+            </div>
+        </div>
+    </div>
+</nav>
