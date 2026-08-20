@@ -3,72 +3,11 @@
 session_start();
 require_once '../includes/db.php';
 require_once 'auth_owner.php';
-require_once '../includes/upload_helper.php';
 
-// --- 1. AJAX สลับสถานะพร้อมขาย ---
-if (isset($_POST['update_status_id'])) {
-    $id = intval($_POST['update_status_id']);
-    $status = intval($_POST['new_status_val']);
-    // ใช้ตาราง item และ is_active
-    $stmt = $conn->prepare("UPDATE item SET is_active = ? WHERE item_id = ?");
-    $stmt->bind_param("ii", $status, $id);
-    $stmt->execute();
-    echo "success";
-    exit();
-}
+// การบันทึกเมนูและสลับสถานะพร้อมขาย แยกไปอยู่ที่ api_save_menu.php / api_toggle_menu_status.php แล้ว
+// (มีการ include upload_helper.php เฉพาะที่ api_save_menu.php ที่ต้องใช้)
 
-// --- 2. บันทึก/อัปเดตข้อมูลเมนู ---
-if (isset($_POST['save_menu'])) {
-    $m_id = isset($_POST['item_id']) ? intval($_POST['item_id']) : 0;
-    $name = $_POST['menu_name'];
-    $price = (float) $_POST['price'];
-    $cat_id = (int) $_POST['category_id'];
-    $status = isset($_POST['is_active']) ? 1 : 0;
-
-    $db_image_path = "";
-    if (!empty($_FILES['image']['name'])) {
-        $uploaded = handle_image_upload($_FILES['image'], "../assets/images/items/", "item");
-        if ($uploaded !== false) {
-            $db_image_path = $uploaded;
-        }
-    }
-
-    if ($m_id > 0) {
-        if ($db_image_path !== "") {
-            $stmt = $conn->prepare("UPDATE item SET name=?, price=?, category_id=?, is_active=?, image_url=? WHERE item_id=?");
-            $stmt->bind_param("sdiisi", $name, $price, $cat_id, $status, $db_image_path, $m_id);
-        } else {
-            $stmt = $conn->prepare("UPDATE item SET name=?, price=?, category_id=?, is_active=? WHERE item_id=?");
-            $stmt->bind_param("sdiii", $name, $price, $cat_id, $status, $m_id);
-        }
-    } else {
-        $img = !empty($db_image_path) ? $db_image_path : 'default_food.png';
-        $stmt = $conn->prepare("INSERT INTO item (name, price, category_id, image_url, is_active) VALUES (?, ?, ?, ?, 1)");
-        $stmt->bind_param("sdis", $name, $price, $cat_id, $img);
-    }
-
-    if ($stmt->execute()) {
-        $target_id = ($m_id > 0) ? $m_id : $conn->insert_id;
-        
-        // จัดการท็อปปิ้ง
-        $conn->query("DELETE FROM menu_toppings WHERE item_id = $target_id");
-        if (!empty($_POST['topping_ids'])) {
-            foreach ($_POST['topping_ids'] as $t_id) {
-                $conn->query("INSERT INTO menu_toppings (item_id, topping_id) VALUES ($target_id, ".intval($t_id).")");
-            }
-        }
-        // ✅ เปลี่ยนจากการใช้ echo script alert เป็นการส่งค่าเข้า Session แทน
-        $_SESSION['success_msg'] = "บันทึกข้อมูลเรียบร้อย!";
-        header("Location: manage_menu.php");
-        exit;
-    } else {
-        $_SESSION['error_msg'] = "เกิดข้อผิดพลาด: " . $conn->error;
-        header("Location: manage_menu.php");
-        exit;
-    }
-}
-
-// --- 3. ลบเมนู ---
+// --- ลบเมนู ---
 if (isset($_GET['delete_id'])) {
     $id = intval($_GET['delete_id']);
     $img_query = $conn->query("SELECT image_url FROM item WHERE item_id = $id");
@@ -95,30 +34,7 @@ include '../includes/header_owner.php';
 include '../includes/nav_owner.php'; 
 ?>
 
-<style>
-    body { background-color: #f0f2f5; font-family: 'Sarabun', sans-serif; }
-    .folder-card { background: #fff; border-radius: 20px; border: none; box-shadow: 0 4px 10px rgba(0,0,0,0.08); margin-bottom: 20px; }
-    .accordion-button { font-size: 1.3rem; font-weight: 800; padding: 25px; color: #1a1a1a; border-radius: 20px !important; }
-    .menu-item-row { border-top: 1px solid #eee; padding: 20px; display: flex; align-items: center; }
-    .modal-content { border-radius: 30px; border: none; }
-    .section-label { background: #e7f1ff; color: #0d6efd; padding: 8px 20px; border-radius: 50px; font-weight: bold; display: inline-block; margin-bottom: 15px; }
-    .topping-section-label { background: #e6fcf5; color: #0ca678; padding: 8px 20px; border-radius: 50px; font-weight: bold; display: inline-block; margin-top: 20px; margin-bottom: 10px; }
-    .topping-group-box { background: #f8f9fa; border: 2px solid #eee; border-radius: 20px; padding: 20px; margin-bottom: 20px; }
-    .form-control-lg, .form-select-lg { border-radius: 15px; border: 2px solid #dee2e6; font-size: 1.1rem; }
-    .btn-save { font-size: 1.3rem; padding: 15px; border-radius: 20px; font-weight: bold; }
-    .custom-option input[type="checkbox"] { display: none; }
-    .custom-option .option-btn {
-        display: inline-block; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 8px;
-        background-color: #ffffff; color: #4b5563; cursor: pointer; transition: all 0.2s ease-in-out;
-        user-select: none; width: 100%; text-align: center; font-size: 0.95rem;
-    }
-    .custom-option input[type="checkbox"]:checked + .option-btn {
-        background-color: #f97316; border-color: #f97316; color: #ffffff; font-weight: bold;
-    }
-    .status-btn { padding: 5px 15px; border-radius: 50px; font-size: 0.9rem; font-weight: bold; cursor: pointer; border: none; }
-    .status-green { background-color: #d1fae5; color: #059669; border: 1px solid #059669; }
-    .status-gray { background-color: #f3f4f6; color: #6b7280; border: 1px solid #6b7280; }
-</style>
+<link rel="stylesheet" href="<?= BASE_URL ?>assets/css/owner-manage-menu.css">
 
 <div class="main-content container-fluid p-4 dashboard-spacing text-dark" style="margin-top: 60px;">
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
@@ -193,7 +109,7 @@ include '../includes/nav_owner.php';
 
                         <div class="modal fade" id="editMenu_<?php echo $menu['item_id']; ?>" tabindex="-1">
                             <div class="modal-dialog modal-lg modal-dialog-scrollable">
-                                <form class="modal-content" method="POST" enctype="multipart/form-data">
+                                <form class="modal-content" method="POST" action="api_save_menu.php" enctype="multipart/form-data">
                                     <div class="modal-header border-0 pt-4 px-4 text-dark"><h3 class="fw-bold m-0">✏️ แก้ไขเมนู</h3><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                                     <div class="modal-body px-4 text-start text-dark">
                                         <div class="mb-4">
@@ -267,7 +183,7 @@ include '../includes/nav_owner.php';
 
 <div class="modal fade" id="addMenuModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
-        <form class="modal-content" method="POST" enctype="multipart/form-data">
+        <form class="modal-content" method="POST" action="api_save_menu.php" enctype="multipart/form-data">
             <div class="modal-header border-0 pt-4 px-4 text-dark"><h3 class="fw-bold m-0">➕ เพิ่มรายการใหม่</h3><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body px-4 text-start text-dark">
                 <div class="section-label">1. ข้อมูลพื้นฐาน</div>
@@ -317,57 +233,9 @@ include '../includes/nav_owner.php';
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="<?= BASE_URL ?>assets/js/owner-manage-menu.js"></script>
 
 <script>
-function selectAll(groupClassName) {
-    const checkboxes = document.querySelectorAll('.' + groupClassName);
-    let allChecked = true;
-    checkboxes.forEach(cb => { if (!cb.checked) allChecked = false; });
-    checkboxes.forEach(cb => { cb.checked = !allChecked; });
-}
-
-function changeStatus(id, newStatus) {
-    if(confirm('ยืนยันการเปลี่ยนสถานะเมนูนี้?')) {
-        let formData = new FormData();
-        formData.append('update_status_id', id);
-        formData.append('new_status_val', newStatus);
-
-        fetch('manage_menu.php', { method: 'POST', body: formData })
-        .then(response => response.text())
-        .then(data => {
-            if(data.trim() === 'success') {
-                let btn = document.getElementById('status-btn-' + id);
-                if(newStatus === 1) {
-                    btn.className = 'status-btn status-green';
-                    btn.innerHTML = '● พร้อมขาย';
-                    btn.setAttribute('onclick', 'changeStatus(' + id + ', 0)');
-                } else {
-                    btn.className = 'status-btn status-gray';
-                    btn.innerHTML = '● ไม่พร้อมขาย';
-                    btn.setAttribute('onclick', 'changeStatus(' + id + ', 1)');
-                }
-            } else { 
-                Swal.fire({icon: 'error', title: 'เกิดข้อผิดพลาด!'}); 
-            }
-        });
-    }
-}
-
-// ✅ แสดงแอนิเมชัน Loading หมุนๆ ตอนกดบันทึกข้อมูล
-document.querySelectorAll('form').forEach(form => {
-    form.addEventListener('submit', function(e) {
-        Swal.fire({
-            title: 'กำลังบันทึกข้อมูล...',
-            html: 'กรุณารอสักครู่',
-            allowOutsideClick: false,
-            showConfirmButton: false,
-            didOpen: () => {
-                Swal.showLoading()
-            }
-        });
-    });
-});
-
 // ✅ แจ้งเตือนเมื่อบันทึกข้อมูลหรือลบข้อมูลสำเร็จ (ปิดตัวเองอัตโนมัติ)
 <?php if (isset($_SESSION['success_msg'])): ?>
     Swal.fire({
