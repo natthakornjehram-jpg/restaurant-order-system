@@ -18,59 +18,7 @@ $res = $conn->query($sql);
 $queue_count = $res ? $res->num_rows : 0;
 ?>
 
-<style>
-    body, .main-content { 
-        background-color: #f0f2f5; 
-        font-family: 'Sarabun', sans-serif; 
-        min-height: 100vh;
-    }
-    .soft-card { 
-        background: #ffffff; 
-        border-radius: 15px; 
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05); 
-        transition: 0.3s;
-        position: relative;
-        overflow: hidden;
-    }
-    /* ดีไซน์รอยปรุแบบใบเสร็จ */
-    .soft-card::before {
-        content: "";
-        position: absolute;
-        top: 0; left: 0; right: 0;
-        height: 4px;
-        background-image: linear-gradient(to right, #3b82f6 50%, transparent 50%);
-        background-size: 20px 4px;
-    }
-    .card-header-soft {
-        padding: 18px;
-        border-bottom: 2px dashed #edf2f7;
-    }
-    .bg-soft-pending { background-color: #fffaf0; border-left: 5px solid #f6ad55; }
-    .bg-soft-cooking { background-color: #ebf8ff; border-left: 5px solid #4299e1; }
-    
-    .order-id { font-size: 1.1rem; font-weight: 800; color: #2d3748; }
-    .time-badge { background: #f7fafc; border: 1px solid #edf2f7; color: #718096; padding: 4px 10px; border-radius: 8px; font-size: 0.8rem; }
-    
-    .order-item-qty { 
-        background: #3b82f6; color: white; 
-        min-width: 28px; height: 28px; 
-        display: inline-flex; align-items: center; justify-content: center;
-        border-radius: 6px; font-weight: 800; margin-right: 10px; font-size: 0.9rem;
-    }
-    .order-item-name { font-size: 1.1rem; color: #2d3748; font-weight: 700; }
-    .topping-text { color: #718096; font-size: 0.85rem; padding-left: 38px; margin-top: -3px; }
-    
-    .note-box { 
-        background: #fff5f5; border-radius: 8px; color: #c53030; 
-        padding: 8px 12px; font-size: 0.85rem; font-weight: 600;
-        margin-left: 38px; border: 1px solid #feb2b2;
-    }
-
-    .btn-action { border-radius: 12px; font-weight: 700; padding: 12px; transition: 0.2s; border: none; }
-    .btn-start { background-color: #4a5568; color: white; }
-    .btn-done { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; }
-</style>
+<link rel="stylesheet" href="<?= BASE_URL ?>assets/css/owner-manage-orders.css">
 
 <div class="main-content container-fluid pb-5 px-4 pt-4">
     <div class="d-flex justify-content-between align-items-center mb-4" style="margin-top: 60px;">
@@ -172,27 +120,6 @@ $queue_count = $res ? $res->num_rows : 0;
     </div>
 </div>
 
-<script>
-function changeStatus(orderId, nextStatus) {
-    const fd = new FormData();
-    fd.append('order_id', orderId);
-    fd.append('new_status', nextStatus);
-
-    fetch('api_update_order_status.php', { method: 'POST', body: fd })
-    .then(r => r.json())
-    .then(d => { 
-        if(d.success) location.reload(); 
-        else alert('Error: ' + d.error);
-    })
-    .catch(err => console.error('Error:', err));
-}
-
-// ตรวจสอบออเดอร์ใหม่ทุก 10 วินาที
-setInterval(function(){
-    if(document.querySelectorAll('.modal.show').length === 0) {
-        location.reload();
-    }
-}, 10000); 
-</script>
+<script src="<?= BASE_URL ?>assets/js/owner-manage-orders.js"></script>
 
 <?php include '../includes/footer_owner.php';?>

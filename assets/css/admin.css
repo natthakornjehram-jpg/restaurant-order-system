@@ -1,0 +1,45 @@
+/* Shared theme for admin panel pages (admin/*.php) */
+:root {
+    --admin-dark: #212529;
+    --admin-accent: #343a40;
+    --danger-red: #dc3545;
+}
+
+body {
+    font-family: 'Sarabun', sans-serif;
+    background-color: #f8f9fa; /* พื้นหลังสีเทาอ่อนแบบ Dashboard */
+    color: #212529;
+}
+
+h1, h2, h3, .navbar-brand {
+    font-family: 'Mitr', sans-serif;
+}
+
+/* ตกแต่งตารางในหน้า Admin */
+.table {
+    background: white;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.table thead {
+    background-color: var(--admin-dark);
+    color: white;
+}
+
+/* ตกแต่ง Sidebar หรือ Card สรุปผล */
+.admin-card {
+    border: none;
+    border-radius: 15px;
+    transition: 0.3s;
+}
+
+.admin-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+}
+
+/* สีพิเศษสำหรับ Admin */
+.bg-admin-dark { background-color: var(--admin-dark) !important; }
+.text-admin { color: var(--admin-dark); }

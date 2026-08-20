@@ -45,70 +45,7 @@ $pending_list_sql = "SELECT * FROM orders ORDER BY created_at DESC LIMIT 8";
 $pending_list_res = $conn->query($pending_list_sql);
 ?>
 
-<style>
-    /* 🎨 CSS เฉพาะหน้า Dashboard */
-    body { background-color: #f0f4f7; }
-    
-    .dashboard-scope { 
-        background-color: #f0f4f7; 
-        min-height: 100vh; 
-        font-family: 'Sarabun', sans-serif; 
-        padding-top: 85px; 
-        padding-bottom: 50px;
-    }
-    
-    @media (min-width: 768px) {
-        .dashboard-scope {
-            padding-top: 100px; 
-        }
-    }
-    
-    /* 🌟 กรอบสถิติข้างบน */
-    .dashboard-scope .stat-link { text-decoration: none !important; color: inherit; display: block; }
-    .dashboard-scope .stat-card-top { 
-        background: #fff; border-radius: 24px; padding: 25px; 
-        border: 3px solid #dee2e6; transition: 0.3s;
-    }
-    .dashboard-scope .stat-card-top:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
-    
-    /* สีขอบกรอบสถิติ */
-    .dashboard-scope .border-sales   { border-color: #2ecc71 !important; background-color: #f9fffb; } 
-    .dashboard-scope .border-pending { border-color: #f1c40f !important; background-color: #fffef5; } 
-    .dashboard-scope .border-unpaid  { border-color: #3498db !important; background-color: #f5faff; } 
-
-    .dashboard-scope .stat-label { font-size: 1.05rem; font-weight: 700; color: #6c757d; display: block; margin-bottom: 5px; }
-    .dashboard-scope .stat-value { font-size: 2.6rem; font-weight: 900; line-height: 1; }
-
-    /* ปุ่มเปิด/ปิด (Toggle) */
-    .dashboard-scope .btn-toggle { 
-        border-radius: 15px; font-weight: 700; padding: 10px 20px; border: none; 
-        transition: 0.3s; min-width: 150px; color: #fff !important; 
-    }
-    .dashboard-scope .bg-shop-open { background-color: #27ae60; }
-    .dashboard-scope .bg-online-open { background-color: #2980b9; }
-    .dashboard-scope .bg-status-closed { background-color: #c0392b; }
-
-    /* 🌟 กรอบออเดอร์ข้างล่าง */
-    .dashboard-scope .order-item-box {
-        border: 3px solid #e9ecef; border-radius: 25px; background: #fff;
-        overflow: hidden; transition: 0.3s; position: relative;
-    }
-    .dashboard-scope .order-tag {
-        font-size: 0.75rem; font-weight: 800; padding: 5px 15px;
-        border-radius: 0 0 12px 12px; color: #fff; display: inline-block;
-    }
-    .dashboard-scope .tag-onsite { background: #495057; } 
-    .dashboard-scope .tag-online { background: #d63384; } 
-
-    /* สีขอบการ์ดออเดอร์ตามสถานะ */
-    .dashboard-scope .st-border-pending { border-color: #f1c40f; } 
-    .dashboard-scope .st-border-cooking { border-color: #3498db; }
-    .dashboard-scope .st-border-ready   { border-color: #fd7e14; }
-    .dashboard-scope .st-border-paid    { border-color: #2ecc71; }
-
-    .dashboard-scope .table-title { font-size: 1.7rem; font-weight: 800; color: #343a40; }
-    .dashboard-scope .status-badge { font-size: 0.85rem; font-weight: 700; padding: 6px 16px; border-radius: 50px; }
-</style>
+<link rel="stylesheet" href="<?= BASE_URL ?>assets/css/owner-dashboard.css">
 
 <div class="dashboard-scope container-fluid px-4 text-dark">
     <div class="pb-3 mb-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center border-bottom border-secondary border-opacity-10">
