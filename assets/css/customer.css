@@ -1,0 +1,54 @@
+/* Shared theme for customer-facing pages (menu.php, member/*.php, qr_table/*.php) */
+:root {
+    --main-brown: #795548;
+    --dark-brown: #3e2723;
+    --light-brown: #d7ccc8;
+    --bg-soft: #fdfaf5; /* สีครีมเบจจางๆ สบายตา */
+}
+
+body {
+    font-family: 'Sarabun', sans-serif;
+    background-color: var(--bg-soft);
+    color: var(--dark-brown);
+    margin: 0;
+    padding: 0;
+}
+
+h1, h2, h3, h4, h5, h6, .font-mitr {
+    font-family: 'Mitr', sans-serif;
+}
+
+/* ตกแต่ง Card ให้เข้าธีมน้ำตาล */
+.card {
+    border: none;
+    border-radius: 20px;
+    box-shadow: 0 10px 25px rgba(62, 39, 35, 0.05);
+}
+
+/* ปุ่มสีน้ำตาลหลัก */
+.btn-primary-brown {
+    background-color: var(--main-brown);
+    color: white;
+    border: none;
+    border-radius: 50px;
+    padding: 10px 25px;
+    transition: 0.3s;
+}
+
+.btn-primary-brown:hover {
+    background-color: var(--dark-brown);
+    color: white;
+    transform: translateY(-2px);
+}
+
+/* ปรับแต่ง Scrollbar ให้ดูแพง */
+::-webkit-scrollbar {
+    width: 8px;
+}
+::-webkit-scrollbar-track {
+    background: var(--bg-soft);
+}
+::-webkit-scrollbar-thumb {
+    background: var(--main-brown);
+    border-radius: 10px;
+}

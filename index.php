@@ -23,81 +23,8 @@ $is_online_open = $store['is_online_open'] ?? 0;
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600&family=Sarabun:wght@300;400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    
-    <style>
-        body, html {
-            height: 100%;
-            margin: 0;
-            font-family: 'Sarabun', sans-serif;
-            background-color: #3e2723;
-        }
-        
-        h1, h2, h3, .font-mitr {
-            font-family: 'Mitr', sans-serif;
-        }
 
-        .hero-section {
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            background: linear-gradient(135deg, rgba(62, 39, 35, 0.9), rgba(121, 85, 72, 0.8));
-            color: white;
-            text-align: center;
-            padding: 20px;
-            position: relative;
-        }
-
-        .store-icon {
-            font-size: 5rem;
-            color: #ffb300;
-            margin-bottom: 20px;
-            text-shadow: 0 4px 15px rgba(255, 179, 0, 0.3);
-        }
-
-        .btn-order {
-            background-color: #ff9800;
-            color: white;
-            font-size: 1.3rem;
-            padding: 15px 40px;
-            border-radius: 50px;
-            font-weight: bold;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            margin-top: 20px;
-            box-shadow: 0 8px 25px rgba(255, 152, 0, 0.4);
-            border: 2px solid transparent;
-        }
-        
-        .btn-order:hover {
-            background-color: #e68a00;
-            color: white;
-            transform: translateY(-5px);
-            box-shadow: 0 12px 30px rgba(255, 152, 0, 0.5);
-        }
-
-        .owner-link {
-            position: absolute;
-            bottom: 30px;
-            color: rgba(255, 255, 255, 0.5);
-            font-size: 0.9rem;
-            text-decoration: none;
-            transition: 0.3s;
-        }
-        
-        .owner-link:hover {
-            color: white;
-            text-decoration: underline;
-        }
-
-        .status-alert {
-            max-width: 400px;
-            width: 100%;
-            border-radius: 15px;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-        }
-    </style>
+    <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/index.css">
 </head>
 <body>
 
