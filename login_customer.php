@@ -69,67 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <style>
-        :root {
-            --theme-color: #d35400; /* สีส้มน้ำตาล (Burnt Orange) */
-            --theme-hover: #a04000; /* สีส้มน้ำตาลเข้มตอนเอาเมาส์ชี้ */
-            --theme-light: #fef5ec; /* สีพื้นหลังไอคอนอ่อนๆ */
-        }
-        
-        body { 
-            background-color: #fcfaf8; 
-            font-family: 'Sarabun', sans-serif; 
-            min-height: 100vh; /* ใช้ min-height เพื่อให้ยืดหยุ่น */
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            padding: 40px 15px; /* ดันไม่ให้ชิดขอบบน-ล่างเกินไป */
-        }
-        
-        .login-card { 
-            width: 100%; 
-            max-width: 420px; 
-            background: white; 
-            padding: 40px 30px; 
-            border-radius: 25px; 
-            box-shadow: 0 20px 40px rgba(211, 84, 0, 0.08); /* เงาสีส้มน้ำตาลบางๆ ให้ดูสวยและลอยขึ้น */
-            border: 1px solid #f9f1ea;
-        }
-        
-        .form-control { 
-            border-radius: 12px; 
-            padding: 12px; 
-            border: 1px solid #e2e8f0; 
-            background-color: #fcfcfc; 
-        }
-        
-        .form-control:focus { 
-            border-color: var(--theme-color); 
-            box-shadow: 0 0 0 3px rgba(211, 84, 0, 0.15); 
-            background: #fff; 
-        }
-        
-        .btn-theme { 
-            background: var(--theme-color); 
-            color: white; 
-            border: none; 
-            border-radius: 50px; 
-            padding: 12px; 
-            font-weight: bold; 
-            width: 100%; 
-            transition: 0.3s; 
-        }
-        
-        .btn-theme:hover { 
-            background: var(--theme-hover); 
-            color: white; 
-            transform: translateY(-3px); /* ปุ่มลอยขึ้นตอนเมาส์ชี้ */
-            box-shadow: 0 8px 20px rgba(211, 84, 0, 0.2);
-        }
-
-        .text-theme { color: var(--theme-color) !important; }
-        .bg-theme-light { background-color: var(--theme-light) !important; }
-    </style>
+    <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/auth.css">
 </head>
 <body>
     <div class="container px-3">
