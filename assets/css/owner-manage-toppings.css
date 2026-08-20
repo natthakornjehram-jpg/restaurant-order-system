@@ -1,0 +1,3 @@
+.out-of-stock { opacity: 0.6; background-color: #f8f9fa; }
+.out-of-stock .topping-name { text-decoration: line-through; color: #6c757d; }
+.btn-status { font-size: 0.7rem; font-weight: bold; width: 75px; }

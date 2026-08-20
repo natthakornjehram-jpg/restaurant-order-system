@@ -34,23 +34,7 @@ $sql_eating = "SELECT * FROM orders
 $res_eating = $conn->query($sql_eating);
 ?>
 
-<style>
-    body,.main-content { background-color: #f7f9fc; font-family: 'Sarabun', sans-serif; min-height: 100vh; }
-    .soft-card { background: #ffffff; border-radius: 20px; border: none; box-shadow: 0 8px 25px rgba(0, 0, 0, 0.03); transition: 0.3s; }
-    .soft-card:hover { transform: translateY(-5px); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.06); }
-    .badge-soft-warning { background-color: #fffbeb; color: #b45309; padding: 8px 16px; border-radius: 50px; font-weight: bold; }
-    .badge-soft-info { background-color: #eff6ff; color: #1d4ed8; padding: 8px 16px; border-radius: 50px; font-weight: bold; }
-    .badge-soft-success { background-color: #ecfdf5; color: #047857; padding: 8px 16px; border-radius: 50px; font-weight: bold; }
-    .order-id { font-size: 1.3rem; font-weight: 800; color: #2d3748; }
-    .total-price { font-size: 2rem; font-weight: 800; color: #059669; line-height: 1; }
-    .slip-image-box { background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 16px; padding: 10px; text-align: center; }
-    .slip-image-box img { max-width: 100%; max-height: 400px; border-radius: 10px; object-fit: contain; cursor: zoom-in; }
-    
-    /* สไตล์ปุ่ม Tab */
-    .nav-pills .nav-link { color: #64748b; font-weight: bold; border-radius: 50px; padding: 10px 20px; margin-right: 10px; transition: 0.3s; }
-    .nav-pills .nav-link.active { background-color: #1e293b; color: white; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-    .nav-pills .nav-link:hover:not(.active) { background-color: #e2e8f0; }
-</style>
+<link rel="stylesheet" href="<?= BASE_URL ?>assets/css/owner-manage-payments.css">
 
 <div class="main-content container-fluid text-dark pb-5 px-4 pt-4" style="margin-top: 80px;">
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -177,46 +161,6 @@ $res_eating = $conn->query($sql_eating);
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-// ฟังก์ชันสำหรับอนุมัติออเดอร์ออนไลน์ (โอนเงินผ่านสลิปชัวร์ๆ)
-function approvePayment(orderId, paymentMethod) {
-    if (confirm('ยืนยันยอดเงินและอนุมัติออเดอร์นี้?')) {
-        sendPaymentData(orderId, paymentMethod);
-    }
-}
-
-// ฟังก์ชันสำหรับลูกค้าหน้าร้าน (ดึงค่าจาก Dropdown ว่าจ่ายสดหรือโอน)
-function approveDineInPayment(orderId) {
-    const method = document.getElementById('payMethod_' + orderId).value;
-    if (confirm('ยืนยันการรับเงินหน้าร้านแบบ ' + (method === 'cash' ? 'เงินสด' : 'โอนเงิน') + ' ใช่หรือไม่?')) {
-        sendPaymentData(orderId, method);
-    }
-}
-
-// ส่งข้อมูลไปให้ API (ใช้ร่วมกันได้เลย)
-function sendPaymentData(orderId, method) {
-    const fd = new FormData();
-    fd.append('order_id', orderId);
-    fd.append('method', method); // ส่งไปบอก API ด้วยว่าจ่ายแบบไหน (เอาไปลงตาราง payment)
-
-    fetch('api_approve_payment.php', { 
-        method: 'POST', 
-        body: fd 
-    })
-    .then(res => res.json())
-    .then(data => {
-        if(data.success) {
-            alert('บันทึกการชำระเงินเรียบร้อย!');
-            location.reload(); 
-        } else {
-            alert('ผิดพลาด: ' + (data.error || data.message));
-        }
-    })
-    .catch(err => {
-        console.error(err);
-        alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
-    });
-}
-</script>
+<script src="<?= BASE_URL ?>assets/js/owner-manage-payments.js"></script>
 
 <?php include '../includes/footer_owner.php';?>
