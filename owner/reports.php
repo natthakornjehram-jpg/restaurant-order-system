@@ -55,7 +55,7 @@ $reports_res = $stmt_rep->get_result();
     .table tbody td { border-bottom: 1px solid #f1f1f1; padding: 15px; vertical-align: middle; }
 </style>
 
-<div class="main-content container-fluid pb-5" style="margin-top: 80px;">
+<div class="main-content container-fluid pb-5">
     <div class="pt-4 pb-3 mb-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center border-bottom">
         <div>
             <h3 class="fw-bold mb-1">รายงานการขาย</h3>

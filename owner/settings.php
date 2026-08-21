@@ -79,7 +79,7 @@ include '../includes/header_owner.php';
 include '../includes/nav_owner.php'; 
 ?>
 
-<div class="main-content container py-5" style="margin-top: 70px;">
+<div class="main-content container py-5">
     <div class="row justify-content-center">
         <div class="col-lg-10">
             <div class="d-flex justify-content-between align-items-center mb-4">

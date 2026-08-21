@@ -13,7 +13,7 @@ include '../includes/header_owner.php';
 include '../includes/nav_owner.php'; 
 ?>
 
-<div class="main-content container-fluid text-dark" style="margin-top: 80px;">
+<div class="main-content container-fluid text-dark">
     <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-4 border-bottom">
         <h1 class="h2 fw-bold"><i class="bi bi-tags me-2 text-primary"></i>จัดการหมวดหมู่อาหาร</h1>
         <a href="manage_menu.php" class="btn btn-secondary rounded-pill px-4">กลับหน้าจัดการเมนู</a>

@@ -36,7 +36,7 @@ include '../includes/nav_owner.php';
 
 <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/owner-manage-menu.css">
 
-<div class="main-content container-fluid p-4 dashboard-spacing text-dark" style="margin-top: 60px;">
+<div class="main-content container-fluid p-4 dashboard-spacing text-dark">
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
         <h2 class="fw-bold text-dark m-0"><i class="bi bi-folder-fill text-warning me-2"></i>เมนูอาหารในร้าน</h2>
         <div class="d-flex flex-column flex-sm-row gap-2">

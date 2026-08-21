@@ -32,7 +32,7 @@ include '../includes/header_owner.php';
 include '../includes/nav_owner.php'; 
 ?>
 
-<div class="main-content container-fluid" style="padding-top: 100px;">
+<div class="main-content container-fluid">
     <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-4 border-bottom text-dark">
         <h1 class="h2 fw-bold"><i class="bi bi-grid-3x3-gap me-2"></i>จัดการโต๊ะอาหาร</h1>
         <button class="btn btn-primary rounded-pill px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#addTableModal">
@@ -150,6 +150,6 @@ include '../includes/nav_owner.php';
 </div>
 
 <script>const BASE_URL = "<?= BASE_URL ?>";</script>
-<script src="<?= BASE_URL ?>assets/js/owner-manage-tables.js"></script>
+<script src="<?= BASE_URL ?>assets/js/owner-manage-tables.js?v=<?= @filemtime(__DIR__ . '/../assets/js/owner-manage-tables.js') ?>"></script>
 
 <?php include '../includes/footer_owner.php'; ?>

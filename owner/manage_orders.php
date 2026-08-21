@@ -29,7 +29,7 @@ $queue_count = $res ? $res->num_rows : 0;
 <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/owner-manage-orders.css">
 
 <div class="main-content container-fluid pb-5 px-4 pt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4" style="margin-top: 60px;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h2 class="fw-bold mb-0" style="color: #1a202c;">
                 <i class="bi bi-receipt text-primary me-2 shadow-sm"></i>รายการรอทำอาหาร

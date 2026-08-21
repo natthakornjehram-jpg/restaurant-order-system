@@ -36,7 +36,7 @@ $res_eating = $conn->query($sql_eating);
 
 <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/owner-manage-payments.css">
 
-<div class="main-content container-fluid text-dark pb-5 px-4 pt-4" style="margin-top: 80px;">
+<div class="main-content container-fluid text-dark pb-5 px-4 pt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div class="d-flex align-items-center">
             <a href="dashboard.php" class="btn btn-white rounded-circle me-3 shadow-sm d-flex align-items-center justify-content-center" style="width: 45px; height: 45px; border: 1px solid #edf2f7; background: #ffffff; color: #4a5568;">
