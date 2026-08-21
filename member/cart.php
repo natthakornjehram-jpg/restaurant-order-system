@@ -46,7 +46,7 @@ include '../includes/nav_customer.php';
             <div class="py-5">
                 <i class="bi bi-basket2 display-1 text-muted opacity-25"></i>
                 <p class="mt-3 text-muted fw-bold">ยังไม่มีอาหารในตะกร้าของคุณ</p>
-                <a href="menu.php" class="btn btn-brown rounded-pill px-5 py-2 mt-2">ดูเมนูอาหารตอนนี้</a>
+                <a href="../menu.php" class="btn btn-brown rounded-pill px-5 py-2 mt-2">ดูเมนูอาหารตอนนี้</a>
             </div>
         </div>
     <?php else: ?>

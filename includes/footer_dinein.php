@@ -12,21 +12,40 @@
             </div>
         </div>
     </div>
-    <audio id="customerAlertSound" src="../assets/sounds/food_ready.mp3" preload="auto"></audio>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-    let hasNotified = false; 
+    // เสียงแจ้งเตือน สร้างเองด้วย Web Audio API (ไม่ต้องพึ่งไฟล์เสียงภายนอก เหมือนฝั่งเจ้าของร้าน)
+    function playFoodReadySound() {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const now = ctx.currentTime;
+            [660, 990, 1320].forEach((freq, i) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0, now + i * 0.15);
+                gain.gain.linearRampToValueAtTime(0.35, now + i * 0.15 + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.15 + 0.35);
+                osc.connect(gain).connect(ctx.destination);
+                osc.start(now + i * 0.15);
+                osc.stop(now + i * 0.15 + 0.4);
+            });
+        } catch (e) {
+            console.warn('เล่นเสียงแจ้งเตือนไม่ได้:', e);
+        }
+    }
+
+    let hasNotified = false;
     function checkMyFoodStatus() {
         if (hasNotified) return;
-        fetch('../member/api_check_my_order.php') 
+        fetch('../member/api_check_my_order.php')
             .then(response => response.json())
             .then(data => {
                 if (data.food_ready === true) {
-                    let sound = document.getElementById('customerAlertSound');
-                    if(sound) sound.play().catch(e => console.log("Sound blocked by browser"));
-                    
+                    playFoodReadySound();
+
                     let toastEl = document.getElementById('foodReadyToast');
                     let toast = new bootstrap.Toast(toastEl);
                     toast.show();
