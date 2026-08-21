@@ -3,6 +3,10 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+
+// กันหน้านี้โดนแคชไว้ในเบราว์เซอร์ (เจอปัญหาเบราว์เซอร์โหลด Bootstrap เวอร์ชันเก่าค้างจากแคช)
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Pragma: no-cache");
 ?>
 <!DOCTYPE html>
 <html lang="th">

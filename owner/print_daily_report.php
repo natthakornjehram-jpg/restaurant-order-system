@@ -48,7 +48,7 @@ $summary = $summary ?: ['cash'=>0, 'transfer'=>0, 'total'=>0, 'count'=>0];
 <head>
     <meta charset="UTF-8">
     <title>รายงานสรุปรายได้ - <?php echo htmlspecialchars($restaurant_name); ?></title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700;800&display=swap');
         body { font-family: 'Sarabun', sans-serif; color: #333; padding: 40px; background: #fff; line-height: 1.6; }
@@ -127,4 +127,10 @@ $summary = $summary ?: ['cash'=>0, 'transfer'=>0, 'total'=>0, 'count'=>0];
         </div>
 
         <div class="no-print" style="margin-top: 40px; text-align: center;">
-            <button onclick="window.close()" style="padding: 12px 30px; border-radius: 50px; border: 1px solid #e2e8f0; background: #fff; cursor: pointer; font-weight: bold; color: #47
+            <button onclick="window.close()" style="padding: 12px 30px; border-radius: 50px; border: 1px solid #e2e8f0; background: #fff; cursor: pointer; font-weight: bold; color: #475569;">
+                <i class="bi bi-x-lg me-1"></i> ปิดหน้าต่าง
+            </button>
+        </div>
+    </div>
+</body>
+</html>

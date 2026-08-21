@@ -5,6 +5,10 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 require_once '../includes/db.php';
 
+// กันหน้านี้โดนแคชไว้ในเบราว์เซอร์ (เจอปัญหาเบราว์เซอร์โหลด Bootstrap เวอร์ชันเก่าค้างจากแคช)
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Pragma: no-cache");
+
 // ดึงชื่อร้านมาแสดงบน Title Bar (ดึงจากตาราง owner โดยตรง)
 $owner_id = $_SESSION['owner_id'] ?? 0;
 $stmt_h = $conn->prepare("SELECT restaurant_name FROM owner WHERE owner_id = ? LIMIT 1");
