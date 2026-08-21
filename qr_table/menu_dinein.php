@@ -22,6 +22,7 @@ if (isset($_GET['table']) && !empty($_GET['table'])) {
 
     // สแกนใหม่ทุกครั้ง ให้เลือกประเภทออเดอร์ใหม่เสมอ (กันพลาดจากรอบก่อนหน้า)
     unset($_SESSION['order_type']);
+    unset($_SESSION['has_ordered']);
 } elseif (!isset($_SESSION['table_id'])) {
     echo "<script>alert('กรุณาสแกน QR Code ที่โต๊ะก่อนสั่งอาหารครับ'); window.location='../index.php';</script>";
     exit;

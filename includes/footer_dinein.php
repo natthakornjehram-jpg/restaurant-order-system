@@ -36,9 +36,26 @@
             }).catch(err => console.error(err));
     }
     
+    let billClosed = false;
+    function checkBillClosed() {
+        if (billClosed) return;
+        fetch('../qr_table/api_check_bill.php')
+            .then(response => response.json())
+            .then(data => {
+                if (data.closed === true) {
+                    billClosed = true;
+                    alert('ขอบคุณค่ะ แล้วพบกันใหม่ 🙏');
+                    fetch('../qr_table/end_session.php').finally(function() {
+                        window.location.replace('https://www.google.com/');
+                    });
+                }
+            }).catch(err => console.error(err));
+    }
+
     // เริ่มทำงานเมื่อโหลดหน้าเว็บเสร็จ
     document.addEventListener("DOMContentLoaded", function() {
         setInterval(checkMyFoodStatus, 5000);
+        setInterval(checkBillClosed, 5000);
     });
     </script>
 

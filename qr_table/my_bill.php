@@ -3,6 +3,10 @@
 session_start();
 require_once '../includes/db.php';
 
+// กันหน้านี้โดนแคชไว้ในเบราว์เซอร์ (สำคัญเวลากดปุ่มย้อนกลับหลังปิดออเดอร์ไปแล้ว)
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Pragma: no-cache");
+
 // เช็กว่ามีการสแกนโต๊ะมาจริงไหม
 if (!isset($_SESSION['table_id'])) {
     echo "<script>alert('กรุณาสแกน QR Code ที่โต๊ะก่อนครับ'); window.location='../index.php';</script>";

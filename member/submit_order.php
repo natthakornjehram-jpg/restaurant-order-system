@@ -67,17 +67,11 @@ if ($stmt_order->execute()) {
     // 6. เคลียร์ตะกร้าทิ้งเมื่อสั่งสำเร็จ
     unset($_SESSION['cart']);
 
-    // 7. ถ้ามาจากการสแกน QR ที่โต๊ะ (มี table_id) ให้จบรอบการสั่งของโต๊ะนี้ไปเลย
-    //    เคลียร์ session โต๊ะทิ้ง กันลูกค้ากดปุ่มย้อนกลับแล้วสั่งซ้ำ ต้องสแกนใหม่เท่านั้น
+    // 7. ถ้ามาจากการสแกน QR ที่โต๊ะ (มี table_id) ให้กลับไปหน้าเมนูของโต๊ะเดิม
+    //    (ยังไม่จบรอบ! ลูกค้าอาจสั่งเพิ่ม หรือกดดูสถานะ/บิลได้ จนกว่าร้านจะปิดบิลจริง)
     if ($table_id) {
-        unset($_SESSION['table_id']);
-        unset($_SESSION['table_number']);
-        unset($_SESSION['order_type']);
-
-        echo "<script>
-            alert('ขอบคุณค่ะ แล้วพบกันใหม่ 🙏');
-            window.location.replace('https://www.google.com/');
-        </script>";
+        $_SESSION['has_ordered'] = true; // ใช้เช็กตอนโพลว่าเมื่อร้านปิดบิลแล้วให้เด้งออก (ดู qr_table/api_check_bill.php)
+        header("Location: ../qr_table/menu_dinein.php?table=" . urlencode($_SESSION['table_number'] ?? '') . "&order_success=1");
         exit;
     }
 

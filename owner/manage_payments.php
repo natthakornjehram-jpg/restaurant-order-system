@@ -93,6 +93,34 @@ $res_eating = $conn->query($sql_eating);
                         </div>
                     </div>
                 </div>
+
+                <div class="modal fade" id="payModal<?php echo $row['order_id'];?>" tabindex="-1">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content rounded-4 border-0">
+                            <div class="modal-header border-0">
+                                <h5 class="modal-title fw-bold">ตรวจสลิป ออเดอร์ #<?php echo str_pad($row['order_id'], 5, '0', STR_PAD_LEFT);?></h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body text-center">
+                                <?php if (!empty($row['slip_image'])): ?>
+                                    <img src="../assets/images/slips/<?php echo htmlspecialchars($row['slip_image']);?>" class="img-fluid rounded-3 mb-3" style="max-height: 400px;" alt="สลิปโอนเงิน">
+                                <?php else: ?>
+                                    <p class="text-muted">ไม่พบรูปสลิป</p>
+                                <?php endif; ?>
+                                <?php if (!empty($row['transaction_ref'])): ?>
+                                    <p class="small text-muted mb-2">เลขอ้างอิง: <?php echo htmlspecialchars($row['transaction_ref']);?></p>
+                                <?php endif; ?>
+                                <div class="total-price text-primary fw-bold">ยอด ฿<?php echo number_format($row['total_amount'], 2);?></div>
+                            </div>
+                            <div class="modal-footer border-0">
+                                <button type="button" class="btn btn-outline-secondary rounded-3" data-bs-dismiss="modal">ปิด</button>
+                                <button type="button" class="btn btn-primary rounded-3 fw-bold" onclick="approvePayment(<?php echo $row['order_id'];?>, 'transfer')">
+                                    <i class="bi bi-check-circle me-1"></i> อนุมัติ ยืนยันยอดเงิน
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <?php endwhile; else: ?>
                     <div class="col-12 text-center py-5"><h5 class="text-muted"><i class="bi bi-check-circle"></i> ไม่มีสลิปออนไลน์รอตรวจ</h5></div>
                 <?php endif;?>
@@ -117,6 +145,31 @@ $res_eating = $conn->query($sql_eating);
                             <button class="btn btn-success w-100 rounded-3 py-2 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#payModal<?php echo $row['order_id'];?>">
                                 <i class="bi bi-cash-coin me-1"></i> ปิดบิลหน้าร้าน
                             </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal fade" id="payModal<?php echo $row['order_id'];?>" tabindex="-1">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content rounded-4 border-0">
+                            <div class="modal-header border-0">
+                                <h5 class="modal-title fw-bold">ปิดบิล โต๊ะ <?php echo htmlspecialchars($row['table_id']);?> · #<?php echo str_pad($row['order_id'], 5, '0', STR_PAD_LEFT);?></h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body text-center">
+                                <div class="total-price text-success fw-bold mb-3">ยอดสุทธิ ฿<?php echo number_format($row['total_amount'], 2);?></div>
+                                <label class="fw-bold small mb-2 d-block">รับเงินแบบไหน</label>
+                                <select id="payMethod_<?php echo $row['order_id'];?>" class="form-select rounded-3">
+                                    <option value="cash">เงินสด</option>
+                                    <option value="transfer">โอนเงิน</option>
+                                </select>
+                            </div>
+                            <div class="modal-footer border-0">
+                                <button type="button" class="btn btn-outline-secondary rounded-3" data-bs-dismiss="modal">ปิด</button>
+                                <button type="button" class="btn btn-success rounded-3 fw-bold" onclick="approveDineInPayment(<?php echo $row['order_id'];?>)">
+                                    <i class="bi bi-check-circle me-1"></i> ยืนยันรับเงิน
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
