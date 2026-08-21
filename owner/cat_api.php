@@ -75,11 +75,18 @@ if ($action == 'delete') {
     exit;
 }
 
-// --- เปิด/ปิด หมวดหมู่ (Toggle) ---
+// --- เปิด/ปิด หมวดหมู่ (Toggle) - ซ่อนจากเมนูลูกค้าโดยไม่ต้องลบ ---
 if ($action == 'toggle') {
-    // ปิดการทำงานส่วนนี้ไว้ แจ้งเตือนกลับไปที่หน้าเว็บ
-    // หากต้องการใช้งาน ต้องไปรันคำสั่ง SQL: ALTER TABLE `category` ADD `is_active` TINYINT(1) DEFAULT 1; 
-    echo json_encode(['success' => false, 'message' => 'ระบบซ่อนหมวดหมู่ยังไม่เปิดใช้งาน เนื่องจากไม่มีคอลัมน์สถานะในฐานข้อมูล']);
+    $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
+    $stmt = $conn->prepare("UPDATE category SET is_active = NOT is_active WHERE category_id = ?");
+    $stmt->bind_param("i", $id);
+
+    if ($stmt->execute()) {
+        echo json_encode(['success' => true]);
+    } else {
+        echo json_encode(['success' => false, 'message' => 'อัปเดตสถานะไม่สำเร็จ']);
+    }
+    $stmt->close();
     exit;
 }
 

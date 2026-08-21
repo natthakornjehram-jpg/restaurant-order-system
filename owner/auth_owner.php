@@ -6,7 +6,7 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 
 if (($_SESSION['role'] ?? '') !== 'owner' || empty($_SESSION['owner_id'])) {
     $script = basename($_SERVER['SCRIPT_NAME'] ?? '');
-    if (str_starts_with($script, 'api_') || str_ends_with($script, '_ajax.php')) {
+    if (str_starts_with($script, 'api_') || str_ends_with($script, '_ajax.php') || str_ends_with($script, '_api.php')) {
         http_response_code(401);
         header('Content-Type: application/json');
         echo json_encode(['success' => false, 'error' => 'Unauthorized']);
