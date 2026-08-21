@@ -13,78 +13,40 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $password = $_POST['password'];
     $remember = isset($_POST['remember']) ? true : false; // เช็กว่าติ๊กถูกช่องจดจำฉันไหม
 
-    $user_found = false;
-    $role = "";
-    $user_data = [];
-
-    // --- เช็กว่าเป็น Owner หรือไม่ ---
+    // --- ระบบร้านเดี่ยว: มีแต่บัญชีเจ้าของร้านเท่านั้น (ลูกค้าไม่ต้องสมัคร/ล็อกอิน) ---
     $stmt_owner = $conn->prepare("SELECT owner_id, password, is_active FROM owner WHERE username = ? LIMIT 1");
     $stmt_owner->bind_param("s", $username);
     $stmt_owner->execute();
     $res_owner = $stmt_owner->get_result();
-    
+
     if ($res_owner->num_rows > 0) {
         $user_data = $res_owner->fetch_assoc();
-        $role = "owner";
-        $user_found = true;
-    }
-
-    // --- ถ้าไม่ใช่ Owner ให้เช็กว่าเป็น Customer หรือไม่ ---
-    if (!$user_found) {
-        $stmt_cust = $conn->prepare("SELECT customer_id, password, is_active FROM customer WHERE username = ? LIMIT 1");
-        $stmt_cust->bind_param("s", $username);
-        $stmt_cust->execute();
-        $res_cust = $stmt_cust->get_result();
-        
-        if ($res_cust->num_rows > 0) {
-            $user_data = $res_cust->fetch_assoc();
-            $role = "customer";
-            $user_found = true;
-        }
-    }
-
-    // --- ตรวจสอบรหัสผ่านและสิทธิ์ ---
-    if ($user_found) {
         $stored_password = $user_data['password'];
         $legacy_password_matches = !password_get_info($stored_password)['algo']
             && hash_equals($stored_password, $password);
 
         if (password_verify($password, $stored_password) || $legacy_password_matches) {
-            
+
             if ($user_data['is_active'] == 0) {
-                if ($role === 'owner') {
-                    $error = "⌛ บัญชีเจ้าของร้านของคุณถูกระงับ หรืออยู่ระหว่างรออนุมัติครับ";
-                } else {
-                    $error = "❌ บัญชีลูกค้านี้ถูกระงับการใช้งานครับ";
-                }
+                $error = "⌛ บัญชีเจ้าของร้านของคุณถูกระงับ หรืออยู่ระหว่างรออนุมัติครับ";
             } else {
                 // ✅ เข้าสู่ระบบสำเร็จ
                 if ($legacy_password_matches) {
-                    $table = ($role === 'owner') ? 'owner' : 'customer';
-                    $id_column = ($role === 'owner') ? 'owner_id' : 'customer_id';
-                    $upgrade = $conn->prepare("UPDATE {$table} SET password = ? WHERE {$id_column} = ?");
                     $new_hash = password_hash($password, PASSWORD_DEFAULT);
-                    $account_id = (int) $user_data[$id_column];
-                    $upgrade->bind_param('si', $new_hash, $account_id);
+                    $upgrade = $conn->prepare("UPDATE owner SET password = ? WHERE owner_id = ?");
+                    $upgrade->bind_param('si', $new_hash, $user_data['owner_id']);
                     $upgrade->execute();
                 }
 
                 session_regenerate_id(true);
-                $_SESSION['role'] = $role;
-                $user_id = ($role === 'owner') ? $user_data['owner_id'] : $user_data['customer_id'];
+                $_SESSION['role'] = 'owner';
+                $_SESSION['owner_id'] = $user_data['owner_id'];
 
                 // ถ้าติ๊ก "จดจำฉัน 12 ชม." ให้สร้าง Cookie อายุ 12 ชั่วโมง (43,200 วินาที)
                 // The checkbox is retained in the UI but no longer creates an unsafe login cookie.
 
-                if ($role === 'owner') {
-                    $_SESSION['owner_id'] = $user_id;
-                    header("Location: owner/dashboard.php"); 
-                    exit;
-                } elseif ($role === 'customer') {
-                    $_SESSION['user_id'] = $user_id;
-                    header("Location: menu.php");
-                    exit;
-                }
+                header("Location: owner/dashboard.php");
+                exit;
             }
         } else {
             $error = "รหัสผ่านไม่ถูกต้อง";
@@ -126,6 +88,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <div class="alert alert-danger text-center rounded-4 border-0 mb-4 shadow-sm">
                     <i class="bi bi-exclamation-triangle-fill me-1"></i> <?= $error ?>
                 </div>
+            <?php endif; ?>
+
+            <?php if(isset($_SESSION['success_msg'])): ?>
+                <div class="alert alert-success text-center rounded-4 border-0 mb-4 shadow-sm">
+                    <i class="bi bi-check-circle-fill me-1"></i> <?= htmlspecialchars($_SESSION['success_msg']) ?>
+                </div>
+                <?php unset($_SESSION['success_msg']); ?>
             <?php endif; ?>
 
             <form method="POST">

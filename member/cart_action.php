@@ -2,12 +2,6 @@
 session_start();
 require_once '../includes/db.php';
 
-// 1. เช็กสิทธิ์: ต้องล็อกอินเป็นสมาชิก หรือเป็นแขกที่สแกน QR โต๊ะมาแล้ว (ไม่บังคับให้แขกที่โต๊ะต้องสมัครสมาชิก)
-if (!isset($_SESSION['customer_id']) && !isset($_SESSION['table_id'])) {
-    header("Location: ../login_customer.php");
-    exit;
-}
-
 $action = $_GET['action'] ?? '';
 
 // สร้างตะกร้าว่างๆ ถ้ายังไม่เคยมี

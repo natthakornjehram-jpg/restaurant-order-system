@@ -51,6 +51,20 @@ h1, h2, h3, .font-mitr {
     box-shadow: 0 12px 30px rgba(255, 152, 0, 0.5);
 }
 
+.btn-order-outline {
+    background-color: transparent;
+    color: #ffb300;
+    border: 2px solid #ffb300;
+    box-shadow: none;
+    margin-top: 0;
+}
+
+.btn-order-outline:hover {
+    background-color: rgba(255, 179, 0, 0.15);
+    color: #ffb300;
+    box-shadow: none;
+}
+
 .owner-link {
     position: absolute;
     bottom: 30px;

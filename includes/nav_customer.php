@@ -1,7 +1,6 @@
 <?php
 // nav_customer.php
 $current_page = basename($_SERVER['PHP_SELF']);
-$customer_name = $_SESSION['customer_name'] ?? 'สมาชิก';
 ?>
 
 <style>
@@ -64,55 +63,14 @@ $customer_name = $_SESSION['customer_name'] ?? 'สมาชิก';
 
            
             <div class="d-flex align-items-center mt-3 mt-lg-0">
-                
-                <?php if (isset($_SESSION['customer_id'])): ?>
-                   
-                    
-                    <a href="member/cart.php" class="btn btn-outline-dark rounded-pill me-3 position-relative">
-                        <i class="bi bi-cart3"></i>
-                        <?php if (!empty($_SESSION['cart'])): ?>
-                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-                                <?= count($_SESSION['cart']) ?>
-                            </span>
-                        <?php endif; ?>
-                    </a>
-
-                    <div class="dropdown">
-                        <button class="btn rounded-pill dropdown-toggle px-3 fw-bold" 
-                                style="background-color: var(--btn-coffee); color: white;"
-                                type="button" data-bs-toggle="dropdown">
-                            <i class="bi bi-person-circle me-1"></i>
-                            <?= htmlspecialchars($customer_name) ?>
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2 rounded-3">
-                            <li>
-                                <a class="dropdown-item" href="member/history.php">
-                                    <i class="bi bi-clock-history me-2"></i>ประวัติการสั่งซื้อ
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="member/profile.php">
-                                    <i class="bi bi-gear me-2"></i>ตั้งค่าโปรไฟล์
-                                </a>
-                            </li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li>
-                                <a class="dropdown-item text-danger" href="logout.php">
-                                    <i class="bi bi-box-arrow-right me-2"></i>ออกจากระบบ
-                                </a>
-                            </li>
-                        </ul>
-                    </div>
-
-                <?php else: ?>
-                    <a href="login_customer.php" class="btn btn-theme rounded-pill px-4 me-2 fw-bold shadow-sm">
-                        เข้าสู่ระบบ
-                    </a>
-                    <a href="register_customer.php" class="btn btn-outline-theme rounded-pill px-3 small fw-bold">
-                        สมัครสมาชิก
-                    </a>
-                <?php endif; ?>
-
+                <a href="member/cart.php" class="btn btn-theme rounded-pill px-4 position-relative">
+                    <i class="bi bi-cart3 me-1"></i> ตะกร้า
+                    <?php if (!empty($_SESSION['cart'])): ?>
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                            <?= count($_SESSION['cart']) ?>
+                        </span>
+                    <?php endif; ?>
+                </a>
             </div>
         </div>
     </div>

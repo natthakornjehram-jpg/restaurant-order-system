@@ -14,7 +14,7 @@ if (isset($_GET['cancel'])) {
     unset($_SESSION['reset_phone']);
     unset($_SESSION['reset_id']);
     unset($_SESSION['mock_otp']);
-    header("Location: login_customer.php");
+    header("Location: login.php");
     exit;
 }
 
@@ -24,52 +24,32 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['request_otp'])) {
         $phone = trim($_POST['phone']);
         
-        // เช็กว่าเบอร์นี้มีในระบบไหม (หาทั้งในตาราง owner และ customer)
-        $role = "";
-        $matched_owner_id = null;
-        $matched_customer_id = null;
+        // เช็กว่าเบอร์นี้เป็นเจ้าของร้านที่ลงทะเบียนไว้ไหม (ระบบร้านเดี่ยว ไม่มีบัญชีลูกค้าแล้ว)
         $stmt_check_owner = $conn->prepare("SELECT owner_id FROM owner WHERE phone = ? LIMIT 1");
         $stmt_check_owner->bind_param("s", $phone);
         $stmt_check_owner->execute();
         $owner_row = $stmt_check_owner->get_result()->fetch_assoc();
-        if ($owner_row) { $role = "owner"; $matched_owner_id = (int) $owner_row['owner_id']; }
-        else {
-            $stmt_check_cust = $conn->prepare("SELECT customer_id FROM customer WHERE phone = ? LIMIT 1");
-            $stmt_check_cust->bind_param("s", $phone);
-            $stmt_check_cust->execute();
-            $cust_row = $stmt_check_cust->get_result()->fetch_assoc();
-            if ($cust_row) { $role = "customer"; $matched_customer_id = (int) $cust_row['customer_id']; }
-        }
 
-        if ($role != "") {
+        if ($owner_row) {
+            $matched_owner_id = (int) $owner_row['owner_id'];
+
             // สร้าง OTP 6 หลัก
             $otp = rand(100000, 999999);
             $expires_at = date('Y-m-d H:i:s', strtotime('+5 minutes')); // หมดอายุใน 5 นาที
 
-            // password_reset.owner_id/customer_id เป็น NOT NULL + FOREIGN KEY ทั้งคู่ (แม้จะรีเซ็ตให้แค่ฝั่งเดียว)
-            // จึงต้องหาค่า id ที่มีอยู่จริงของอีกตารางมาใส่ เพื่อไม่ให้ติด FK constraint
-            if ($matched_owner_id === null) {
-                $any_owner = $conn->query("SELECT MIN(owner_id) AS id FROM owner")->fetch_assoc();
-                $matched_owner_id = (int) ($any_owner['id'] ?? 0);
-            }
-            if ($matched_customer_id === null) {
-                $any_customer = $conn->query("SELECT MIN(customer_id) AS id FROM customer")->fetch_assoc();
-                $matched_customer_id = (int) ($any_customer['id'] ?? 0);
-            }
-
-            // บันทึกลงตาราง password_reset
-            $stmt = $conn->prepare("INSERT INTO password_reset (owner_id, customer_id, phone, otp, expires_at) VALUES (?, ?, ?, ?, ?)");
-            $stmt->bind_param("iisss", $matched_owner_id, $matched_customer_id, $phone, $otp, $expires_at);
+            // บันทึกลงตาราง password_reset (customer_id เป็น NULL ได้ เพราะไม่มีระบบบัญชีลูกค้าแล้ว)
+            $stmt = $conn->prepare("INSERT INTO password_reset (owner_id, phone, otp, expires_at) VALUES (?, ?, ?, ?)");
+            $stmt->bind_param("isss", $matched_owner_id, $phone, $otp, $expires_at);
             if ($stmt->execute()) {
                 $_SESSION['reset_step'] = 2;
                 $_SESSION['reset_phone'] = $phone;
                 $_SESSION['mock_otp'] = $otp; // จำลองเก็บไว้โชว์ Alert
-                
+
                 header("Location: forgot_password.php");
                 exit;
             }
         } else {
-            $error = "ไม่พบเบอร์โทรศัพท์นี้ในระบบครับ กรุณาสมัครสมาชิกก่อน";
+            $error = "ไม่พบเบอร์โทรศัพท์นี้ในระบบครับ";
         }
     }
 
@@ -122,14 +102,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         } elseif ($new_password === $confirm_password) {
             $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
 
-            // อัปเดตรหัสผ่านใหม่ (อัปเดตทั้งสองตารางแบบ Prepared Statement ปลอดภัยจากการแฮก)
+            // อัปเดตรหัสผ่านใหม่ของเจ้าของร้าน (Prepared Statement ปลอดภัยจากการแฮก)
             $stmt_owner = $conn->prepare("UPDATE owner SET password = ? WHERE phone = ?");
             $stmt_owner->bind_param("ss", $hashed_password, $phone);
             $stmt_owner->execute();
-
-            $stmt_cust = $conn->prepare("UPDATE customer SET password = ? WHERE phone = ?");
-            $stmt_cust->bind_param("ss", $hashed_password, $phone);
-            $stmt_cust->execute();
 
             // ล้าง Session การรีเซ็ตรหัสผ่าน
             unset($_SESSION['reset_step']);
@@ -137,10 +113,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             unset($_SESSION['reset_id']);
             unset($_SESSION['mock_otp']);
 
-            // 💡 สร้าง Session แจ้งเตือนสีเขียวเพื่อไปโชว์หน้า login_customer.php
+            // 💡 สร้าง Session แจ้งเตือนสีเขียวเพื่อไปโชว์หน้า login.php
             $_SESSION['success_msg'] = "เปลี่ยนรหัสผ่านสำเร็จ! กรุณาล็อกอินด้วยรหัสผ่านใหม่ครับ";
 
-            header("Location: login_customer.php");
+            header("Location: login.php");
             exit;
         } else {
             $error = "รหัสผ่านใหม่ทั้งสองช่องไม่ตรงกันครับ";

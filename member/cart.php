@@ -89,16 +89,6 @@ include '../includes/header_customer.php';
                         </div>
                     </div>
 
-                    <?php if ($is_online && !isset($_SESSION['customer_id'])): ?>
-                        <div class="alert alert-warning small border-0 text-center rounded-3">
-                            <i class="bi bi-info-circle-fill me-1"></i> กรุณาเข้าสู่ระบบเพื่อดำเนินการสั่งอาหาร
-                        </div>
-                        <?php $_SESSION['redirect_to'] = 'cart.php'; ?>
-                        <a href="../login_customer.php" class="btn btn-primary w-100 rounded-pill py-3 fw-bold shadow-sm fs-5">
-                            <i class="bi bi-box-arrow-in-right me-2"></i> เข้าสู่ระบบ / สมัครสมาชิก
-                        </a>
-
-                    <?php else: ?>
                         <form action="confirm_order.php" method="POST">
                             <input type="hidden" name="final_price" value="<?= $total_raw ?>">
                             <input type="hidden" name="order_type" value="<?= ($is_online || $is_takeaway_qr) ? 'takeaway' : 'dine_in' ?>">
@@ -118,7 +108,6 @@ include '../includes/header_customer.php';
                                 <button type="button" class="btn btn-secondary w-100 rounded-pill py-3 fw-bold disabled">งดรับออเดอร์ชั่วคราว</button>
                             <?php endif; ?>
                         </form>
-                    <?php endif; ?>
 
                 </div>
             </div>

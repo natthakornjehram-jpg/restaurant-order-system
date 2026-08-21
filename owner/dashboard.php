@@ -32,8 +32,15 @@ $sales_sql = "SELECT SUM(total_amount) as daily_total FROM orders WHERE payment_
 $sales_res = $conn->query($sales_sql);
 $daily_total = ($sales_res && $row = $sales_res->fetch_assoc()) ? $row['daily_total'] : 0;
 
-// ออเดอร์ที่รอทำ
-$order_res = $conn->query("SELECT COUNT(*) as pending_orders FROM orders WHERE order_status = 'pending'");
+// ออเดอร์ที่รอทำ (ไม่นับออเดอร์โอนเงินที่ยังไม่ได้ตรวจสลิป)
+$order_res = $conn->query("SELECT COUNT(*) as pending_orders FROM orders o
+    WHERE o.order_status = 'pending'
+    AND NOT EXISTS (
+        SELECT 1 FROM payment p
+        WHERE p.order_id = o.order_id
+        AND p.slip_image IS NOT NULL
+        AND p.status != 'completed'
+    )");
 $pending_orders = ($order_res && $row = $order_res->fetch_assoc()) ? $row['pending_orders'] : 0;
 
 // ออเดอร์ที่ค้างชำระ

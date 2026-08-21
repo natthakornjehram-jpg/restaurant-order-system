@@ -46,11 +46,16 @@ $is_online_open = $store['is_online_open'] ?? 0;
 
         <?php else: ?>
             <p class="lead mb-4 fw-light" style="max-width: 500px;">
-                เสิร์ฟความอร่อย สดใหม่ ทำด้วยใจทุกเมนู <br>สั่งอาหารง่ายๆ ผ่านระบบออนไลน์ได้เลยทันที!
+                เสิร์ฟความอร่อย สดใหม่ ทำด้วยใจทุกเมนู <br>เลือกได้เลยว่าทานที่ร้านหรือสั่งกลับบ้าน
             </p>
-            <a href="menu.php" class="btn-order">
-                <i class="bi bi-phone-vibrate me-2"></i> สั่งอาหาร / ดูเมนู
-            </a>
+            <div class="d-grid gap-3" style="max-width: 340px; margin: 0 auto;">
+                <a href="qr_table/menu_dinein.php" class="btn-order">
+                    <i class="bi bi-shop me-2"></i> ทานที่ร้าน (สแกน QR ที่โต๊ะ)
+                </a>
+                <a href="menu.php" class="btn-order btn-order-outline">
+                    <i class="bi bi-bag-check me-2"></i> สั่งกลับบ้าน
+                </a>
+            </div>
         <?php endif; ?>
 
         <a href="login.php" class="owner-link">

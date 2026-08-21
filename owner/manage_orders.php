@@ -11,9 +11,17 @@ if (!isset($_SESSION['owner_id'])) {
 include '../includes/header_owner.php'; 
 include '../includes/nav_owner.php'; 
 
-$sql = "SELECT * FROM orders 
-        WHERE order_status IN ('pending', 'cooking') 
-        ORDER BY created_at ASC";
+// ไม่เอาออเดอร์ที่จ่ายผ่านโอนแล้วร้านยังไม่ได้ตรวจ/อนุมัติสลิป เข้าคิวครัว
+// (กันเคสลูกค้าแนบสลิปปลอมหรือยังไม่โอนจริง ต้องให้ร้านเช็คก่อนเริ่มทำ)
+$sql = "SELECT o.* FROM orders o
+        WHERE o.order_status IN ('pending', 'cooking')
+        AND NOT EXISTS (
+            SELECT 1 FROM payment p
+            WHERE p.order_id = o.order_id
+            AND p.slip_image IS NOT NULL
+            AND p.status != 'completed'
+        )
+        ORDER BY o.created_at ASC";
 $res = $conn->query($sql);
 $queue_count = $res ? $res->num_rows : 0;
 ?>

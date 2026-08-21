@@ -7,18 +7,6 @@ $_SESSION['order_type'] = 'takeaway';
 unset($_SESSION['table_id']);
 unset($_SESSION['table_number']);
 
-$is_logged_in = isset($_SESSION['customer_id']) && $_SESSION['role'] === 'customer';
-$customer_name = 'ผู้เยี่ยมชม';
-
-if ($is_logged_in) {
-    $user_id = $_SESSION['customer_id'];
-    $u_stmt = $conn->prepare("SELECT name FROM customer WHERE customer_id = ?");
-    $u_stmt->bind_param("i", $user_id);
-    $u_stmt->execute();
-    $user_data = $u_stmt->get_result()->fetch_assoc();
-    $customer_name = $user_data['name'] ?? 'ลูกค้า';
-}
-
 // 🏪 ดึงสถานะร้าน
 $store_res = $conn->query("SELECT is_online_open, restaurant_name FROM owner LIMIT 1");
 $store = $store_res->fetch_assoc();
@@ -32,8 +20,8 @@ include 'includes/nav_customer.php';
 <div class="container py-4">
     <div class="member-badge-section d-flex justify-content-between align-items-center mt-5">
         <div>
-            <h5 class="fw-bold mb-1">สวัสดีคุณ <?= htmlspecialchars($customer_name) ?> ✨</h5>
-            <p class="mb-0 small opacity-75">พร้อมรับออเดอร์ความอร่อยแล้วครับ!</p>
+            <h5 class="fw-bold mb-1">ยินดีต้อนรับครับ ✨</h5>
+            <p class="mb-0 small opacity-75">สั่งกลับบ้านง่ายๆ ไม่ต้องสมัครสมาชิก</p>
         </div>
         <div class="text-end">
             <span class="badge bg-light text-dark rounded-pill px-3 py-2 fw-bold shadow-sm">

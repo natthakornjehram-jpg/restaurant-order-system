@@ -3,9 +3,9 @@
 session_start();
 require_once '../includes/db.php';
 
-// 1. เช็กสิทธิ์เบื้องต้น (ต้องล็อกอินสมาชิก หรือ เป็นคนสแกนสั่งที่โต๊ะ)
-$customer_id = $_SESSION['customer_id'] ?? NULL;
+// 1. เช็กสิทธิ์เบื้องต้น (ไม่มีระบบบัญชีลูกค้าแล้ว - เช็กจาก session ของแขกที่สแกนโต๊ะ หรือแขกที่เพิ่งสั่งออนไลน์/กลับบ้านเอง)
 $table_id = $_SESSION['table_id'] ?? NULL;
+$guest_order_ids = $_SESSION['guest_order_ids'] ?? [];
 $order_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
 // 2. ดึงข้อมูลร้านค้า
@@ -13,16 +13,16 @@ $store = $conn->query("SELECT restaurant_name FROM owner LIMIT 1")->fetch_assoc(
 $restaurant_name = $store['restaurant_name'] ?? 'RANNAIBAAN';
 
 // 3. ดึงข้อมูลออเดอร์หลัก
-// เช็กความเป็นเจ้าของออเดอร์: สมาชิกต้องเป็นเจ้าของออเดอร์นั้นจริง, แขกที่สแกนโต๊ะต้องดูได้เฉพาะออเดอร์ของโต๊ะตัวเอง
-// ถ้าไม่มีทั้ง customer_id และ table_id ในเซสชัน ห้ามดูออเดอร์ใดๆ ทั้งสิ้น (กัน IDOR)
-if ($customer_id) {
-    $stmt = $conn->prepare("SELECT * FROM orders WHERE order_id = ? AND customer_id = ?");
-    $stmt->bind_param("ii", $order_id, $customer_id);
-    $stmt->execute();
-    $order = $stmt->get_result()->fetch_assoc();
-} elseif ($table_id) {
+// เช็กความเป็นเจ้าของออเดอร์: แขกที่สแกนโต๊ะดูได้เฉพาะออเดอร์ของโต๊ะตัวเอง, แขกออนไลน์/กลับบ้านดูได้เฉพาะออเดอร์ที่ session ตัวเองเพิ่งสั่ง
+// ถ้าไม่เข้าเงื่อนไขไหนเลย ห้ามดูออเดอร์ใดๆ ทั้งสิ้น (กัน IDOR)
+if ($table_id) {
     $stmt = $conn->prepare("SELECT * FROM orders WHERE order_id = ? AND table_id = ? AND customer_id IS NULL");
     $stmt->bind_param("ii", $order_id, $table_id);
+    $stmt->execute();
+    $order = $stmt->get_result()->fetch_assoc();
+} elseif (in_array($order_id, $guest_order_ids, true)) {
+    $stmt = $conn->prepare("SELECT * FROM orders WHERE order_id = ?");
+    $stmt->bind_param("i", $order_id);
     $stmt->execute();
     $order = $stmt->get_result()->fetch_assoc();
 } else {
@@ -63,8 +63,8 @@ include '../includes/nav_customer.php';
         <div class="col-md-8 col-lg-6 mt-3">
             
             <div class="mb-3 px-2">
-                <a href="history.php" class="text-decoration-none text-muted fw-bold small">
-                    <i class="bi bi-chevron-left"></i> ย้อนกลับ
+                <a href="../menu.php" class="text-decoration-none text-muted fw-bold small">
+                    <i class="bi bi-chevron-left"></i> กลับไปหน้าเมนู
                 </a>
             </div>
 

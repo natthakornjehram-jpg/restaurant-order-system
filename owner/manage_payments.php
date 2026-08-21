@@ -14,9 +14,9 @@ include '../includes/nav_owner.php';
 // --- แยกการดึงข้อมูลเป็น 3 กลุ่ม ---
 
 // 1. ออนไลน์ (แนบสลิปแล้ว รอร้านตรวจและอนุมัติเข้าครัว)
-$sql_online = "SELECT o.*, p.status AS pay_status, p.slip_image, p.transaction_ref 
-        FROM orders o 
-        JOIN payment p ON o.order_id = p.order_id 
+$sql_online = "SELECT o.*, p.status AS pay_status, p.method AS pay_method, p.slip_image, p.transaction_ref
+        FROM orders o
+        JOIN payment p ON o.order_id = p.order_id
         WHERE o.payment_status = 'unpaid' AND o.order_type != 'dine_in' AND p.status = 'pending'
         ORDER BY o.created_at ASC";
 $res_online = $conn->query($sql_online);
@@ -80,15 +80,25 @@ $res_eating = $conn->query($sql_eating);
                         <div class="card-body p-4 text-center d-flex flex-column justify-content-between">
                             <div>
                                 <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <span class="badge bg-primary"><i class="bi bi-phone"></i> ออนไลน์</span>
+                                    <span class="badge bg-primary"><i class="bi bi-phone"></i> <?php echo htmlspecialchars($row['online_customer_name'] ?: 'ออนไลน์');?></span>
                                     <div class="order-id">#<?php echo str_pad($row['order_id'], 5, '0', STR_PAD_LEFT);?></div>
                                 </div>
-                                <div class="mb-3 mt-3"><span class="badge-soft-warning"><i class="bi bi-hourglass-split"></i> แนบสลิปแล้ว รอตรวจ</span></div>
-                                <p class="text-muted small mb-1">ยอดโอน (ดูจากสลิป)</p>
+                                <div class="mb-3 mt-3">
+                                    <?php if ($row['pay_method'] === 'cash'): ?>
+                                        <span class="badge-soft-info"><i class="bi bi-cash-coin"></i> จ่ายเงินสดตอนมารับ</span>
+                                    <?php else: ?>
+                                        <span class="badge-soft-warning"><i class="bi bi-hourglass-split"></i> แนบสลิปแล้ว รอตรวจ</span>
+                                    <?php endif; ?>
+                                </div>
+                                <p class="text-muted small mb-1">ยอดที่ต้องชำระ</p>
                                 <div class="total-price mb-4 text-primary">฿<?php echo number_format($row['total_amount'], 0);?></div>
                             </div>
                             <button class="btn btn-primary w-100 rounded-3 py-2 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#payModal<?php echo $row['order_id'];?>">
-                                <i class="bi bi-search me-1"></i> ตรวจสลิป & อนุมัติ
+                                <?php if ($row['pay_method'] === 'cash'): ?>
+                                    <i class="bi bi-check-circle me-1"></i> ยืนยันออเดอร์
+                                <?php else: ?>
+                                    <i class="bi bi-search me-1"></i> ตรวจสลิป & อนุมัติ
+                                <?php endif; ?>
                             </button>
                         </div>
                     </div>
@@ -102,7 +112,16 @@ $res_eating = $conn->query($sql_eating);
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body text-center">
-                                <?php if (!empty($row['slip_image'])): ?>
+                                <p class="small text-muted mb-2">
+                                    ผู้สั่ง: <?php echo htmlspecialchars($row['online_customer_name'] ?: '-');?>
+                                    · โทร <?php echo htmlspecialchars($row['online_customer_phone'] ?: '-');?>
+                                </p>
+                                <?php if ($row['pay_method'] === 'cash'): ?>
+                                    <div class="p-4 bg-light rounded-4 mb-3">
+                                        <i class="bi bi-cash-coin text-muted display-4 mb-2 d-block"></i>
+                                        <p class="fw-bold mb-0">ลูกค้าเลือกจ่ายเงินสดตอนมารับที่ร้าน</p>
+                                    </div>
+                                <?php elseif (!empty($row['slip_image'])): ?>
                                     <img src="../assets/images/slips/<?php echo htmlspecialchars($row['slip_image']);?>" class="img-fluid rounded-3 mb-3" style="max-height: 400px;" alt="สลิปโอนเงิน">
                                 <?php else: ?>
                                     <p class="text-muted">ไม่พบรูปสลิป</p>
@@ -113,8 +132,13 @@ $res_eating = $conn->query($sql_eating);
                                 <div class="total-price text-primary fw-bold">ยอด ฿<?php echo number_format($row['total_amount'], 2);?></div>
                             </div>
                             <div class="modal-footer border-0">
+                                <?php if ($row['pay_method'] !== 'cash'): ?>
+                                    <button type="button" class="btn btn-outline-danger rounded-3 fw-bold" onclick="rejectPayment(<?php echo $row['order_id'];?>)">
+                                        <i class="bi bi-x-circle me-1"></i> ปฏิเสธสลิป
+                                    </button>
+                                <?php endif; ?>
                                 <button type="button" class="btn btn-outline-secondary rounded-3" data-bs-dismiss="modal">ปิด</button>
-                                <button type="button" class="btn btn-primary rounded-3 fw-bold" onclick="approvePayment(<?php echo $row['order_id'];?>, 'transfer')">
+                                <button type="button" class="btn btn-primary rounded-3 fw-bold" onclick="approvePayment(<?php echo $row['order_id'];?>, '<?php echo htmlspecialchars($row['pay_method']);?>')">
                                     <i class="bi bi-check-circle me-1"></i> อนุมัติ ยืนยันยอดเงิน
                                 </button>
                             </div>

@@ -7,9 +7,9 @@ require_once '../includes/upload_helper.php';
 // ... (ส่วนที่ 1 เช็กตะกร้าคงเดิม) ...
 
 // 💡 2. ดึงข้อมูลลูกค้าออนไลน์/กลับบ้าน (รับมาจาก confirm_order.php)
-$customer_id = $_SESSION['customer_id'] ?? NULL;
-$customer_username = $_SESSION['customer_name'] ?? 'Guest'; // สำหรับตั้งชื่อไฟล์
-$table_id = $_SESSION['table_id'] ?? NULL; 
+// ไม่มีระบบบัญชีลูกค้าแล้ว - customer_id เป็น NULL เสมอ ผูกความเป็นเจ้าของออเดอร์ด้วย session แทน (ดูขั้นตอนที่ 8)
+$customer_id = NULL;
+$table_id = $_SESSION['table_id'] ?? NULL;
 $order_type = $_POST['order_type'] ?? 'takeaway';
 $total_amount = floatval($_POST['total_amount'] ?? 0);
 
@@ -17,6 +17,19 @@ $total_amount = floatval($_POST['total_amount'] ?? 0);
 $online_name = $_POST['customer_name_online'] ?? ($_POST['takeaway_name'] ?? '');
 $online_phone = $_POST['customer_phone_online'] ?? '';
 $note = $_POST['note'] ?? '';
+$payment_method = $_POST['payment_method'] ?? 'cash';
+
+// 2.5 ออเดอร์ที่ไม่ได้มาจากโต๊ะ (ลูกค้าออนไลน์/สั่งกลับบ้านผ่านเว็บ) เลือกจ่ายแบบโอน
+//     ต้องแนบสลิปมาด้วยเสมอ ไม่งั้นจะไม่ยอมสร้างออเดอร์เลย (กันออเดอร์ไม่มีหลักฐานการจ่ายเงินหลุดเข้าครัว)
+if (!$table_id && $payment_method === 'transfer') {
+    if (!isset($_FILES['payment_slip']) || $_FILES['payment_slip']['error'] !== 0) {
+        echo "<script>
+            alert('กรุณาแนบสลิปการโอนเงินก่อนยืนยันคำสั่งซื้อ');
+            window.history.back();
+        </script>";
+        exit;
+    }
+}
 
 // 3. บันทึกข้อมูลลงตาราง orders (เพิ่มคอลัมน์ใหม่ 2 ตัว)
 $order_status = 'pending';
@@ -33,14 +46,23 @@ $stmt_order->bind_param("iidssssss", $customer_id, $table_id, $total_amount,
 if ($stmt_order->execute()) {
     $order_id = $conn->insert_id;
 
-    // 4. จัดการเรื่องอัปโหลดสลิป (ตั้งชื่อตาม orderID_วันที่ ไม่ใช้ชื่อผู้ใช้ที่ตั้งเองมาต่อ path)
-    if (isset($_FILES['payment_slip']) && $_FILES['payment_slip']['error'] === 0) {
-        $new_filename = handle_image_upload($_FILES['payment_slip'], '../assets/images/slips/', 'slip_order' . $order_id);
+    // 4. บันทึกข้อมูลการชำระเงิน (เฉพาะออเดอร์ที่ไม่ได้มาจากโต๊ะ - โต๊ะ/ทานที่ร้านจ่ายตอนปิดบิลแทน)
+    if (!$table_id) {
+        if ($payment_method === 'transfer' && isset($_FILES['payment_slip']) && $_FILES['payment_slip']['error'] === 0) {
+            // ตั้งชื่อไฟล์ตาม orderID ไม่ใช้ชื่อผู้ใช้ที่ตั้งเองมาต่อ path
+            $new_filename = handle_image_upload($_FILES['payment_slip'], '../assets/images/slips/', 'slip_order' . $order_id);
 
-        if ($new_filename !== false) {
-            // บันทึกลงตาราง payment (ระบุชื่อสลิปใหม่)
-            $stmt_pay = $conn->prepare("INSERT INTO payment (order_id, amount, slip_image) VALUES (?, ?, ?)");
-            $stmt_pay->bind_param("ids", $order_id, $total_amount, $new_filename);
+            if ($new_filename !== false) {
+                $pay_method = 'transfer';
+                $stmt_pay = $conn->prepare("INSERT INTO payment (order_id, amount, method, slip_image) VALUES (?, ?, ?, ?)");
+                $stmt_pay->bind_param("idss", $order_id, $total_amount, $pay_method, $new_filename);
+                $stmt_pay->execute();
+            }
+        } else {
+            // จ่ายเงินสดตอนมารับ - บันทึกไว้เป็นหลักฐานว่าตกลงจ่ายแบบไหน รอร้านยืนยันรับเงินตอนลูกค้ามารับของ
+            $pay_method = 'cash';
+            $stmt_pay = $conn->prepare("INSERT INTO payment (order_id, amount, method) VALUES (?, ?, ?)");
+            $stmt_pay->bind_param("ids", $order_id, $total_amount, $pay_method);
             $stmt_pay->execute();
         }
     }
@@ -75,7 +97,8 @@ if ($stmt_order->execute()) {
         exit;
     }
 
-    // 8. ลูกค้าออนไลน์/สมาชิก: เด้งไปหน้าดูสถานะ/ใบเสร็จตามเดิม
+    // 8. ลูกค้าออนไลน์/กลับบ้าน (ไม่มีบัญชี): จำ order_id ไว้ใน session เพื่อให้ดูสถานะออเดอร์ตัวเองได้
+    $_SESSION['guest_order_ids'][] = $order_id;
     echo "<script>
         alert('ส่งคำสั่งซื้อเรียบร้อยแล้ว!');
         window.location.href = 'order_detail.php?id=" . $order_id . "';
