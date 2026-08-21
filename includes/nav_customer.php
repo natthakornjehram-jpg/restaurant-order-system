@@ -44,9 +44,9 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
     <div class="container">
         <div class="d-flex align-items-center">
-            <button type="button" onclick="history.back()" class="btn btn-sm btn-light rounded-circle shadow-sm me-2 d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;" title="ย้อนกลับ">
+            <a href="<?= BASE_URL ?>menu.php" class="btn btn-sm btn-light rounded-circle shadow-sm me-2 d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;" title="กลับหน้าหลัก">
                 <i class="bi bi-arrow-left"></i>
-            </button>
+            </a>
             <a class="navbar-brand fw-bold text-theme m-0" href="<?= BASE_URL ?>menu.php">
                 <i class="bi bi-shop me-2"></i> RANNAIBAAN
             </a>
