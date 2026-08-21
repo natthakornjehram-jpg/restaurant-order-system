@@ -88,3 +88,10 @@ $owner_nav_items = [
   </div>
 
   <div class="owner-main flex-grow-1">
+    <?php if ($current_page !== 'dashboard.php'): ?>
+    <div class="owner-back-bar px-3 px-lg-4 pt-3">
+        <button type="button" onclick="history.back()" class="btn btn-sm btn-light rounded-pill shadow-sm fw-bold">
+            <i class="bi bi-arrow-left me-1"></i> ย้อนกลับ
+        </button>
+    </div>
+    <?php endif; ?>

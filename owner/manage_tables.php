@@ -133,6 +133,16 @@ include '../includes/nav_owner.php';
                     </a>
                 </div>
                 <p class="small text-muted mb-3">กดปุ่มไอคอน <i class="bi bi-download"></i> เพื่อดาวน์โหลด <br> หรือคลิกขวาที่รูปเพื่อบันทึก</p>
+
+                <div class="d-grid gap-2 mb-3">
+                    <a id="openTableLinkBtn" href="" target="_blank" class="btn btn-outline-primary rounded-pill fw-bold">
+                        <i class="bi bi-box-arrow-up-right me-1"></i> เปิดลิงก์เมนูโต๊ะนี้
+                    </a>
+                    <button type="button" id="copyTableLinkBtn" class="btn btn-outline-secondary rounded-pill fw-bold">
+                        <i class="bi bi-link-45deg"></i> คัดลอกลิงก์
+                    </button>
+                </div>
+
                 <button type="button" class="btn btn-secondary w-100 rounded-pill" data-bs-dismiss="modal">ปิดหน้าต่าง</button>
             </div>
         </div>

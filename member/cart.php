@@ -12,8 +12,8 @@ $is_takeaway_qr = ($table_no === 'กลับบ้าน' || $table_no === 'Ta
 $store_res = $conn->query("SELECT is_online_open FROM owner LIMIT 1");
 $store = $store_res->fetch_assoc();
 
-include '../includes/header_customer.php'; 
-
+include '../includes/header_customer.php';
+include '../includes/nav_customer.php';
 ?>
 
 <style>

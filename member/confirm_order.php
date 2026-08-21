@@ -25,6 +25,7 @@ foreach ($_SESSION['cart'] as $item) {
 $store = $conn->query("SELECT bank_info, promptpay_qr FROM owner LIMIT 1")->fetch_assoc();
 
 include '../includes/header_customer.php';
+include '../includes/nav_customer.php';
 ?>
 
 <style>

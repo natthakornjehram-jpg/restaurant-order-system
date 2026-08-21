@@ -43,27 +43,32 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
 <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
     <div class="container">
-        <a class="navbar-brand fw-bold text-theme" href="menu.php">
-            <i class="bi bi-shop me-2"></i> RANNAIBAAN
-        </a>
-        
-        <button class="navbar-toggler border-0 shadow-none" type="button" 
+        <div class="d-flex align-items-center">
+            <button type="button" onclick="history.back()" class="btn btn-sm btn-light rounded-circle shadow-sm me-2 d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;" title="ย้อนกลับ">
+                <i class="bi bi-arrow-left"></i>
+            </button>
+            <a class="navbar-brand fw-bold text-theme m-0" href="<?= BASE_URL ?>menu.php">
+                <i class="bi bi-shop me-2"></i> RANNAIBAAN
+            </a>
+        </div>
+
+        <button class="navbar-toggler border-0 shadow-none" type="button"
                 data-bs-toggle="collapse" data-bs-target="#navCustomer">
             <span class="navbar-toggler-icon"></span>
         </button>
-        
+
         <div class="collapse navbar-collapse" id="navCustomer">
-            
+
             <ul class="navbar-nav me-auto mb-2 mb-lg-0 mt-2 mt-lg-0">
                 <li class="nav-item">
-                    <a class="nav-link fw-bold nav-menu-link <?= ($current_page == 'menu.php') ? 'active-menu' : '' ?>" 
-                       href="../menu.php">เมนูอาหาร</a>
+                    <a class="nav-link fw-bold nav-menu-link <?= ($current_page == 'menu.php') ? 'active-menu' : '' ?>"
+                       href="<?= BASE_URL ?>menu.php">เมนูอาหาร</a>
                 </li>
             </ul>
 
-           
+
             <div class="d-flex align-items-center mt-3 mt-lg-0">
-                <a href="member/cart.php" class="btn btn-theme rounded-pill px-4 position-relative">
+                <a href="<?= BASE_URL ?>member/cart.php" class="btn btn-theme rounded-pill px-4 position-relative">
                     <i class="bi bi-cart3 me-1"></i> ตะกร้า
                     <?php if (!empty($_SESSION['cart'])): ?>
                         <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">

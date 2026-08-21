@@ -76,6 +76,17 @@ h1, h2, h3, h4, h5, .font-mitr {
     min-width: 0; /* กัน flex item ดันความกว้างเกินจอตอนมีตาราง/เนื้อหากว้างๆ ข้างใน */
 }
 
+/* ปุ่มย้อนกลับบนสุดของแต่ละหน้า (ยกเว้น dashboard) - จอมือถือมี navbar แบบ fixed-top ทับอยู่ ต้องเว้นระยะให้พ้น */
+.owner-back-bar {
+    margin-top: 56px;
+}
+
+@media (min-width: 992px) {
+    .owner-back-bar {
+        margin-top: 0;
+    }
+}
+
 .owner-sidebar-brand {
     background-color: rgba(255, 255, 255, 0.03);
 }
