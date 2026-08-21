@@ -12,7 +12,7 @@ if (isset($_GET['delete_id'])) {
     $id = intval($_GET['delete_id']);
     $img_query = $conn->query("SELECT image_url FROM item WHERE item_id = $id");
     if ($img_row = $img_query->fetch_assoc()) {
-        if (!empty($img_row['image_url']) && $img_row['image_url'] != 'default_food.jpg.' && file_exists("../assets/images/items/" . $img_row['image_url'])) {
+        if (!empty($img_row['image_url']) && $img_row['image_url'] != 'default_food.jpg' && file_exists("../assets/images/items/" . $img_row['image_url'])) {
             unlink("../assets/images/items/" . $img_row['image_url']);
         }
         $conn->query("DELETE FROM menu_toppings WHERE item_id = $id");
@@ -70,8 +70,8 @@ include '../includes/nav_owner.php';
                        <div class="menu-item-row text-dark p-3 p-md-4 border-bottom" style="display: block;">
                             
                             <div class="d-flex align-items-start mb-3">
-                                <img src="uploads/menu_images/<?php echo !empty($menu['image_url']) ? $menu['image_url'] : 'default_food.jpg'; ?>" 
-                                     class="rounded-4 me-3 shadow-sm border" 
+                                <img src="../assets/images/items/<?php echo !empty($menu['image_url']) ? $menu['image_url'] : 'default_food.jpg'; ?>"
+                                     class="rounded-4 me-3 shadow-sm border"
                                      style="width: 85px; height: 85px; min-width: 85px; object-fit: cover;" 
                                      onerror="this.src='../assets/images/items/default_food.jpg'">
                                 
