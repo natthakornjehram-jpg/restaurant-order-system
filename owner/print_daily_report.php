@@ -2,13 +2,8 @@
 // owner/print_daily_report.php
 session_start();
 include '../includes/db.php';
+require_once 'auth_owner.php';
 
-// 1. เช็กสิทธิ์เจ้าของร้าน (ร้านเดี่ยวใช้ owner_id)
-if (!isset($_SESSION['owner_id'])) {
-    die("ไม่มีสิทธิ์เข้าถึงรายงานนี้");
-}
-
-$owner_id = $_SESSION['owner_id'];
 $date = isset($_GET['date']) ? $_GET['date'] : date('Y-m-d');
 
 // 2. ดึงข้อมูลร้านค้าจากตาราง owner (เพื่อเอาชื่อร้านมาแสดง)

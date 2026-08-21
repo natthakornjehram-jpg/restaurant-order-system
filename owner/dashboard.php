@@ -1,13 +1,6 @@
 <?php 
 session_start();
 include '../includes/db.php';
-
-// 🔴 แก้ไขแล้ว: เช็กว่ามีการล็อกอินและใช้ Session ชื่อ 'owner_id' ให้ตรงกับหน้า login.php
-if (!isset($_SESSION['owner_id'])) {
-    header("Location: ../login.php");
-    exit;
-}
-
 require_once 'auth_owner.php';
 
 include '../includes/header_owner.php'; 

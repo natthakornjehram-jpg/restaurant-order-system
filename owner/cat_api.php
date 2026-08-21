@@ -6,12 +6,6 @@ require_once '../includes/db.php';
 require_once 'auth_owner.php';
 header('Content-Type: application/json');
 
-// เช็คสิทธิ์การเข้าถึงว่าเป็นเจ้าของร้านหรือไม่ (ใช้ Session ของ owner)
-if (!isset($_SESSION['owner_id'])) {
-    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
-    exit;
-}
-
 // ไม่ต้องดึงหา restaurant_id เพราะเป็นระบบร้านเดียว
 $action = isset($_GET['action']) ? $_GET['action'] : '';
 

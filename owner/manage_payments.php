@@ -2,11 +2,7 @@
 // owner/manage_payments.php
 session_start();
 include '../includes/db.php';
-
-if (!isset($_SESSION['owner_id'])) {
-    header("Location: ../login.php");
-    exit;
-}
+require_once 'auth_owner.php';
 
 include '../includes/header_owner.php'; 
 include '../includes/nav_owner.php'; 

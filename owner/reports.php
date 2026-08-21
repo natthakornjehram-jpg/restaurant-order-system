@@ -2,14 +2,9 @@
 // owner/reports.php
 session_start();
 include '../includes/db.php';
+require_once 'auth_owner.php';
 
-// 1. เช็กสิทธิ์เจ้าของร้าน (ร้านเดี่ยว ใช้ owner_id)
-if (!isset($_SESSION['owner_id'])) {
-    header("Location: ../login.php");
-    exit;
-}
-
-include '../includes/header_owner.php'; 
+include '../includes/header_owner.php';
 include '../includes/nav_owner.php'; 
 
 // 2. รับค่าวันที่เลือก (Default คือวันนี้)

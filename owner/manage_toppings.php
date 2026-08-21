@@ -2,11 +2,7 @@
 // owner/manage_toppings.php
 session_start();
 require_once '../includes/db.php';
-
-if (!isset($_SESSION['owner_id'])) {
-    header("Location: ../login.php");
-    exit;
-}
+require_once 'auth_owner.php';
 
 // --- 1. จัดการข้อมูลหมวดหมู่ (เพิ่ม/แก้ไข) ---
 if (isset($_POST['save_category'])) {

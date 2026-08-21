@@ -1,15 +1,10 @@
 <?php
 // manage_categories.php
 session_start();
-require_once '../includes/db.php'; 
+require_once '../includes/db.php';
+require_once 'auth_owner.php';
 
-// เช็กสิทธิ์เจ้าของร้าน (อิงจาก Session ของตาราง owner)
-if (!isset($_SESSION['owner_id'])) {
-    header("Location: ../login.php");
-    exit;
-}
-
-include '../includes/header_owner.php'; 
+include '../includes/header_owner.php';
 include '../includes/nav_owner.php'; 
 ?>
 

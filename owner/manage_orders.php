@@ -4,11 +4,7 @@ session_start();
 include '../includes/db.php';
 require_once 'auth_owner.php';
 
-if (!isset($_SESSION['owner_id'])) {
-    die("<script>alert('กรุณาล็อกอินก่อน'); window.location='../login.php';</script>");
-}
-
-include '../includes/header_owner.php'; 
+include '../includes/header_owner.php';
 include '../includes/nav_owner.php'; 
 
 // ไม่เอาออเดอร์ที่จ่ายผ่านโอนแล้วร้านยังไม่ได้ตรวจ/อนุมัติสลิป เข้าคิวครัว

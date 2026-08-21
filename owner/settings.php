@@ -2,13 +2,8 @@
 session_start();
 include '../includes/db.php';
 include '../includes/upload_helper.php';
+require_once 'auth_owner.php';
 
-if (!isset($_SESSION['owner_id'])) {
-    header("Location: ../login.php");
-    exit;
-}
-
-$owner_id = $_SESSION['owner_id'];
 $success_msg = "";
 $error_msg = "";
 
