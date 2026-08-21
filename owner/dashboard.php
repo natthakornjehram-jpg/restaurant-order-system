@@ -70,7 +70,7 @@ $pending_list_res = $conn->query($pending_list_sql);
             <button data-id="online" data-type="shop_status" 
                     onclick="toggleStatus('online', 'shop_status', <?= $store['is_online_open']; ?>)" 
                     class="btn btn-toggle shadow-sm <?= ($store['is_online_open'] == 1) ? 'bg-online-open' : 'bg-status-closed'; ?>">
-                <?= ($store['is_online_open'] == 1) ? '<i class="bi bi-globe me-1"></i> รับออนไลน์' : '<i class="bi bi-globe me-1"></i> ปิดออนไลน์' ?>
+                <?= ($store['is_online_open'] == 1) ? '<i class="bi bi-bag-check me-1"></i> เปิดรับกลับบ้าน' : '<i class="bi bi-bag-check me-1"></i> ปิดรับกลับบ้าน' ?>
             </button>
         </div>
     </div>

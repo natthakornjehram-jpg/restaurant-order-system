@@ -40,7 +40,7 @@ $is_online_open = $store['is_online_open'] ?? 0;
             
         <?php elseif ($is_online_open == 0): ?>
             <div class="alert alert-warning status-alert mt-3 border-0" style="background-color: rgba(255, 193, 7, 0.9); color: #3e2723;">
-                <h5 class="font-mitr m-0"><i class="bi bi-exclamation-triangle-fill me-2"></i> งดรับออเดอร์ออนไลน์ชั่วคราว</h5>
+                <h5 class="font-mitr m-0"><i class="bi bi-exclamation-triangle-fill me-2"></i> งดรับออเดอร์กลับบ้านชั่วคราว</h5>
                 <small class="d-block mt-2">ขณะนี้คิวหน้าร้านเต็ม หรือติดธุระด่วน รบกวนสั่งใหม่ภายหลังนะครับ</small>
             </div>
 

@@ -46,7 +46,7 @@ function toggleStatus(id, type, currentStatus) {
                         btn.innerHTML = (newStatus === 1) ? '<i class="bi bi-shop me-2"></i> ร้านเปิดอยู่' : '<i class="bi bi-shop me-2"></i> ร้านปิดอยู่';
                     } else {
                         btn.className = (newStatus === 1) ? 'btn btn-toggle bg-online-open' : 'btn btn-toggle bg-status-closed';
-                        btn.innerHTML = (newStatus === 1) ? '<i class="bi bi-globe me-2"></i> รับออนไลน์' : '<i class="bi bi-globe me-2"></i> ปิดออนไลน์';
+                        btn.innerHTML = (newStatus === 1) ? '<i class="bi bi-bag-check me-2"></i> เปิดรับกลับบ้าน' : '<i class="bi bi-bag-check me-2"></i> ปิดรับกลับบ้าน';
                     }
                 } else if (type === 'menu' || type === 'topping') {
                     // ปรับแต่งปุ่ม เมนู, ท็อปปิ้ง (มีของ/หมด)

@@ -44,7 +44,7 @@ $res_eating = $conn->query($sql_eating);
             </a>
             <div>
                 <h2 class="fw-bold mb-0" style="color: #1a202c;"><i class="bi bi-wallet2 text-success me-2"></i>จัดการชำระเงิน</h2>
-                <p class="text-muted small mb-0">รับเงินหน้าร้าน และ ตรวจสอบสลิปออนไลน์</p>
+                <p class="text-muted small mb-0">รับเงินหน้าร้าน และ ตรวจสอบสลิปสั่งกลับบ้าน</p>
             </div>
         </div>
     </div>
@@ -52,7 +52,7 @@ $res_eating = $conn->query($sql_eating);
     <ul class="nav nav-pills mb-4" id="pills-tab" role="tablist">
         <li class="nav-item" role="presentation">
             <button class="nav-link active" id="pills-online-tab" data-bs-toggle="pill" data-bs-target="#pills-online" type="button" role="tab">
-                <i class="bi bi-phone me-1"></i> ออนไลน์รอตรวจสลิป 
+                <i class="bi bi-phone me-1"></i> กลับบ้านรอตรวจสลิป
                 <?php if($res_online && $res_online->num_rows > 0) echo "<span class='badge bg-danger rounded-pill ms-1'>{$res_online->num_rows}</span>"; ?>
             </button>
         </li>
@@ -80,7 +80,7 @@ $res_eating = $conn->query($sql_eating);
                         <div class="card-body p-4 text-center d-flex flex-column justify-content-between">
                             <div>
                                 <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <span class="badge bg-primary"><i class="bi bi-phone"></i> <?php echo htmlspecialchars($row['online_customer_name'] ?: 'ออนไลน์');?></span>
+                                    <span class="badge bg-primary"><i class="bi bi-phone"></i> <?php echo htmlspecialchars($row['online_customer_name'] ?: 'กลับบ้าน');?></span>
                                     <div class="order-id">#<?php echo str_pad($row['order_id'], 5, '0', STR_PAD_LEFT);?></div>
                                 </div>
                                 <div class="mb-3 mt-3">
@@ -146,7 +146,7 @@ $res_eating = $conn->query($sql_eating);
                     </div>
                 </div>
                 <?php endwhile; else: ?>
-                    <div class="col-12 text-center py-5"><h5 class="text-muted"><i class="bi bi-check-circle"></i> ไม่มีสลิปออนไลน์รอตรวจ</h5></div>
+                    <div class="col-12 text-center py-5"><h5 class="text-muted"><i class="bi bi-check-circle"></i> ไม่มีสลิปกลับบ้านรอตรวจ</h5></div>
                 <?php endif;?>
             </div>
         </div>

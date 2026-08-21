@@ -14,8 +14,8 @@ $success = false;
 
 // 3. แยกอัปเดตตามปุ่มที่กดมา
 if ($type === 'shop_status') {
-    // 🟢 กดจากหน้า Dashboard (เปิด/ปิด ร้านและออนไลน์)
-    // เช็กว่ากดปุ่ม หน้าร้าน(shop) หรือ ออนไลน์(online)
+    // 🟢 กดจากหน้า Dashboard (เปิด/ปิด ร้านและรับกลับบ้าน)
+    // เช็กว่ากดปุ่ม หน้าร้าน(shop) หรือ รับกลับบ้าน(online)
     $column = ($id === 'shop') ? 'is_shop_open' : 'is_online_open';
     
     $stmt = $conn->prepare("UPDATE owner SET $column = ? WHERE owner_id = ?");

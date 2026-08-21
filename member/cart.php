@@ -37,7 +37,7 @@ include '../includes/nav_customer.php';
 
     <?php if($store['is_online_open'] == 0 && empty($_SESSION['table_no'])): ?>
         <div class="alert alert-danger text-center rounded-4 shadow-sm py-4 mb-4">
-            <h5 class="fw-bold mb-1"><i class="bi bi-exclamation-triangle-fill"></i> ร้านงดรับออเดอร์ออนไลน์ชั่วคราว</h5>
+            <h5 class="fw-bold mb-1"><i class="bi bi-exclamation-triangle-fill"></i> ร้านงดรับออเดอร์กลับบ้านชั่วคราว</h5>
         </div>
     <?php endif; ?>
 

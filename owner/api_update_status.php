@@ -28,7 +28,7 @@ if ($type === 'shop_status') {
         $stmt->bind_param("ii", $new_status, $owner_id);
         $success = $stmt->execute();
     } elseif ($id === 'online') {
-        // อัปเดตออนไลน์ พร้อมบันทึกเหตุผล
+        // อัปเดตสถานะรับกลับบ้าน พร้อมบันทึกเหตุผล
         $stmt = $conn->prepare("UPDATE owner SET is_online_open = ?, close_reason = ? WHERE owner_id = ?");
         $stmt->bind_param("isi", $new_status, $reason, $owner_id);
         $success = $stmt->execute();

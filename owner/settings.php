@@ -139,7 +139,7 @@ include '../includes/nav_owner.php';
                                     </div>
                                     <div class="form-check form-switch h5">
                                         <input class="form-check-input" type="checkbox" name="is_online_open" <?= ($store['is_online_open'] == 1) ? 'checked' : '' ?>>
-                                        <label class="form-check-label">เปิดรับออเดอร์ออนไลน์</label>
+                                        <label class="form-check-label">เปิดรับออเดอร์กลับบ้าน</label>
                                     </div>
                                 </div>
                             </div>
@@ -149,7 +149,7 @@ include '../includes/nav_owner.php';
                     <div class="col-md-5">
                         <div class="card border-0 shadow-sm rounded-4 h-100">
                             <div class="card-body p-4 p-md-5 bg-light rounded-4">
-                                <h5 class="fw-bold mb-4 border-bottom pb-2 text-success"><i class="bi bi-wallet2 me-2"></i>ช่องทางรับเงิน (ออนไลน์)</h5>
+                                <h5 class="fw-bold mb-4 border-bottom pb-2 text-success"><i class="bi bi-wallet2 me-2"></i>ช่องทางรับเงิน (สั่งกลับบ้าน)</h5>
                                 
                                 <div class="mb-4 text-center">
                                     <label class="fw-bold mb-2 d-block">QR Code รับเงิน (พร้อมเพย์/ธนาคาร)</label>

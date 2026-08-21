@@ -32,7 +32,7 @@ include 'includes/nav_customer.php';
 
     <?php if($store['is_online_open'] == 0): ?>
         <div class="alert alert-warning text-center rounded-4 shadow-sm border-0 py-5">
-            <h4 class="fw-bold mb-2"><i class="bi bi-exclamation-triangle-fill text-warning"></i> ร้านงดรับออเดอร์ชั่วคราว</h4>
+            <h4 class="fw-bold mb-2"><i class="bi bi-exclamation-triangle-fill text-warning"></i> ร้านงดรับออเดอร์กลับบ้านชั่วคราว</h4>
             <p class="mb-0 text-muted">ขออภัยค่ะ ขณะนี้คิวหน้าร้านเต็ม หรือปิดปรับปรุงระบบ</p>
         </div>
     <?php else: ?>
