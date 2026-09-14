@@ -52,6 +52,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
             }
             $qr_name = $new_qr_name;
         }
+    } elseif (!empty($_POST['remove_qr'])) {
+        // กดปุ่ม "ลบ QR" โดยไม่ได้แนบไฟล์ใหม่มาแทน - ลบไฟล์เดิมทิ้งแล้วเคลียร์ค่าในฐานข้อมูล
+        // (ถ้ามีไฟล์ใหม่แนบมาด้วย ให้ยึดตามเงื่อนไขข้างบนเสมอ ไม่ต้องมาลบซ้ำตรงนี้)
+        if (!empty($qr_name) && file_exists($target_dir . $qr_name)) {
+            unlink($target_dir . $qr_name);
+        }
+        $qr_name = '';
     }
 
     // --- อัปเดตข้อมูลลงฐานข้อมูล ---
@@ -99,7 +106,7 @@ include '../includes/nav_owner.php';
                 <div class="alert alert-danger border-0 shadow-sm rounded-4 mb-4"><i class="bi bi-exclamation-triangle-fill me-2"></i><?= htmlspecialchars($error_msg) ?></div>
             <?php endif; ?>
 
-            <form action="" method="POST" enctype="multipart/form-data">
+            <form id="settings_form" action="" method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
                 <div class="row g-4">
                     <div class="col-md-7">
@@ -164,6 +171,10 @@ include '../includes/nav_owner.php';
                                 <div class="mb-4 text-center">
                                     <label class="fw-bold mb-2 d-block">QR Code รับเงิน (พร้อมเพย์/ธนาคาร)</label>
                                     <div class="border rounded-4 bg-white p-2 mb-2 mx-auto" style="width: 200px; height: 200px; overflow: hidden; position: relative;">
+                                        <!-- วงกลมแจ้งสถานะ: ✓ เขียว = มี QR อยู่แล้ว, ! แดง = ยังไม่มี/ถูกลบไป ต้องแนบก่อนลูกค้าถึงจะเห็น QR ตอนเลือกโอนเงิน -->
+                                        <span id="qr_status_badge" class="position-absolute d-flex align-items-center justify-content-center rounded-circle shadow-sm <?= !empty($store['promptpay_qr']) ? 'bg-success' : 'bg-danger'; ?>" style="width: 28px; height: 28px; top: -8px; right: -8px; color: #fff; z-index: 2;">
+                                            <i class="bi <?= !empty($store['promptpay_qr']) ? 'bi-check-lg' : 'bi-exclamation-lg'; ?>"></i>
+                                        </span>
                                         <?php if(!empty($store['promptpay_qr'])): ?>
                                             <img src="../assets/images/logos/<?= $store['promptpay_qr'] ?>" id="preview_qr" style="width: 100%; height: 100%; object-fit: contain;">
                                         <?php else: ?>
@@ -177,7 +188,11 @@ include '../includes/nav_owner.php';
                                     <label for="qr_input" class="btn btn-sm btn-outline-success rounded-pill px-3">
                                         <i class="bi bi-upload me-1"></i> อัปโหลดรูป QR
                                     </label>
-                                    <input type="file" id="qr_input" name="promptpay_qr" class="d-none" accept="image/*" onchange="previewImg(this, 'preview_qr', 'qr_placeholder')">
+                                    <button type="button" id="qr_remove_btn" class="btn btn-sm btn-outline-danger rounded-pill px-3 ms-1" style="<?= empty($store['promptpay_qr']) ? 'display:none;' : ''; ?>" onclick="removeQr()">
+                                        <i class="bi bi-trash me-1"></i> ลบ QR
+                                    </button>
+                                    <input type="file" id="qr_input" name="promptpay_qr" class="d-none" accept="image/*" onchange="onQrFileSelected(this)">
+                                    <input type="hidden" name="remove_qr" id="remove_qr_flag" value="0">
                                 </div>
 
                                 <div>
@@ -189,7 +204,7 @@ include '../includes/nav_owner.php';
                     </div>
 
                     <div class="col-12 mt-4">
-                        <button type="submit" class="btn btn-primary w-100 py-3 rounded-pill fw-bold shadow fs-5">
+                        <button type="submit" id="settings_save_btn" class="btn btn-primary w-100 py-3 rounded-pill fw-bold shadow fs-5">
                             <i class="bi bi-save2 me-2"></i>บันทึกการตั้งค่าทั้งหมด
                         </button>
                     </div>
@@ -215,6 +230,52 @@ function previewImg(input, targetId, placeholderId = null) {
         reader.readAsDataURL(input.files[0]);
     }
 }
+
+// วงกลมสถานะ QR: เขียว+ติ๊กถูก = มี QR พร้อมให้ลูกค้าเห็น, แดง+! = ยังไม่มี/ถูกลบไปแล้ว ต้องแนบใหม่ก่อน
+function setQrBadge(hasQr) {
+    var badge = document.getElementById('qr_status_badge');
+    if (!badge) return;
+    badge.className = 'position-absolute d-flex align-items-center justify-content-center rounded-circle shadow-sm ' + (hasQr ? 'bg-success' : 'bg-danger');
+    badge.innerHTML = '<i class="bi ' + (hasQr ? 'bi-check-lg' : 'bi-exclamation-lg') + '"></i>';
+}
+
+// เลือกไฟล์ QR ใหม่ (กดยกเลิกกล่องเลือกไฟล์แล้วไม่ได้เลือกอะไรเลย ให้ input.files ว่าง - ไม่ต้องทำอะไรเลยตรงนี้)
+function onQrFileSelected(input) {
+    if (!input.files || !input.files[0]) return;
+    previewImg(input, 'preview_qr', 'qr_placeholder');
+    setQrBadge(true);
+    document.getElementById('remove_qr_flag').value = '0'; // ยกเลิกคำสั่งลบเดิม (ถ้ามี) เพราะมีไฟล์ใหม่มาแทนแล้ว
+    document.getElementById('qr_remove_btn').style.display = '';
+}
+
+// กดปุ่ม "ลบ QR" - เคลียร์พรีวิวกลับเป็นค่าว่างทันที แล้วตั้งค่าสถานะรอลบจริงตอนกดบันทึก
+function removeQr() {
+    var img = document.getElementById('preview_qr');
+    img.src = '';
+    img.style.display = 'none';
+    var placeholder = document.getElementById('qr_placeholder');
+    if (placeholder) {
+        placeholder.style.display = 'flex';
+    } else {
+        // ตอนโหลดหน้าแรกมี QR อยู่แล้วเลยไม่มี placeholder element ในหน้า ต้องสร้างขึ้นมาใหม่
+        placeholder = document.createElement('div');
+        placeholder.id = 'qr_placeholder';
+        placeholder.className = 'd-flex align-items-center justify-content-center h-100 text-muted flex-column';
+        placeholder.innerHTML = '<i class="bi bi-qr-code-scan fs-1"></i><small>ยังไม่มี QR Code</small>';
+        img.insertAdjacentElement('afterend', placeholder);
+    }
+    setQrBadge(false);
+    document.getElementById('qr_input').value = '';
+    document.getElementById('remove_qr_flag').value = '1';
+    document.getElementById('qr_remove_btn').style.display = 'none';
+}
+
+// ปุ่มบันทึก: โชว์วงกลมหมุนระหว่างกำลังส่งข้อมูล กันกดซ้ำ (พอบันทึกเสร็จหน้าจะโหลดใหม่พร้อมข้อความติ๊กถูกยืนยันด้านบนอยู่แล้ว)
+document.getElementById('settings_form').addEventListener('submit', function () {
+    var btn = document.getElementById('settings_save_btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>กำลังบันทึก...';
+});
 </script>
 
 <?php include '../includes/footer_owner.php'; ?>

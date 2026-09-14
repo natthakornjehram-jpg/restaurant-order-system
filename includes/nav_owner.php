@@ -6,13 +6,14 @@ $current_page = basename($_SERVER['PHP_SELF']);
 $owner_name = "ผู้ดูแลระบบ";
 $restaurant_name = "Owner System";
 $owner_logo_url = "";
+$owner_missing_qr = false;
 
 // ตรวจสอบ Session ของฝั่งเจ้าของร้าน (สมมติว่าตอน Login คุณตั้งชื่อ Session เป็น owner_id)
 if (isset($_SESSION['owner_id'])) {
     $o_id = $_SESSION['owner_id'];
 
     // ดึงชื่อเจ้าของร้าน และ ชื่อร้านอาหาร จากตาราง owner ตามโครงสร้าง DB ของคุณ
-    $stmt = $conn->prepare("SELECT name, restaurant_name, logo_url FROM owner WHERE owner_id = ?");
+    $stmt = $conn->prepare("SELECT name, restaurant_name, logo_url, promptpay_qr FROM owner WHERE owner_id = ?");
     $stmt->bind_param("i", $o_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -22,6 +23,9 @@ if (isset($_SESSION['owner_id'])) {
         $owner_name = !empty($o_info['name']) ? $o_info['name'] : "ผู้ดูแลระบบ";
         $restaurant_name = !empty($o_info['restaurant_name']) ? $o_info['restaurant_name'] : "Owner System";
         $owner_logo_url = $o_info['logo_url'] ?? '';
+        // ยังไม่ได้แนบ QR Code รับเงิน - เตือนไว้ที่เมนู "ตั้งค่าร้าน" เลย เผื่อเจ้าของร้านไม่รู้ว่าต้องมาตั้งค่าตรงนี้
+        // (ไม่งั้นลูกค้าเลือกโอนเงินตอนสั่งกลับบ้านแล้วไม่เห็น QR ให้สแกนจ่าย)
+        $owner_missing_qr = empty($o_info['promptpay_qr']);
     }
     $stmt->close();
 }
@@ -36,7 +40,10 @@ $owner_nav_items = [
     ['page' => 'manage_toppings.php',  'icon' => 'bi-plus-circle-dotted','label' => 'จัดการตัวเลือกเสริม'],
     ['page' => 'manage_tables.php',    'icon' => 'bi-grid-3x3-gap',      'label' => 'จัดการโต๊ะอาหาร'],
     ['page' => 'reports.php',          'icon' => 'bi-bar-chart-line',    'label' => 'สถิติและยอดขาย'],
-    ['page' => 'settings.php',         'icon' => 'bi-gear',              'label' => 'ตั้งค่าร้านและเวลาเปิด-ปิด'],
+    [
+        'page' => 'settings.php', 'icon' => 'bi-gear', 'label' => 'ตั้งค่าร้านและเวลาเปิด-ปิด',
+        'warn' => $owner_missing_qr, 'warn_title' => 'ยังไม่ได้แนบ QR Code รับเงิน ลูกค้าโอนเงินตอนสั่งกลับบ้านจะไม่เห็น QR ให้สแกนจ่าย',
+    ],
 ];
 ?>
 
@@ -84,9 +91,12 @@ $owner_nav_items = [
       <ul class="nav flex-column flex-grow-1 mt-2 mt-lg-0">
         <?php foreach ($owner_nav_items as $item): ?>
         <li class="nav-item">
-          <a class="owner-nav-link nav-link text-white py-2 px-3 <?= ($current_page == $item['page']) ? 'active' : ''; ?>" href="../owner/<?= $item['page'] ?>">
+          <a class="owner-nav-link nav-link text-white py-2 px-3 d-flex align-items-center <?= ($current_page == $item['page']) ? 'active' : ''; ?>" href="../owner/<?= $item['page'] ?>">
             <span class="owner-nav-icon"><i class="bi <?= $item['icon'] ?>"></i></span>
             <span><?= $item['label'] ?></span>
+            <?php if (!empty($item['warn'])): ?>
+                <i class="bi bi-exclamation-circle-fill text-warning ms-2" title="<?= htmlspecialchars($item['warn_title'] ?? 'ต้องตรวจสอบการตั้งค่า') ?>"></i>
+            <?php endif; ?>
           </a>
         </li>
         <?php endforeach; ?>
