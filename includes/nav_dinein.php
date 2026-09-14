@@ -10,7 +10,7 @@ $nav_is_shop_open = isset($store['is_shop_open']) ? intval($store['is_shop_open'
 $nav_menu_url = '../qr_table/menu_dinein.php' . ($nav_has_table ? '?table=' . urlencode($nav_table_no) : '');
 ?>
 
-<nav class="navbar sticky-top shadow-sm" style="background-color: var(--cafe-dark);">
+<nav class="navbar sticky-top shadow-sm auto-hide-header" style="background-color: var(--cafe-dark);">
     <div class="container d-flex justify-content-between align-items-center py-1">
 
         <div class="d-flex align-items-center">

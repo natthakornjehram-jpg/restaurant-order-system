@@ -13,6 +13,9 @@
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+    <script src="<?= BASE_URL ?>assets/js/auto-hide-header.js"></script>
 
     <script>
     // เสียงแจ้งเตือน สร้างเองด้วย Web Audio API (ไม่ต้องพึ่งไฟล์เสียงภายนอก เหมือนฝั่งเจ้าของร้าน)

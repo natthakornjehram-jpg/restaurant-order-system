@@ -41,7 +41,7 @@ $owner_nav_items = [
 ?>
 
 <!-- แถบบนสุด: โชว์เฉพาะจอมือถือ (< lg) ใช้เป็นที่เปิดเมนูด้วยปุ่มแฮมเบอร์เกอร์ -->
-<nav class="navbar navbar-dark bg-dark shadow-sm fixed-top d-lg-none">
+<nav class="navbar navbar-dark bg-dark shadow-sm fixed-top d-lg-none auto-hide-header">
   <div class="container-fluid">
     <div class="d-flex align-items-center">
         <button class="navbar-toggler border-0 shadow-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#ownerSidebar">
