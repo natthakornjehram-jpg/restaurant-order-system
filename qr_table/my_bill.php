@@ -16,6 +16,13 @@ if (!isset($_SESSION['table_id'])) {
 $table_id = $_SESSION['table_id'];
 $table_no = $_SESSION['table_number'] ?? '';
 
+// บิลรวมของโต๊ะมีความหมายเฉพาะ "ทานที่ร้าน" เท่านั้น "สั่งกลับบ้าน" เป็นออเดอร์ส่วนตัว แม้จะสแกน QR โต๊ะมา
+// ก็ตาม ไม่ควรเห็นบิลรวมที่อาจมีออเดอร์ของคนอื่นที่โต๊ะเดียวกันปนอยู่ ส่งไปหน้าเมนู/สถานะของตัวเองแทน
+if (($_SESSION['order_type'] ?? '') !== 'dine_in') {
+    header("Location: menu_dinein.php?table=" . urlencode($table_no));
+    exit;
+}
+
 // เช็กรหัสร่วมโต๊ะเหมือนกับ menu_dinein.php - กันคนอื่นที่ไม่รู้รหัสเข้ามาดูบิล/รายการสั่งของโต๊ะนี้
 // (ก่อนหน้านี้หน้านี้เช็คแค่ session table_id ซึ่งถูกตั้งค่าได้แค่เดาเลขโต๊ะจาก URL ของ menu_dinein.php)
 $tbl_stmt = $conn->prepare("SELECT join_code FROM restauranttable WHERE table_id = ?");
@@ -35,9 +42,11 @@ if (!empty($db_join_code) && !$is_verified_join) {
 // (ของเดิม query ซ้ำแต่ดึงแค่ restaurant_name มาทับ $store ทำให้ nav_dinein.php เห็น is_shop_open หายไป
 // ป้ายสถานะร้านบนหน้านี้เลยโชว์ "เปิดรับออเดอร์" ตลอดแม้ร้านจะปิดแล้วก็ตาม)
 
-// ดึงออเดอร์ของโต๊ะนี้ ที่สถานะยังไม่จ่ายเงิน (unpaid)
-// ไม่รวมออเดอร์ที่ถูกยกเลิก เพราะไม่ต้องให้ลูกค้าเห็นในบิลอีกต่อไป (และจะ unpaid ค้างตลอดไปเพราะไม่มีทางถูกจ่ายเงิน)
-$sql_orders = "SELECT * FROM orders WHERE table_id = ? AND payment_status = 'unpaid' AND order_status != 'canceled' ORDER BY created_at DESC";
+// ดึงออเดอร์ "ทานที่ร้าน" ของโต๊ะนี้ ที่สถานะยังไม่จ่ายเงิน (unpaid) เท่านั้น
+// - ไม่รวมออเดอร์ที่ถูกยกเลิก เพราะไม่ต้องให้ลูกค้าเห็นในบิลอีกต่อไป (และจะ unpaid ค้างตลอดไปเพราะไม่มีทางถูกจ่ายเงิน)
+// - กรอง order_type = 'dine_in' ซ้ำอีกชั้น (นอกเหนือจากการ redirect ด้านบน) กันบิลรวมปนกับออเดอร์กลับบ้าน
+//   ของคนอื่นที่โต๊ะเดียวกันโดยไม่ตั้งใจ เผื่อกรณี session order_type เปลี่ยนไปหลังโหลดหน้านี้ค้างไว้
+$sql_orders = "SELECT * FROM orders WHERE table_id = ? AND order_type = 'dine_in' AND payment_status = 'unpaid' AND order_status != 'canceled' ORDER BY created_at DESC";
 $stmt = $conn->prepare($sql_orders);
 $stmt->bind_param("i", $table_id);
 $stmt->execute();

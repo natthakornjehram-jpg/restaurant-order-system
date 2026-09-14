@@ -54,6 +54,9 @@ $is_shop_open = $store['is_shop_open'] ?? 0;
                 <i class="bi bi-qr-code-scan me-2 fs-4"></i>
                 <span class="fw-bold">หากต้องการสั่งเพิ่ม โปรดสแกน QR Code ใหม่<br>เพื่อเริ่มการสั่งอาหารอีกครั้งครับ</span>
             </div>
+            <a href="qr_table/menu_dinein.php" class="btn btn-lg rounded-pill fw-bold shadow mt-3 px-4" style="background-color: var(--cafe-brown, #795548); color: #fff;">
+                <i class="bi bi-bag-fill me-2"></i> สั่งอาหารกลับบ้าน (ไม่ต้องสแกน QR)
+            </a>
         <?php endif; ?>
     </div>
 

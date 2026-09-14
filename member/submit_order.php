@@ -12,9 +12,12 @@ if (!csrf_verify($_POST['csrf_token'] ?? '')) {
     exit;
 }
 
-// 1. เช็กว่ามีตะกร้าจริงไหม (กันเคส POST ตรงมาที่ไฟล์นี้โดยไม่ผ่าน confirm_order.php)
+// 0. ปลายทางกลับไปหน้าเมนูตอนเกิดข้อผิดพลาด (มีโต๊ะก็กลับไปหน้าเมนูของโต๊ะนั้น ไม่มีโต๊ะก็กลับไปหน้าเมนูเฉยๆ)
+$menu_fallback_url = '../qr_table/menu_dinein.php' . (!empty($_SESSION['table_number']) ? '?table=' . urlencode($_SESSION['table_number']) : '');
+
+// 1. เช็กว่ามีตะกร้าจริงไหม (กันเคส POST ตรงมาที่ไฟล์นี้โดยไม่ผ่านหน้าตะกร้า)
 if (empty($_SESSION['cart'])) {
-    header("Location: ../menu.php");
+    header("Location: $menu_fallback_url");
     exit;
 }
 
@@ -23,7 +26,7 @@ if (empty($_SESSION['cart'])) {
 if (empty($store['is_shop_open'])) {
     echo "<script>
         alert('ขณะนี้ร้านปิดให้บริการ ไม่สามารถสั่งอาหารได้ในขณะนี้');
-        window.location.href = '../menu.php';
+        window.location.href = " . json_encode($menu_fallback_url, JSON_UNESCAPED_SLASHES) . ";
     </script>";
     exit;
 }
@@ -93,7 +96,7 @@ foreach ($_SESSION['cart'] as $item) {
 if (empty($validated_cart)) {
     echo "<script>
         alert('เมนูในตะกร้าไม่พร้อมขายแล้ว กรุณาเลือกเมนูใหม่อีกครั้ง');
-        window.location.href = '../menu.php';
+        window.location.href = " . json_encode($menu_fallback_url, JSON_UNESCAPED_SLASHES) . ";
     </script>";
     exit;
 }
@@ -214,9 +217,11 @@ try {
 // 6. เคลียร์ตะกร้าทิ้งเมื่อสั่งสำเร็จ
 unset($_SESSION['cart']);
 
-// 7. ถ้ามาจากการสแกน QR ที่โต๊ะ (มี table_id) ให้กลับไปหน้าเมนูของโต๊ะเดิม
-//    (ยังไม่จบรอบ! ลูกค้าอาจสั่งเพิ่ม หรือกดดูสถานะ/บิลได้ จนกว่าร้านจะปิดบิลจริง)
-if ($table_id) {
+// 7. "ทานที่ร้าน" (มี table_id จริง) เท่านั้นที่ถือเป็นบิลรวมของโต๊ะ กลับไปหน้าเมนูของโต๊ะเดิมได้
+//    (ยังไม่จบรอบ! ลูกค้าอาจสั่งเพิ่ม หรือกดดูสถานะ/บิลรวมได้ จนกว่าร้านจะปิดบิลจริง)
+//    ส่วน "สั่งกลับบ้าน" ถือเป็นออเดอร์ส่วนตัวเสมอ แม้จะสแกน QR จากโต๊ะมาก็ตาม (แค่ใช้ QR เป็นทางลัดเข้าเมนู)
+//    ไม่ควรไปปนกับบิลรวมของโต๊ะที่อาจมีคนอื่นสั่งทานที่ร้านอยู่ จึงแยกไปดูสถานะออเดอร์ของตัวเองเท่านั้นที่ขั้นตอนที่ 8
+if ($table_id && $order_type === 'dine_in') {
     $_SESSION['has_ordered'] = true; // ใช้เช็กตอนโพลว่าเมื่อร้านปิดบิลแล้วให้เด้งออก (ดู qr_table/api_check_bill.php)
 
     // จำชื่อ/เบอร์ล่าสุดไว้ในเซสชัน เผื่อสั่งเพิ่มรอบถัดไปที่โต๊ะเดียวกัน จะได้กดใช้ซ้ำได้เลยไม่ต้องพิมพ์ใหม่
@@ -229,8 +234,13 @@ if ($table_id) {
     exit;
 }
 
-// 8. ลูกค้าออนไลน์/กลับบ้าน (ไม่มีบัญชี): จำ order_id ไว้ใน session เพื่อให้ดูสถานะออเดอร์ตัวเองได้
+// 8. "สั่งกลับบ้าน" ทุกกรณี (ไม่ว่าจะสแกน QR โต๊ะมาหรือเข้าลิงก์ตรงๆ ไม่มีบัญชีลูกค้า):
+//    จำ order_id ไว้ใน session เพื่อให้ดูสถานะ/ใบเสร็จของออเดอร์ตัวเองเท่านั้น ไม่ปนกับของคนอื่นที่โต๊ะเดียวกัน
 $_SESSION['guest_order_ids'][] = $order_id;
+if ($online_name !== '') {
+    $_SESSION['dinein_last_name'] = $online_name;
+    $_SESSION['dinein_last_phone'] = $online_phone;
+}
 echo "<script>
     alert('ส่งคำสั่งซื้อเรียบร้อยแล้ว!');
     window.location.href = 'order_detail.php?id=" . $order_id . "';

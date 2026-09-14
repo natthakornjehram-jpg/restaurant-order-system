@@ -3,24 +3,17 @@
 session_start();
 require_once '../includes/db.php';
 
-// 1. เช็กสิทธิ์เบื้องต้น (ไม่มีระบบบัญชีลูกค้าแล้ว - เช็กจาก session ของแขกที่สแกนโต๊ะ หรือแขกที่เพิ่งสั่งออนไลน์/กลับบ้านเอง)
-$table_id = $_SESSION['table_id'] ?? NULL;
+// 1. เช็กสิทธิ์เบื้องต้น (ไม่มีระบบบัญชีลูกค้าแล้ว - หน้านี้ใช้สำหรับ "สั่งกลับบ้าน" เท่านั้น ไม่ว่าจะสแกน QR
+//    โต๊ะมาหรือเข้าลิงก์ตรงๆ ก็ตาม) เช็กจาก guest_order_ids ที่ submit_order.php บันทึกไว้ตอนสั่งสำเร็จเท่านั้น
+//    (เดิมเคยเช็กจาก table_id ร่วมด้วย ทำให้ลูกค้าที่นั่งโต๊ะเดียวกันเดา order_id ของคนอื่นแล้วดูออเดอร์กันได้)
 $guest_order_ids = $_SESSION['guest_order_ids'] ?? [];
 $order_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
-// 2. ดึงข้อมูลร้านค้า
-$store = $conn->query("SELECT restaurant_name, logo_url FROM owner LIMIT 1")->fetch_assoc();
+// 2. ข้อมูลร้านค้า ($store ถูกดึงไว้แล้วครบจาก includes/db.php ไม่ต้อง query ซ้ำ)
 $restaurant_name = $store['restaurant_name'] ?? 'My Restaurant';
 
-// 3. ดึงข้อมูลออเดอร์หลัก
-// เช็กความเป็นเจ้าของออเดอร์: แขกที่สแกนโต๊ะดูได้เฉพาะออเดอร์ของโต๊ะตัวเอง, แขกออนไลน์/กลับบ้านดูได้เฉพาะออเดอร์ที่ session ตัวเองเพิ่งสั่ง
-// ถ้าไม่เข้าเงื่อนไขไหนเลย ห้ามดูออเดอร์ใดๆ ทั้งสิ้น (กัน IDOR)
-if ($table_id) {
-    $stmt = $conn->prepare("SELECT * FROM orders WHERE order_id = ? AND table_id = ?");
-    $stmt->bind_param("ii", $order_id, $table_id);
-    $stmt->execute();
-    $order = $stmt->get_result()->fetch_assoc();
-} elseif (in_array($order_id, $guest_order_ids, true)) {
+// 3. ดึงข้อมูลออเดอร์หลัก - ต้องเป็น order_id ที่ session นี้เพิ่งสั่งเองเท่านั้น กันดูออเดอร์ของคนอื่น (IDOR)
+if (in_array($order_id, $guest_order_ids, true)) {
     $stmt = $conn->prepare("SELECT * FROM orders WHERE order_id = ?");
     $stmt->bind_param("i", $order_id);
     $stmt->execute();
@@ -33,9 +26,8 @@ if (!$order) {
     die("<div class='container mt-5 alert alert-danger text-center rounded-4'>ไม่พบข้อมูลออเดอร์นี้</div>");
 }
 
-include '../includes/header_customer.php';
-include '../includes/nav_customer.php'; 
-
+include '../includes/header_dinein.php';
+include '../includes/nav_dinein.php';
 ?>
 
 <style>
@@ -54,7 +46,7 @@ include '../includes/nav_customer.php';
         <div class="col-md-8 col-lg-6 mt-3">
             
             <div class="mb-3 px-2">
-                <a href="../menu.php" class="text-decoration-none text-muted fw-bold small">
+                <a href="../qr_table/menu_dinein.php" class="text-decoration-none text-muted fw-bold small">
                     <i class="bi bi-chevron-left"></i> กลับไปหน้าเมนู
                 </a>
             </div>
@@ -167,4 +159,4 @@ include '../includes/nav_customer.php';
     </div>
 </div>
 
-<?php include '../includes/footer_customer.php'; ?>
+<?php include '../includes/footer_dinein.php'; ?>

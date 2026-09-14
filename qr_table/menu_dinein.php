@@ -60,8 +60,12 @@ if (isset($_GET['table']) && !empty($_GET['table'])) {
         unset($_SESSION['has_ordered']);
     }
 } elseif (!isset($_SESSION['table_id'])) {
-    echo "<script>alert('กรุณาสแกน QR Code ที่โต๊ะก่อนสั่งอาหารครับ'); window.location='../index.php';</script>";
-    exit;
+    // ไม่มีเลขโต๊ะเลย (เข้าทางลิงก์ตรงๆ ไม่ผ่านการสแกน QR เช่น กดจากหน้าแรก/ลิงก์ที่แชร์ไว้)
+    // เดิมบังคับสแกน QR เท่านั้นถึงจะเข้าได้ แต่ตอนนี้หน้าเมนูออนไลน์แบบเดิม (menu.php) ถูกยุบมารวมกับ
+    // หน้านี้แล้ว จึงถือว่าเป็นลูกค้าสั่งกลับบ้านอย่างเดียว (ไม่มีตัวเลือก "ทานที่ร้าน" เพราะไม่มีโต๊ะให้ผูก)
+    if (!isset($_SESSION['order_type'])) {
+        $_SESSION['order_type'] = 'takeaway';
+    }
 }
 
 // รับค่าประเภทออเดอร์จากหน้าเลือก (ทานที่ร้าน / กลับบ้าน)
@@ -114,7 +118,18 @@ if (!isset($_SESSION['order_type'])) {
     exit;
 }
 
-$table_display = $_SESSION['table_number'] ?? 'ไม่ทราบโต๊ะ';
+// สั่งกลับบ้านแบบไม่ผ่าน QR ไม่มีเลขโต๊ะให้ผูก ปล่อยเป็นค่าว่างไว้ (เดิม fallback เป็น "ไม่ทราบโต๊ะ"
+// ซึ่งจะหลุดไปติดอยู่ใน URL ?table=ไม่ทราบโต๊ะ ของทุกลิงก์ในหน้านี้โดยไม่ได้ตั้งใจ)
+$table_display = $_SESSION['table_number'] ?? '';
+
+// สร้าง query string ของหน้านี้ ใส่ table= ต่อท้ายเฉพาะตอนมีโต๊ะจริงเท่านั้น ใช้ซ้ำกับทุกลิงก์ภายในหน้านี้
+function dinein_url($extra = '') {
+    global $table_display;
+    $parts = [];
+    if ($table_display !== '') { $parts[] = 'table=' . urlencode($table_display); }
+    if ($extra !== '') { $parts[] = $extra; }
+    return empty($parts) ? '' : ('?' . implode('&', $parts));
+}
 
 // ดักจับหมวดหมู่
 $current_cat_id = isset($_GET['cat_id']) ? intval($_GET['cat_id']) : 0;
@@ -130,24 +145,31 @@ if (!empty($_SESSION['cart'])) {
 }
 
 $active_tab = (isset($_GET['tab']) && $_GET['tab'] === 'cart') ? 'cart' : 'menu';
-$cart_return_url = '../qr_table/menu_dinein.php?table=' . urlencode($table_display) . '&tab=cart';
+$cart_return_url = '../qr_table/menu_dinein.php' . dinein_url('tab=cart');
 
-$tbl_stmt = $conn->prepare("SELECT join_code FROM restauranttable WHERE table_id = ?");
-$tbl_stmt->bind_param("i", $_SESSION['table_id']);
-$tbl_stmt->execute();
-$tbl_data = $tbl_stmt->get_result()->fetch_assoc();
+// รหัสร่วมโต๊ะมีความหมายเฉพาะตอน "ทานที่ร้าน" เท่านั้น เพราะเป็นการกันคนแปลกหน้ามาสั่งปนกับโต๊ะที่ทานอาหารร่วมกัน
+// ส่วน "สั่งกลับบ้าน" ต่อให้สแกน QR จากโต๊ะเดียวกันมา ก็เป็นออเดอร์ส่วนตัวแยกจากคนอื่น ไม่ได้ทานร่วมโต๊ะ
+// จึงไม่ต้องขอรหัสอะไรเลย แต่ละคนสั่ง/จ่าย/ดูใบเสร็จของตัวเองอิสระต่อกัน
+$db_join_code = '';
+$is_verified_join = true;
+if (isset($_SESSION['table_id']) && $_SESSION['order_type'] === 'dine_in') {
+    $tbl_stmt = $conn->prepare("SELECT join_code FROM restauranttable WHERE table_id = ?");
+    $tbl_stmt->bind_param("i", $_SESSION['table_id']);
+    $tbl_stmt->execute();
+    $tbl_data = $tbl_stmt->get_result()->fetch_assoc();
 
-$db_join_code = $tbl_data['join_code'] ?? '';
+    $db_join_code = $tbl_data['join_code'] ?? '';
 
-// ตรวจสอบว่าผู้ใช้มีสิทธิ์สั่งอาหารในรอบนี้หรือไม่
-$is_verified_join = (!empty($_SESSION['has_ordered']) || (isset($_SESSION['user_join_code']) && $_SESSION['user_join_code'] === $db_join_code));
+    // ตรวจสอบว่าผู้ใช้มีสิทธิ์สั่งอาหารในรอบนี้หรือไม่
+    $is_verified_join = (!empty($_SESSION['has_ordered']) || (isset($_SESSION['user_join_code']) && $_SESSION['user_join_code'] === $db_join_code));
 
-// โต๊ะนี้มีคนอื่นเปิดออเดอร์ไว้ก่อนแล้วและยังไม่ได้ยืนยันรหัสร่วมโต๊ะ -> ส่งไปหน้ากรอกรหัสแยกต่างหาก
-// เช็คจาก join_code อย่างเดียว ไม่เช็คสถานะโต๊ะ เพราะรหัสถูกสุ่มไว้ตั้งแต่ตอนสั่งออเดอร์แรก
-// ก่อนที่ร้านจะกดอนุมัติเปิดโต๊ะเสียอีก (สถานะตอนนั้นอาจยังเป็น "available" อยู่)
-if ($store['is_shop_open'] != 0 && !empty($db_join_code) && !$is_verified_join) {
-    header("Location: join_table.php?table=" . urlencode($table_display));
-    exit;
+    // โต๊ะนี้มีคนอื่นเปิดออเดอร์ไว้ก่อนแล้วและยังไม่ได้ยืนยันรหัสร่วมโต๊ะ -> ส่งไปหน้ากรอกรหัสแยกต่างหาก
+    // เช็คจาก join_code อย่างเดียว ไม่เช็คสถานะโต๊ะ เพราะรหัสถูกสุ่มไว้ตั้งแต่ตอนสั่งออเดอร์แรก
+    // ก่อนที่ร้านจะกดอนุมัติเปิดโต๊ะเสียอีก (สถานะตอนนั้นอาจยังเป็น "available" อยู่)
+    if ($store['is_shop_open'] != 0 && !empty($db_join_code) && !$is_verified_join) {
+        header("Location: join_table.php?table=" . urlencode($table_display));
+        exit;
+    }
 }
 
 $nav_cart_qty = $total_qty;
@@ -179,7 +201,7 @@ include '../includes/nav_dinein.php';
     <div id="tab-menu" class="dinein-tab-pane" style="<?= $active_tab === 'cart' ? 'display:none;' : '' ?>">
 
     <div class="scroll-horizontal mb-4">
-        <a href="menu_dinein.php?table=<?= urlencode($table_display) ?>" class="btn <?= ($current_cat_id == 0) ? 'btn-dark' : 'btn-outline-dark bg-white' ?> rounded-pill px-4 flex-shrink-0 fw-bold shadow-sm">
+        <a href="menu_dinein.php<?= dinein_url() ?>" class="btn <?= ($current_cat_id == 0) ? 'btn-dark' : 'btn-outline-dark bg-white' ?> rounded-pill px-4 flex-shrink-0 fw-bold shadow-sm">
             เมนูทั้งหมด
         </a>
         <?php
@@ -188,7 +210,7 @@ include '../includes/nav_dinein.php';
             while ($cat = $categories->fetch_assoc()):
                 $is_active_cat = ($current_cat_id == $cat['category_id']) ? 'btn-dark' : 'btn-outline-dark bg-white';
         ?>
-                <a href="menu_dinein.php?table=<?= urlencode($table_display) ?>&cat_id=<?= $cat['category_id'] ?>" class="btn <?= $is_active_cat ?> rounded-pill px-4 flex-shrink-0 fw-bold shadow-sm">
+                <a href="menu_dinein.php<?= dinein_url('cat_id=' . $cat['category_id']) ?>" class="btn <?= $is_active_cat ?> rounded-pill px-4 flex-shrink-0 fw-bold shadow-sm">
                     <?= htmlspecialchars($cat['category_name']) ?>
                 </a>
         <?php
@@ -238,7 +260,7 @@ include '../includes/nav_dinein.php';
                     <form class="modal-content border-0 rounded-4 shadow" action="../member/cart_action.php?action=add" method="POST">
                         <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
                         <input type="hidden" name="item_id" value="<?= $m_id ?>">
-                        <input type="hidden" name="return_url" value="../qr_table/menu_dinein.php?table=<?= urlencode($table_display) ?><?= ($current_cat_id > 0) ? '&cat_id='.$current_cat_id : '' ?>">
+                        <input type="hidden" name="return_url" value="../qr_table/menu_dinein.php<?= dinein_url($current_cat_id > 0 ? 'cat_id='.$current_cat_id : '') ?>">
 
                         <div class="modal-header border-0 pb-0">
                             <h5 class="fw-bold m-0"><?= htmlspecialchars($m['name']) ?></h5>
@@ -479,7 +501,7 @@ include '../includes/nav_dinein.php';
     document.addEventListener("DOMContentLoaded", function() {
         var successModal = new bootstrap.Modal(document.getElementById('successOrderModal'));
         successModal.show();
-        window.history.replaceState(null, null, window.location.pathname + "?table=<?= urlencode($table_display) ?>");
+        window.history.replaceState(null, null, window.location.pathname + <?= json_encode(dinein_url()) ?>);
     });
 </script>
 <?php endif; ?>

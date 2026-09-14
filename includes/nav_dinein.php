@@ -1,10 +1,13 @@
 <?php
-$nav_table_no = $_SESSION['table_number'] ?? 'ไม่ระบุ';
+$nav_has_table = isset($_SESSION['table_id']);
+$nav_table_no = $_SESSION['table_number'] ?? '';
 $nav_order_type = $_SESSION['order_type'] ?? null;
 $current_page = basename($_SERVER['PHP_SELF']);
 $nav_cart_qty = $nav_cart_qty ?? 0; // ตั้งค่าจาก menu_dinein.php ก่อน include ไฟล์นี้
 $nav_active_tab = $nav_active_tab ?? 'menu';
 $nav_is_shop_open = isset($store['is_shop_open']) ? intval($store['is_shop_open']) : 1;
+// ใส่ ?table= ต่อท้ายเฉพาะตอนมีโต๊ะจริงเท่านั้น (สั่งกลับบ้านแบบไม่ผ่าน QR ไม่มีโต๊ะให้ผูก)
+$nav_menu_url = '../qr_table/menu_dinein.php' . ($nav_has_table ? '?table=' . urlencode($nav_table_no) : '');
 ?>
 
 <nav class="navbar sticky-top shadow-sm" style="background-color: var(--cafe-dark);">
@@ -12,11 +15,11 @@ $nav_is_shop_open = isset($store['is_shop_open']) ? intval($store['is_shop_open'
 
         <div class="d-flex align-items-center">
             <?php if ($current_page !== 'menu_dinein.php'): ?>
-            <a href="../qr_table/menu_dinein.php?table=<?= urlencode($nav_table_no) ?>" class="btn btn-outline-light btn-sm rounded-circle shadow-sm me-2 d-flex align-items-center justify-content-center" title="กลับหน้าหลัก" style="width: 38px; height: 38px;">
+            <a href="<?= $nav_menu_url ?>" class="btn btn-outline-light btn-sm rounded-circle shadow-sm me-2 d-flex align-items-center justify-content-center" title="กลับหน้าหลัก" style="width: 38px; height: 38px;">
                 <i class="bi bi-arrow-left"></i>
             </a>
             <?php endif; ?>
-            <a class="navbar-brand fw-bold d-flex align-items-center text-white m-0" href="../qr_table/menu_dinein.php?table=<?= urlencode($nav_table_no) ?>">
+            <a class="navbar-brand fw-bold d-flex align-items-center text-white m-0" href="<?= $nav_menu_url ?>">
                 <?php if (!empty($store['logo_url']) && $store['logo_url'] !== 'default_logo.png'): ?>
                     <img src="<?= BASE_URL ?>assets/images/logos/<?= htmlspecialchars($store['logo_url']) ?>" alt="logo" style="width:24px;height:24px;object-fit:cover;border-radius:50%;" class="me-2">
                 <?php else: ?>
@@ -34,9 +37,13 @@ $nav_is_shop_open = isset($store['is_shop_open']) ? intval($store['is_shop_open'
                 <span class="status-dot"></span> <?= $nav_is_shop_open ? 'เปิดรับออเดอร์' : 'ปิดรับออเดอร์' ?>
             </span>
 
+            <?php if ($nav_has_table && $nav_order_type === 'dine_in'): ?>
+            <!-- บิลรวมของโต๊ะ (my_bill.php) มีความหมายเฉพาะ "ทานที่ร้าน" เท่านั้น เพราะเป็นบิลรวมของทุกคนที่โต๊ะนี้
+                 "สั่งกลับบ้าน" เป็นออเดอร์ส่วนตัว ดูสถานะผ่าน order_detail.php ของตัวเองแทน (ไม่มีไอคอนนี้) -->
             <a href="../qr_table/my_bill.php" class="btn btn-outline-light btn-sm rounded-circle shadow-sm d-flex align-items-center justify-content-center" title="ติดตามสถานะ" style="width: 38px; height: 38px;">
                 <i class="bi bi-receipt"></i>
             </a>
+            <?php endif; ?>
 
         </div>
     </div>
