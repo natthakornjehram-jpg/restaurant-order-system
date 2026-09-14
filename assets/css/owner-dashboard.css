@@ -5,13 +5,13 @@ body { background-color: #f0f4f7; }
     background-color: #f0f4f7;
     min-height: 100vh;
     font-family: 'Sarabun', sans-serif;
-    padding-top: 85px;
+    padding-top: 10px;
     padding-bottom: 50px;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 992px) {
     .dashboard-scope {
-        padding-top: 100px;
+        padding-top: 20px;
     }
 }
 
@@ -46,7 +46,6 @@ body { background-color: #f0f4f7; }
     transition: 0.3s; min-width: 150px; color: #fff !important;
 }
 .dashboard-scope .bg-shop-open { background-color: #27ae60; }
-.dashboard-scope .bg-online-open { background-color: #2980b9; }
 .dashboard-scope .bg-status-closed { background-color: #c0392b; }
 
 /* กรอบออเดอร์ข้างล่าง */
@@ -69,3 +68,12 @@ body { background-color: #f0f4f7; }
 
 .dashboard-scope .table-title { font-size: 1.7rem; font-weight: 800; color: #343a40; }
 .dashboard-scope .status-badge { font-size: 0.85rem; font-weight: 700; padding: 6px 16px; border-radius: 50px; }
+
+@media (max-width: 576px) {
+    .dashboard-scope .stat-card-top { padding: 16px 14px; border-radius: 18px; border-width: 2px; }
+    .dashboard-scope .stat-value { font-size: 2rem; }
+    .dashboard-scope .stat-label { font-size: 0.9rem; }
+    .dashboard-scope .stat-icon { width: 46px; height: 46px; font-size: 1.3rem; margin-bottom: 8px; border-radius: 12px; }
+    .dashboard-scope .btn-toggle { width: 100%; min-width: 100%; }
+    .dashboard-scope .table-title { font-size: 1.4rem; }
+}

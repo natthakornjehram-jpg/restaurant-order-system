@@ -17,6 +17,12 @@ body { background-color: #f0f2f5; font-family: 'Sarabun', sans-serif; }
 .custom-option input[type="checkbox"]:checked + .option-btn {
     background-color: #f97316; border-color: #f97316; color: #ffffff; font-weight: bold;
 }
-.status-btn { padding: 5px 15px; border-radius: 50px; font-size: 0.9rem; font-weight: bold; cursor: pointer; border: none; }
-.status-green { background-color: #d1fae5; color: #059669; border: 1px solid #059669; }
-.status-gray { background-color: #f3f4f6; color: #6b7280; border: 1px solid #6b7280; }
+
+/* การ์ดกลุ่มตัวเลือกเสริม ในหน้าเพิ่ม/แก้ไขเมนู (แทนกริดเช็คบ็อกซ์ยาวๆ แบบเดิม) */
+.topping-group-card {
+    background: #ffffff; border: 1px solid #e9ecef; border-radius: 14px;
+    padding: 12px 14px; margin-bottom: 10px;
+}
+.topping-group-editor {
+    border-top: 1px dashed #dee2e6; padding-top: 10px;
+}

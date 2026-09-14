@@ -1,7 +1,9 @@
+
 <?php
 // member/cart.php
 session_start();
 require_once '../includes/db.php';
+require_once '../includes/csrf.php';
 
 // ดึงข้อมูลโต๊ะ และเช็กว่าออนไลน์หรือหน้าร้าน
 $table_no = $_SESSION['table_no'] ?? '';
@@ -9,7 +11,7 @@ $is_online = empty($table_no); // ถ้าไม่มีโต๊ะ = สั�
 $is_takeaway_qr = ($table_no === 'กลับบ้าน' || $table_no === 'Takeaway'); // สแกน QR สั่งกลับบ้านหน้าร้าน
 
 // เช็กสถานะร้าน
-$store_res = $conn->query("SELECT is_online_open FROM owner LIMIT 1");
+$store_res = $conn->query("SELECT is_shop_open, restaurant_name, logo_url FROM owner LIMIT 1");
 $store = $store_res->fetch_assoc();
 
 include '../includes/header_customer.php';
@@ -35,9 +37,9 @@ include '../includes/nav_customer.php';
         <a href="../menu.php" class="text-decoration-none text-muted fw-bold small"><i class="bi bi-arrow-left"></i> เลือกเมนูเพิ่ม</a>
     </div>
 
-    <?php if($store['is_online_open'] == 0 && empty($_SESSION['table_no'])): ?>
+    <?php if($store['is_shop_open'] == 0): ?>
         <div class="alert alert-danger text-center rounded-4 shadow-sm py-4 mb-4">
-            <h5 class="fw-bold mb-1"><i class="bi bi-exclamation-triangle-fill"></i> ร้านงดรับออเดอร์กลับบ้านชั่วคราว</h5>
+            <h5 class="fw-bold mb-1"><i class="bi bi-door-closed-fill me-2"></i> ขณะนี้ร้านปิดให้บริการ</h5>
         </div>
     <?php endif; ?>
 
@@ -72,7 +74,12 @@ include '../includes/nav_customer.php';
                             <div class="text-end" style="min-width: 110px;">
                                 <div class="fw-bold text-dark fs-5">฿<?= number_format($item['price'] * $item['quantity'], 0) ?></div>
                                 <div class="small text-muted mb-2"><?= $item['quantity'] ?> จาน</div>
-                                <a href="cart_action.php?action=remove&id=<?= $key ?>" class="text-danger small text-decoration-none fw-bold bg-danger bg-opacity-10 px-2 py-1 rounded"><i class="bi bi-trash3"></i> ลบ</a>
+                                <form method="POST" action="cart_action.php" class="d-inline">
+                                    <input type="hidden" name="action" value="remove">
+                                    <input type="hidden" name="id" value="<?= $key ?>">
+                                    <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
+                                    <button type="submit" class="btn btn-link text-danger small text-decoration-none fw-bold bg-danger bg-opacity-10 px-2 py-1 rounded border-0"><i class="bi bi-trash3"></i> ลบ</button>
+                                </form>
                             </div>
                         </div>
                     <?php endforeach; ?>
@@ -100,12 +107,12 @@ include '../includes/nav_customer.php';
                                 </div>
                             <?php endif; ?>
 
-                            <?php if($store['is_online_open'] == 1 || !empty($_SESSION['table_no'])): ?>
+                            <?php if($store['is_shop_open'] == 1): ?>
                                 <button type="submit" class="btn btn-brown w-100 rounded-pill py-3 fw-bold shadow-sm fs-5">
                                     <i class="bi bi-check-circle-fill me-2"></i> ดำเนินการต่อ
                                 </button>
                             <?php else: ?>
-                                <button type="button" class="btn btn-secondary w-100 rounded-pill py-3 fw-bold disabled">งดรับออเดอร์ชั่วคราว</button>
+                                <button type="button" class="btn btn-secondary w-100 rounded-pill py-3 fw-bold disabled">งดรับออเดอร์ชั่วคราว (ร้านปิด)</button>
                             <?php endif; ?>
                         </form>
 

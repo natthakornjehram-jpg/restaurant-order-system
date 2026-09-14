@@ -3,7 +3,14 @@
 session_start();
 require_once '../includes/db.php';
 require_once 'auth_owner.php';
+require_once '../includes/csrf.php';
 header('Content-Type: application/json');
+
+if (!csrf_verify($_POST['csrf_token'] ?? '')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
+    exit;
+}
 
 // 2. รับค่าจาก Javascript
 $id = $_POST['id'] ?? '';
@@ -14,11 +21,8 @@ $success = false;
 
 // 3. แยกอัปเดตตามปุ่มที่กดมา
 if ($type === 'shop_status') {
-    // 🟢 กดจากหน้า Dashboard (เปิด/ปิด ร้านและรับกลับบ้าน)
-    // เช็กว่ากดปุ่ม หน้าร้าน(shop) หรือ รับกลับบ้าน(online)
-    $column = ($id === 'shop') ? 'is_shop_open' : 'is_online_open';
-    
-    $stmt = $conn->prepare("UPDATE owner SET $column = ? WHERE owner_id = ?");
+    // 🟢 กดจากหน้า Dashboard (เปิด/ปิดร้าน)
+    $stmt = $conn->prepare("UPDATE owner SET is_shop_open = ? WHERE owner_id = ?");
     $stmt->bind_param("ii", $new_status, $owner_id);
     $success = $stmt->execute();
 
@@ -41,6 +45,6 @@ if ($type === 'shop_status') {
 if ($success) {
     echo json_encode(['success' => true]);
 } else {
-    echo json_encode(['success' => false, 'error' => 'ระบบฐานข้อมูลขัดข้อง: ' . $conn->error]);
+    echo json_encode(['success' => false, 'error' => 'ระบบฐานข้อมูลขัดข้อง กรุณาลองใหม่อีกครั้ง']);
 }
 ?>

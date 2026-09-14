@@ -2,9 +2,17 @@
 // member/confirm_order.php
 session_start();
 require_once '../includes/db.php';
+require_once '../includes/csrf.php';
 
 // 1. เช็กความปลอดภัย
 if (empty($_SESSION['cart'])) {
+    header("Location: ../menu.php");
+    exit;
+}
+
+// เช็คสถานะร้านอีกครั้งฝั่งเซิร์ฟเวอร์ (จุดตัดสินใจจริงอยู่ที่ submit_order.php แต่เช็คตรงนี้ด้วย
+// เพื่อไม่ให้ลูกค้าเห็นหน้ายืนยันออเดอร์ทั้งที่ร้านปิดไปแล้วระหว่างที่กำลังเลือกเมนูอยู่)
+if (empty($store['is_shop_open'])) {
     header("Location: ../menu.php");
     exit;
 }
@@ -20,9 +28,6 @@ $total_amount = 0;
 foreach ($_SESSION['cart'] as $item) {
     $total_amount += ($item['price'] * $item['quantity']);
 }
-
-// ดึงข้อมูลร้าน (เอาไว้โชว์เลขบัญชี)
-$store = $conn->query("SELECT bank_info, promptpay_qr FROM owner LIMIT 1")->fetch_assoc();
 
 include '../includes/header_customer.php';
 include '../includes/nav_customer.php';
@@ -58,30 +63,27 @@ include '../includes/nav_customer.php';
                 </div>
             </div>
 
-            <form action="submit_order.php" method="POST" enctype="multipart/form-data">
+            <form action="submit_order.php" method="POST">
+                <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
                 <input type="hidden" name="order_type" value="<?= htmlspecialchars($order_type) ?>">
                 <input type="hidden" name="total_amount" value="<?= $total_amount ?>">
                 <input type="hidden" name="takeaway_name" value="<?= htmlspecialchars($takeaway_name) ?>">
 
-                <?php if (!$is_online): ?>
+                <?php if ($order_type === 'dine_in'): ?>
                     <div class="alert alert-info rounded-4 border-0 shadow-sm text-center py-4 mb-4">
-                        <?php if ($order_type === 'dine_in'): ?>
-                            <h5 class="fw-bold text-dark"><i class="bi bi-shop"></i> ทานที่ร้าน (โต๊ะ <?= htmlspecialchars($table_no) ?>)</h5>
-                            <p class="mb-0 small text-muted">คุณสามารถกดส่งออเดอร์เข้าครัวได้เลย<br>และชำระเงินภายหลังเมื่อทานเสร็จครับ</p>
-                        <?php else: ?>
-                            <h5 class="fw-bold text-dark"><i class="bi bi-bag"></i> สั่งกลับบ้าน (คุณ <?= htmlspecialchars($takeaway_name) ?>)</h5>
-                            <p class="mb-0 small text-muted">กรุณากดส่งออเดอร์เข้าครัว<br>และชำระเงินที่หน้าเคาน์เตอร์ครับ</p>
-                        <?php endif; ?>
+                        <h5 class="fw-bold text-dark"><i class="bi bi-shop"></i> ทานที่ร้าน (โต๊ะ <?= htmlspecialchars($table_no) ?>)</h5>
+                        <p class="mb-0 small text-muted">คุณสามารถกดส่งออเดอร์เข้าครัวได้เลย<br>และชำระเงินภายหลังเมื่อทานเสร็จครับ</p>
                     </div>
-                    
+
                     <button type="submit" class="btn btn-brown w-100 rounded-pill py-3 fw-bold shadow-sm fs-5">
                         <i class="bi bi-send-fill me-2"></i> ส่งออเดอร์เข้าครัว
                     </button>
 
                 <?php else: ?>
                     <div class="card confirm-card border-primary border-2 p-4 mb-4 shadow-sm">
-                        <h5 class="fw-bold text-dark mb-2">ข้อมูลผู้สั่งและชำระเงิน</h5>
+                        <h5 class="fw-bold text-dark mb-2">ข้อมูลผู้สั่ง</h5>
 
+                        <?php if ($is_online): ?>
                         <div class="text-start mb-3">
                             <div class="row g-2">
                                 <div class="col-6">
@@ -94,57 +96,31 @@ include '../includes/nav_customer.php';
                                 </div>
                             </div>
                         </div>
+                        <?php else: ?>
+                        <p class="small text-muted mb-3">คุณ <?= htmlspecialchars($takeaway_name) ?></p>
+                        <?php endif; ?>
 
                         <div class="text-start mb-3">
-                            <label class="form-label small fw-bold d-block mb-2">วิธีชำระเงิน</label>
-                            <div class="d-flex gap-3">
+                            <label class="form-label small fw-bold d-block mb-2">วิธีชำระเงิน (จ่ายที่หน้าเคาน์เตอร์ตอนมารับอาหาร)</label>
+                            <div class="d-flex flex-column gap-2">
                                 <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="payment_method" id="payCash" value="cash" checked>
-                                    <label class="form-check-label fw-bold" for="payCash"><i class="bi bi-cash-coin me-1"></i>เงินสด (จ่ายหน้าร้านตอนมารับ)</label>
+                                    <input class="form-check-input" type="radio" name="payment_method" id="payQr" value="qr_counter" checked>
+                                    <label class="form-check-label fw-bold" for="payQr"><i class="bi bi-qr-code me-1"></i>สแกน QR หน้าเคาน์เตอร์</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="payment_method" id="payCash" value="cash">
+                                    <label class="form-check-label fw-bold" for="payCash"><i class="bi bi-cash-coin me-1"></i>เงินสดหน้าเคาน์เตอร์</label>
                                 </div>
                                 <div class="form-check">
                                     <input class="form-check-input" type="radio" name="payment_method" id="payTransfer" value="transfer">
-                                    <label class="form-check-label fw-bold" for="payTransfer"><i class="bi bi-bank me-1"></i>โอนเงิน</label>
+                                    <label class="form-check-label fw-bold" for="payTransfer"><i class="bi bi-bank me-1"></i>โอนเงินเอง แล้วโชว์สลิปตอนมารับ</label>
                                 </div>
                             </div>
                         </div>
-
-                        <div id="transferPaySection" class="card confirm-card border-primary border-2 p-4 mb-4 text-center shadow-sm" style="display: none;">
-                        <h5 class="fw-bold text-dark mb-2">ชำระเงินผ่านการโอน</h5>
-                        <p class="small text-muted mb-3">กรุณาโอนเงินตามยอดสุทธิ และแนบสลิปด้านล่าง<br>ร้านจะตรวจสลิปและยืนยันออเดอร์ให้ก่อนเริ่มทำอาหาร</p>
-
-                        <?php if (!empty($store['promptpay_qr'])): ?>
-                            <img src="../assets/images/promptpay_qr/<?= htmlspecialchars($store['promptpay_qr']) ?>" alt="PromptPay QR" class="img-fluid rounded-4 mb-3 shadow-sm" style="max-height: 250px; width: auto;">
-                        <?php else: ?>
-                            <div class="p-4 bg-light rounded-4 mb-3 border">
-                                <i class="bi bi-bank text-muted display-4 mb-2 d-block"></i>
-                                <div class="fw-bold fs-5"><?= nl2br(htmlspecialchars($store['bank_info'] ?? 'กรุณาติดต่อร้านเพื่อขอเลขบัญชี')) ?></div>
-                            </div>
-                        <?php endif; ?>
-                        <div class="text-start">
-                            <label class="form-label fw-bold text-primary small"><i class="bi bi-cloud-arrow-up-fill me-1"></i> แนบสลิปโอนเงิน <span class="text-danger">*</span></label>
-                            <input type="file" id="paymentSlipInput" name="payment_slip" class="form-control bg-light border-0 shadow-sm" accept="image/*">
-                        </div>
                     </div>
-                    <hr>
                     <button type="submit" class="btn btn-success w-100 rounded-pill py-3 fw-bold shadow-sm fs-5">
                         <i class="bi bi-check-circle-fill me-2"></i> ยืนยันคำสั่งซื้อ
                     </button>
-
-                    <script>
-                        (function() {
-                            var radios = document.querySelectorAll('input[name="payment_method"]');
-                            var section = document.getElementById('transferPaySection');
-                            var slipInput = document.getElementById('paymentSlipInput');
-                            function toggle() {
-                                var isTransfer = document.getElementById('payTransfer').checked;
-                                section.style.display = isTransfer ? 'block' : 'none';
-                                slipInput.required = isTransfer;
-                            }
-                            radios.forEach(function(r) { r.addEventListener('change', toggle); });
-                            toggle();
-                        })();
-                    </script>
                 <?php endif; ?>
             </form>
 

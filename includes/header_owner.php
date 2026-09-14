@@ -4,6 +4,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 require_once '../includes/db.php';
+require_once '../includes/csrf.php';
 
 // กันหน้านี้โดนแคชไว้ในเบราว์เซอร์ (เจอปัญหาเบราว์เซอร์โหลด Bootstrap เวอร์ชันเก่าค้างจากแคช)
 header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
@@ -26,9 +27,18 @@ $display_name = !empty($header_res['restaurant_name']) ? $header_res['restaurant
     
     <link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;600&family=Sarabun:wght@300;400;600&display=swap" rel="stylesheet">
     
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
 
-    <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/owner.css">
+    <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/owner.css?v=<?= time() ?>">
+    <style>
+        @media (max-width: 991.98px) {
+            body { padding-top: 56px !important; }
+        }
+        @media (min-width: 992px) {
+            body { padding-top: 0 !important; }
+        }
+    </style>
 </head>
 <body>
+<script>const CSRF_TOKEN = "<?= csrf_token() ?>";</script>

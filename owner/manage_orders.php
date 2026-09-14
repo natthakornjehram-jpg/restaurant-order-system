@@ -7,33 +7,31 @@ require_once 'auth_owner.php';
 include '../includes/header_owner.php';
 include '../includes/nav_owner.php'; 
 
-// ไม่เอาออเดอร์ที่จ่ายผ่านโอนแล้วร้านยังไม่ได้ตรวจ/อนุมัติสลิป เข้าคิวครัว
-// (กันเคสลูกค้าแนบสลิปปลอมหรือยังไม่โอนจริง ต้องให้ร้านเช็คก่อนเริ่มทำ)
-$sql = "SELECT o.* FROM orders o
+// ดึงรายการออเดอร์พร้อมหมายเลขโต๊ะ
+$sql = "SELECT o.*, t.table_number, t.status AS table_status FROM orders o
+        LEFT JOIN restauranttable t ON o.table_id = t.table_id
         WHERE o.order_status IN ('pending', 'cooking')
-        AND NOT EXISTS (
-            SELECT 1 FROM payment p
-            WHERE p.order_id = o.order_id
-            AND p.slip_image IS NOT NULL
-            AND p.status != 'completed'
-        )
         ORDER BY o.created_at ASC";
 $res = $conn->query($sql);
 $queue_count = $res ? $res->num_rows : 0;
 ?>
 
-<link rel="stylesheet" href="<?= BASE_URL ?>assets/css/owner-manage-orders.css">
+<link rel="stylesheet" href="<?= BASE_URL ?>assets/css/owner-manage-orders.css?v=<?= time() ?>">
 
 <div class="main-content container-fluid pb-5 px-4 pt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h2 class="fw-bold mb-0" style="color: #1a202c;">
-                <i class="bi bi-receipt text-primary me-2 shadow-sm"></i>รายการรอทำอาหาร
-            </h2>
-            <p class="text-muted small mb-0">ระบบจัดการคิวห้องครัวอัจฉริยะ</p>
+        <div class="d-flex align-items-center">
+            <a href="dashboard.php" class="btn btn-white rounded-circle me-3 shadow-sm d-flex align-items-center justify-content-center" style="width: 45px; height: 45px; border: 1px solid #edf2f7; background: #ffffff; color: #4a5568;" title="ย้อนกลับ">
+                <i class="bi bi-arrow-left fs-4"></i>
+            </a>
+            <div>
+                <h4 class="fw-bold mb-0" style="color: #1a202c; font-size: 1.50rem;">
+                    ออเดอร์ใหม่
+                </h4>
+            </div>
         </div>
         <div class="text-end">
-             <span class="badge bg-white text-primary border border-primary rounded-pill px-4 py-2 fs-6 shadow-sm">
+             <span class="badge bg-white text-primary border border-primary rounded-pill px-3 py-2 fs-6 shadow-sm">
                 กำลังรอ <?php echo $queue_count; ?> ใบสั่ง
              </span>
         </div>
@@ -43,22 +41,42 @@ $queue_count = $res ? $res->num_rows : 0;
         <?php if($res && $res->num_rows > 0): while($order = $res->fetch_assoc()): 
             $oid = $order['order_id']; 
             $status = $order['order_status']; 
-            $card_class = ($status == 'pending') ? 'bg-soft-pending' : 'bg-soft-cooking';
+            $table_status = $order['table_status'] ?? 'available';
+            $is_open_table = ($order['order_type'] === 'dine_in' && $table_status === 'available' && $status === 'pending');
+            $card_class = $is_open_table ? 'border border-3 border-danger shadow-lg' : (($status == 'pending') ? 'bg-soft-pending' : 'bg-soft-cooking');
+            $table_label = (!empty($order['table_number'])) ? 'โต๊ะ ' . htmlspecialchars($order['table_number']) : 'กลับบ้าน';
         ?>
         <div class="col-md-6 col-lg-4 col-xl-3">
             <div class="soft-card h-100 d-flex flex-column <?php echo $card_class; ?>">
                 
                 <div class="card-header-soft d-flex justify-content-between align-items-center">
                     <div>
-                        <div class="text-muted x-small fw-bold text-uppercase">ออเดอร์</div>
-                        <div class="order-id">#<?php echo str_pad($oid, 4, '0', STR_PAD_LEFT);?></div>
+                        <span class="badge <?php echo $is_open_table ? 'bg-danger' : 'bg-dark'; ?> rounded-pill px-3 mb-1" style="font-size: 0.85rem;">
+                            <i class="bi bi-shop me-1"></i><?php echo $table_label; ?>
+                        </span>
+                        <div class="order-id text-primary fw-bold fs-5">#<?php echo str_pad($order['daily_order_no'] ?: $oid, 3, '0', STR_PAD_LEFT);?></div>
                     </div>
                     <div class="text-end">
                         <span class="time-badge"><i class="bi bi-clock-history me-1"></i> <?php echo date('H:i', strtotime($order['created_at']));?></span>
                     </div>
                 </div>
 
+                <?php if ($order['order_type'] !== 'dine_in' && (!empty($order['online_customer_name']) || !empty($order['online_customer_phone']))): ?>
+                <div class="px-3 pt-2 small text-muted">
+                    <i class="bi bi-person-fill me-1"></i><?php echo htmlspecialchars($order['online_customer_name'] ?: '-'); ?>
+                    <?php if (!empty($order['online_customer_phone'])): ?>
+                        <span class="mx-1">|</span><i class="bi bi-telephone-fill me-1"></i><a href="tel:<?php echo htmlspecialchars($order['online_customer_phone']); ?>" class="text-muted text-decoration-none"><?php echo htmlspecialchars($order['online_customer_phone']); ?></a>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
+
                 <div class="card-body p-3 flex-grow-1">
+                    <?php if($is_open_table): ?>
+                        <div class="alert alert-danger p-2 mb-3 rounded-3 text-center fw-bold small shadow-sm" style="background-color: #fff5f5; border-color: #feb2b2; color: #c53030;">
+                            <i class="bi bi-bell-fill me-1 text-danger"></i> 🔔 ออเดอร์แรก (ขอเปิดโต๊ะใหม่)
+                        </div>
+                    <?php endif; ?>
+
                     <div class="order-items-list">
                         <?php 
                         $item_sql = "
@@ -69,9 +87,12 @@ $queue_count = $res ? $res->num_rows : 0;
                                  WHERE odt.order_detail_id = od.order_detail_id) AS topping_details
                             FROM orderdetail od
                             JOIN item i ON od.item_id = i.item_id
-                            WHERE od.order_id = $oid
+                            WHERE od.order_id = ?
                         ";
-                        $items_res = $conn->query($item_sql);
+                        $item_stmt = $conn->prepare($item_sql);
+                        $item_stmt->bind_param("i", $oid);
+                        $item_stmt->execute();
+                        $items_res = $item_stmt->get_result();
                         if($items_res) {
                             while($i = $items_res->fetch_assoc()):?>
                                 <div class="mb-4">
@@ -96,9 +117,13 @@ $queue_count = $res ? $res->num_rows : 0;
                 </div>
 
                 <div class="p-3">
-                    <?php if($status == 'pending'):?>
+                    <?php if($is_open_table):?>
+                        <button onclick="changeStatus('<?php echo $oid;?>', 'cooking')" class="btn w-100 btn-success py-3 fw-bold rounded-pill shadow fs-6">
+                            <i class="bi bi-check-circle-fill me-1"></i> อนุมัติเปิดโต๊ะ & รับออเดอร์
+                        </button>
+                    <?php elseif($status == 'pending'):?>
                         <button onclick="changeStatus('<?php echo $oid;?>', 'cooking')" class="btn w-100 btn-start btn-action shadow-sm">
-                            <i class="bi bi-play-fill me-1"></i> รับออเดอร์เข้าครัว
+                            <i class="bi bi-play-fill me-1"></i> รับออเดอร์
                         </button>
                     <?php elseif($status == 'cooking'):?>
                         <button onclick="changeStatus('<?php echo $oid;?>', 'served')" class="btn w-100 btn-done btn-action shadow-sm">
@@ -113,8 +138,7 @@ $queue_count = $res ? $res->num_rows : 0;
         
         <div class="col-12 text-center" style="margin-top: 15vh;">
             <div style="font-size: 6rem; color: #cbd5e0;"><i class="bi bi-receipt-cutoff"></i></div>
-            <h3 class="mt-4 fw-bold" style="color: #4a5568;">ยังไม่มีใบสั่งอาหารในขณะนี้</h3>
-            <p class="text-muted">ออเดอร์ใหม่จะปรากฏขึ้นที่นี่โดยอัตโนมัติ</p>
+            <h3 class="mt-4 fw-bold" style="color: #4a5568;">ยังไม่มีออเดอร์ในขณะนี้</h3>
             <a href="dashboard.php" class="btn btn-outline-primary rounded-pill px-4 mt-3">
                 <i class="bi bi-arrow-left me-2"></i>กลับหน้าหลัก
             </a>

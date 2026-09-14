@@ -1,0 +1,18 @@
+# ไฟล์ที่เกิดจากผู้ใช้งานจริงตอนรันเว็บ (รูปเมนู/โลโก้/พร้อมเพย์/สลิปโอนเงิน)
+# เป็นข้อมูล ไม่ใช่ซอร์สโค้ด ไม่ควร commit ปนกับโค้ด (ไฟล์ default ที่โค้ดอ้างอิงถึงยังคง track ไว้)
+/assets/images/items/*
+!/assets/images/items/default_food.jpg
+/assets/images/logos/*
+!/assets/images/logos/default_logo.png
+/assets/images/promptpay_qr/*
+/assets/images/slips/*
+
+# ไฟล์ค่าตั้งค่า/ความลับเฉพาะเครื่อง (เผื่อเพิ่มในอนาคต)
+.env
+.env.local
+
+# ไฟล์ของระบบปฏิบัติการ/เอดิเตอร์
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

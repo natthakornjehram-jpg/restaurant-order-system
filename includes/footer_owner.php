@@ -2,10 +2,67 @@
 </div><!-- /.owner-shell -->
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
     //footer_owner.php
+/**
+ * 0. กล่องแจ้งเตือนกลาง ใช้แทน alert()/confirm() ของเบราว์เซอร์ทั้งหมด
+ *    เด้งเป็นกรอบเข้มที่ขอบบนจอ ปิดเองอัตโนมัติ ไม่บล็อกการทำงาน ลื่นไหลกว่าป็อปอัปเบราว์เซอร์
+ */
+function ownerNotify(message, icon = 'success') {
+    Swal.fire({
+        toast: true,
+        position: 'top',
+        showConfirmButton: false,
+        timer: 2200,
+        timerProgressBar: true,
+        icon: icon,
+        title: message,
+        background: '#212529',
+        color: '#fff'
+    });
+}
+
+// อ่านข้อความแจ้งเตือนที่ค้างไว้ก่อนหน้า reload (เช่น หลังบันทึก/ลบข้อมูลผ่าน AJAX แล้วรีโหลดหน้า)
+(function () {
+    try {
+        const pending = sessionStorage.getItem('ownerFlashMsg');
+        if (pending) {
+            sessionStorage.removeItem('ownerFlashMsg');
+            ownerNotify(pending);
+        }
+    } catch (e) { /* sessionStorage ใช้ไม่ได้ก็แค่ข้ามไป ไม่กระทบการทำงานหลัก */ }
+})();
+
+/**
+ * 0.5 จำตำแหน่งเลื่อนหน้าจอไว้ก่อนหน้าจะ reload/เปลี่ยนหน้า แล้วเลื่อนกลับไปที่เดิมให้อัตโนมัติ
+ *     แก้ปัญหาบันทึก/ลบ/แก้ไขรายการที่อยู่ล่างๆ หน้า (เช่น จัดการตัวเลือกเสริม, จัดการเมนู) แล้วหน้าเด้งขึ้นบนสุดทุกครั้ง
+ *     ใช้ beforeunload ดักทุกกรณีที่หน้าออกไป ไม่ว่าจะ submit ฟอร์มปกติ, fetch() แล้วสั่ง location.href/reload เอง, หรือกดลิงก์
+ */
+(function () {
+    const scrollKey = 'ownerScrollPos:' + location.pathname;
+
+    window.addEventListener('beforeunload', function () {
+        try { sessionStorage.setItem(scrollKey, String(window.scrollY)); } catch (e) {}
+    });
+
+    try {
+        const saved = sessionStorage.getItem(scrollKey);
+        if (saved !== null) {
+            sessionStorage.removeItem(scrollKey);
+            const y = parseInt(saved, 10) || 0;
+            // ต้องระบุ behavior: 'instant' เท่านั้น (ไม่ใช่ 'auto' ซึ่งแปลว่า "ให้ใช้ค่าตาม CSS scroll-behavior"
+            // ยังคงเลื่อนแบบมีแอนิเมชันเหมือนเดิม) เพื่อบังคับข้าม scroll-behavior: smooth ที่ Bootstrap
+            // ตั้งไว้ที่ :root แล้วเด้งไปตำแหน่งเดิมทันทีแบบไม่มีการเลื่อนให้เห็นเลย
+            const jump = () => window.scrollTo({ top: y, left: 0, behavior: 'instant' });
+            // เผื่อเนื้อหาบางส่วนยังไม่ทัน render เต็มความสูงตอน DOM พร้อม ลองเลื่อนซ้ำอีกครั้งหลัง load เสร็จ
+            requestAnimationFrame(jump);
+            window.addEventListener('load', jump);
+        }
+    } catch (e) {}
+})();
+
 /**
  * 1. ฟังก์ชันสลับสถานะ (Toggle) แบบ AJAX + SweetAlert2
  */
@@ -16,6 +73,7 @@ function toggleStatus(id, type, currentStatus) {
     formData.append('id', id);
     formData.append('type', type);
     formData.append('new_status', newStatus);
+    formData.append('csrf_token', CSRF_TOKEN);
 
     fetch('update_status_ajax.php', {
         method: 'POST',
@@ -41,14 +99,9 @@ function toggleStatus(id, type, currentStatus) {
             const btn = document.querySelector(`[data-id="${id}"][data-type="${type}"]`);
             if (btn) {
                 if (type === 'shop_status') {
-                    if (id === 'shop') {
-                        btn.className = (newStatus === 1) ? 'btn btn-toggle bg-shop-open' : 'btn btn-toggle bg-status-closed';
-                        btn.innerHTML = (newStatus === 1) ? '<i class="bi bi-shop me-2"></i> ร้านเปิดอยู่' : '<i class="bi bi-shop me-2"></i> ร้านปิดอยู่';
-                    } else {
-                        btn.className = (newStatus === 1) ? 'btn btn-toggle bg-online-open' : 'btn btn-toggle bg-status-closed';
-                        btn.innerHTML = (newStatus === 1) ? '<i class="bi bi-bag-check me-2"></i> เปิดรับกลับบ้าน' : '<i class="bi bi-bag-check me-2"></i> ปิดรับกลับบ้าน';
-                    }
-                } else if (type === 'menu' || type === 'topping') {
+                    btn.className = (newStatus === 1) ? 'btn btn-toggle bg-shop-open' : 'btn btn-toggle bg-status-closed';
+                    btn.innerHTML = (newStatus === 1) ? '<i class="bi bi-shop me-1"></i> ร้านเปิดอยู่ (รับออเดอร์)' : '<i class="bi bi-shop me-1"></i> ร้านปิดอยู่';
+                } else if (type === 'menu' || type === 'topping' || type === 'item') {
                     // ปรับแต่งปุ่ม เมนู, ท็อปปิ้ง (มีของ/หมด)
                     if (newStatus == 1) {
                         btn.className = 'btn btn-sm rounded-pill px-3 btn-success';
@@ -93,9 +146,26 @@ function playNotifySound() {
 }
 
 /**
- * 3. ระบบเช็คออเดอร์ใหม่แบบเกือบเรียลไทม์ (โพลทุก 3 วินาที)
+ * 2.5 พูดแจ้งเตือนด้วยเสียง (Web Speech API) ใช้คู่กับ playNotifySound()
+ */
+function speakThai(text) {
+    try {
+        if (!('speechSynthesis' in window)) return;
+        speechSynthesis.cancel(); // กันเสียงพูดซ้อนกันถ้าแจ้งเตือนเข้ามาถี่ๆ
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = 'th-TH';
+        utter.rate = 1;
+        speechSynthesis.speak(utter);
+    } catch (e) {
+        console.warn('พูดแจ้งเตือนไม่ได้:', e);
+    }
+}
+
+/**
+ * 3. ระบบเช็คออเดอร์ใหม่แบบเกือบเรียลไทม์ (โพลทุก 2 วินาที)
  */
 let lastPendingCount = null;
+let lastPaymentsCount = null;
 
 function checkNewOrders() {
     fetch('api_check_update.php')
@@ -103,6 +173,7 @@ function checkNewOrders() {
     .then(data => {
         if (lastPendingCount !== null && data.pending_count > lastPendingCount) {
             playNotifySound();
+            speakThai('ออเดอร์เข้าแล้ว');
             Swal.fire({
                 icon: 'info',
                 title: 'มีออเดอร์ใหม่เข้า!',
@@ -120,14 +191,21 @@ function checkNewOrders() {
             }
         }
 
+        // หน้าจัดการชำระเงิน: รีโหลดอัตโนมัติเมื่อมีรายการเปลี่ยนแปลง (สลิปใหม่เข้ามา / โต๊ะปิดบิลจากเครื่องอื่น)
+        if (lastPaymentsCount !== null && data.payments_count !== lastPaymentsCount
+            && window.location.pathname.includes('manage_payments.php')) {
+            location.reload();
+        }
+
         lastPendingCount = data.pending_count;
+        lastPaymentsCount = data.payments_count;
     })
     .catch(err => console.error('API Error:', err));
 }
 
-// เช็คทุก 3 วินาที (เกือบเรียลไทม์ โดยไม่ต้องใช้ WebSocket)
+// เช็คทุก 2 วินาที (เกือบเรียลไทม์ โดยไม่ต้องใช้ WebSocket)
 if (lastPendingCount === null) checkNewOrders();
-setInterval(checkNewOrders, 3000);
+setInterval(checkNewOrders, 2000);
 </script>
 </body>
 </html>

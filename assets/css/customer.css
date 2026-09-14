@@ -4,6 +4,11 @@
     --dark-brown: #3e2723;
     --light-brown: #d7ccc8;
     --bg-soft: #fdfaf5; /* สีครีมเบจจางๆ สบายตา */
+
+    /* ใช้ชื่อชุดนี้ในหน้าโต๊ะ (qr_table/*) ให้ตรงกับที่ nav_dinein.php และ menu-dinein.css อ้างถึง */
+    --cafe-brown: var(--main-brown);
+    --cafe-dark: var(--dark-brown);
+    --cafe-gold: #c9a227;
 }
 
 body {

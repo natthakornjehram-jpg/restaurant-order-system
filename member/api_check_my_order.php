@@ -27,12 +27,24 @@ $stmt->execute();
 $res = $stmt->get_result();
 
 // 3. ถ้าเจอออเดอร์ที่พร้อมเสิร์ฟ ส่งค่า true กลับไปให้ JS ทำงาน
-if ($res->num_rows > 0) {
-    echo json_encode(['food_ready' => true]);
-} else {
-    echo json_encode(['food_ready' => false]);
-}
-
+$food_ready = $res->num_rows > 0;
 $stmt->close();
+
+// 4. สร้างค่าสรุปสถานะออเดอร์ทั้งหมดของโต๊ะนี้ (ยังไม่จ่ายเงิน) ไว้เทียบว่ามีการเปลี่ยนแปลงไหม
+// ให้หน้าบิล (my_bill.php) รีเฟรชตัวเองอัตโนมัติเมื่อสถานะออเดอร์ไหนก็ตามเปลี่ยน ไม่ต้องรอแค่ "พร้อมเสิร์ฟ"
+$status_stmt = $conn->prepare("SELECT order_id, order_status FROM orders WHERE table_id = ? AND payment_status = 'unpaid' ORDER BY order_id ASC");
+$status_stmt->bind_param("i", $table_id);
+$status_stmt->execute();
+$status_res = $status_stmt->get_result();
+$parts = [];
+while ($row = $status_res->fetch_assoc()) {
+    $parts[] = $row['order_id'] . ':' . $row['order_status'];
+}
+$status_stmt->close();
+
+echo json_encode([
+    'food_ready' => $food_ready,
+    'status_hash' => implode(',', $parts)
+]);
 $conn->close();
 ?>

@@ -1,18 +1,27 @@
 function ajaxCheckout(tableId) {
-    if (!confirm('ยืนยันการเช็คบิลและเคลียร์โต๊ะนี้ให้ว่าง?')) return;
     const formData = new FormData();
     formData.append('table_id', tableId);
+    formData.append('csrf_token', CSRF_TOKEN);
     fetch('update_table_status_ajax.php', { method: 'POST', body: formData })
     .then(res => res.json())
     .then(data => {
-        if (data.success) { location.reload(); } else { alert('ผิดพลาด: ' + data.error); }
+        if (data.success) {
+            sessionStorage.setItem('ownerFlashMsg', 'เช็คบิลและเคลียร์โต๊ะเรียบร้อยแล้ว');
+            location.reload();
+        } else {
+            ownerNotify('ผิดพลาด: ' + data.error, 'error');
+        }
     });
 }
 
-function showQR(tableNum) {
+function showQR(tableNum, qrToken) {
     // ใช้โดเมนที่กำลังเปิดอยู่จริง + BASE_URL (คำนวณจาก db.php) แทนการ hardcode โดเมน
     // ทำให้ QR code ชี้ไปที่โดเมนถูกต้องเสมอ ไม่ว่าจะรันบน localhost หรือโฮสต์จริง
-    const tableUrl = window.location.origin + BASE_URL + "qr_table/menu_dinein.php?table=" + encodeURIComponent(tableNum);
+    // แนบ token ลับต่อโต๊ะ (&t=) ไปด้วยเสมอ - menu_dinein.php ใช้เช็คว่าสแกนจาก QR จริง ไม่ใช่แค่เดาเลขโต๊ะ
+    let tableUrl = window.location.origin + BASE_URL + "qr_table/menu_dinein.php?table=" + encodeURIComponent(tableNum);
+    if (qrToken) {
+        tableUrl += "&t=" + encodeURIComponent(qrToken);
+    }
     const qrApi = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(tableUrl)}`;
 
     document.getElementById('qrTableNum').innerText = tableNum;

@@ -50,7 +50,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
             </a>
             <?php endif; ?>
             <a class="navbar-brand fw-bold text-theme m-0" href="<?= BASE_URL ?>menu.php">
-                <i class="bi bi-shop me-2"></i> RANNAIBAAN
+                <?php if (!empty($store['logo_url']) && $store['logo_url'] !== 'default_logo.png'): ?>
+                    <img src="<?= BASE_URL ?>assets/images/logos/<?= htmlspecialchars($store['logo_url']) ?>" alt="logo" style="width:24px;height:24px;object-fit:cover;border-radius:50%;" class="me-2">
+                <?php else: ?>
+                    <i class="bi bi-shop me-2"></i>
+                <?php endif; ?>
+                <?= htmlspecialchars($store['restaurant_name'] ?? 'ร้านของเรา') ?>
             </a>
         </div>
 

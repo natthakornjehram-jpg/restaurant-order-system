@@ -16,12 +16,28 @@ if (!isset($_SESSION['table_id'])) {
 $table_id = $_SESSION['table_id'];
 $table_no = $_SESSION['table_number'] ?? '';
 
-// ดึงข้อมูลร้าน
-$store_res = $conn->query("SELECT restaurant_name FROM owner LIMIT 1");
-$store = $store_res->fetch_assoc();
+// เช็กรหัสร่วมโต๊ะเหมือนกับ menu_dinein.php - กันคนอื่นที่ไม่รู้รหัสเข้ามาดูบิล/รายการสั่งของโต๊ะนี้
+// (ก่อนหน้านี้หน้านี้เช็คแค่ session table_id ซึ่งถูกตั้งค่าได้แค่เดาเลขโต๊ะจาก URL ของ menu_dinein.php)
+$tbl_stmt = $conn->prepare("SELECT join_code FROM restauranttable WHERE table_id = ?");
+$tbl_stmt->bind_param("i", $table_id);
+$tbl_stmt->execute();
+$tbl_data = $tbl_stmt->get_result()->fetch_assoc();
+$db_join_code = $tbl_data['join_code'] ?? '';
+
+$is_verified_join = (!empty($_SESSION['has_ordered']) || (isset($_SESSION['user_join_code']) && $_SESSION['user_join_code'] === $db_join_code));
+
+if (!empty($db_join_code) && !$is_verified_join) {
+    header("Location: join_table.php?table=" . urlencode($table_no));
+    exit;
+}
+
+// หมายเหตุ: $store (ชื่อร้าน, is_shop_open ฯลฯ) ถูกโหลดมาครบแล้วจาก includes/db.php ไม่ต้อง query ซ้ำ
+// (ของเดิม query ซ้ำแต่ดึงแค่ restaurant_name มาทับ $store ทำให้ nav_dinein.php เห็น is_shop_open หายไป
+// ป้ายสถานะร้านบนหน้านี้เลยโชว์ "เปิดรับออเดอร์" ตลอดแม้ร้านจะปิดแล้วก็ตาม)
 
 // ดึงออเดอร์ของโต๊ะนี้ ที่สถานะยังไม่จ่ายเงิน (unpaid)
-$sql_orders = "SELECT * FROM orders WHERE table_id = ? AND payment_status = 'unpaid' ORDER BY created_at DESC";
+// ไม่รวมออเดอร์ที่ถูกยกเลิก เพราะไม่ต้องให้ลูกค้าเห็นในบิลอีกต่อไป (และจะ unpaid ค้างตลอดไปเพราะไม่มีทางถูกจ่ายเงิน)
+$sql_orders = "SELECT * FROM orders WHERE table_id = ? AND payment_status = 'unpaid' AND order_status != 'canceled' ORDER BY created_at DESC";
 $stmt = $conn->prepare($sql_orders);
 $stmt->bind_param("i", $table_id);
 $stmt->execute();
@@ -29,7 +45,7 @@ $orders = $stmt->get_result();
 
 $grand_total = 0;
 
-include '../includes/header_dinein.php'; 
+include '../includes/header_dinein.php';
 include '../includes/nav_dinein.php'; 
 ?>
 
@@ -49,7 +65,13 @@ include '../includes/nav_dinein.php';
 <div class="container py-4 mb-5">
     
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="fw-bold m-0 text-dark"><i class="bi bi-receipt-cutoff text-primary me-2"></i>บิลโต๊ะ <?= htmlspecialchars($table_no) ?></h4>
+        <h4 class="fw-bold m-0 text-dark">
+            <?php if (($_SESSION['order_type'] ?? '') === 'takeaway'): ?>
+                <i class="bi bi-receipt-cutoff text-primary me-2"></i>ใบสรุปออเดอร์ (สั่งกลับบ้าน)
+            <?php else: ?>
+                <i class="bi bi-receipt-cutoff text-primary me-2"></i>บิลโต๊ะ <?= htmlspecialchars($table_no) ?>
+            <?php endif; ?>
+        </h4>
         <a href="menu_dinein.php?table=<?= urlencode($table_no) ?>" class="btn btn-sm btn-outline-secondary rounded-pill shadow-sm">
             <i class="bi bi-plus-circle"></i> สั่งเพิ่ม
         </a>
@@ -65,9 +87,9 @@ include '../includes/nav_dinein.php';
             <div class="dotted-divider"></div>
 
             <?php 
-            while ($order = $orders->fetch_assoc()): 
+            while ($order = $orders->fetch_assoc()):
                 $grand_total += $order['total_amount'];
-                
+
                 // 🟢 แปลงสถานะออเดอร์ให้เป็นข้อความและสีที่เข้าใจง่าย
                 $status_color = 'bg-secondary';
                 $status_text = 'ไม่ทราบสถานะ';
@@ -84,18 +106,21 @@ include '../includes/nav_dinein.php';
                         $status_color = 'bg-success'; 
                         $status_text = '<i class="bi bi-check2-circle"></i> พร้อมเสิร์ฟ!'; 
                         break;
-                    case 'served': 
-                        $status_color = 'bg-info text-dark'; 
-                        $status_text = '<i class="bi bi-cup-hot"></i> เสิร์ฟแล้ว'; 
-                        break;
-                    case 'canceled': 
-                        $status_color = 'bg-danger'; 
-                        $status_text = '<i class="bi bi-x-circle"></i> ยกเลิก'; 
+                    case 'served':
+                        $status_color = 'bg-info text-dark';
+                        $status_text = '<i class="bi bi-cup-hot"></i> เสิร์ฟแล้ว';
                         break;
                 }
 
-                // ดึงรายการอาหารในแต่ละออเดอร์
-                $detail_sql = "SELECT od.*, i.name FROM orderdetail od JOIN item i ON od.item_id = i.item_id WHERE od.order_id = ?";
+                // ดึงรายการอาหารในแต่ละออเดอร์พร้อมท็อปปิ้ง
+                $detail_sql = "SELECT od.*, i.name,
+                    (SELECT GROUP_CONCAT(t.topping_name SEPARATOR ', ') 
+                     FROM orderdetail_topping odt 
+                     JOIN topping t ON odt.topping_id = t.topping_id 
+                     WHERE odt.order_detail_id = od.order_detail_id) AS topping_names
+                    FROM orderdetail od 
+                    JOIN item i ON od.item_id = i.item_id 
+                    WHERE od.order_id = ?";
                 $d_stmt = $conn->prepare($detail_sql);
                 $d_stmt->bind_param("i", $order['order_id']);
                 $d_stmt->execute();
@@ -104,16 +129,24 @@ include '../includes/nav_dinein.php';
                 <div class="mb-4">
                     <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom border-light">
                         <div>
-                            <span class="fw-bold text-dark small">ออเดอร์ #<?= str_pad($order['order_id'], 4, '0', STR_PAD_LEFT) ?></span>
+                            <span class="fw-bold text-dark small">คิวที่ #<?= str_pad($order['daily_order_no'] ?: $order['order_id'], 3, '0', STR_PAD_LEFT) ?></span>
                             <span class="badge rounded-pill <?= $status_color ?> ms-2 fw-normal" style="font-size: 0.75rem;"><?= $status_text ?></span>
                         </div>
                         <span class="small text-muted"><?= date('H:i', strtotime($order['created_at'])) ?> น.</span>
                     </div>
-                    
+
                     <?php while ($item = $details->fetch_assoc()): ?>
-                        <div class="d-flex justify-content-between mb-1 small">
-                            <span><?= $item['quantity'] ?>x <?= htmlspecialchars($item['name']) ?></span>
-                            <span>฿<?= number_format($item['unit_price'] * $item['quantity'], 2) ?></span>
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between small">
+                                <span class="fw-bold"><?= $item['quantity'] ?>x <?= htmlspecialchars($item['name']) ?></span>
+                                <span>฿<?= number_format($item['unit_price'] * $item['quantity'], 2) ?></span>
+                            </div>
+                            <?php if(!empty($item['topping_names'])): ?>
+                                <div class="small text-muted ms-3">+ <?= htmlspecialchars($item['topping_names']) ?></div>
+                            <?php endif; ?>
+                            <?php if(!empty($item['note'])): ?>
+                                <div class="small text-danger ms-3">* <?= htmlspecialchars($item['note']) ?></div>
+                            <?php endif; ?>
                         </div>
                     <?php endwhile; ?>
                 </div>
@@ -127,7 +160,10 @@ include '../includes/nav_dinein.php';
             </div>
             
             <div class="mt-4 text-center">
-                <p class="small text-danger fw-bold"><i class="bi bi-info-circle"></i> เมื่อชำระเงินเสร็จสิ้น รายการจะถูกรีเซ็ตอัตโนมัติ</p>
+                <a href="menu_dinein.php?table=<?= urlencode($table_no) ?>" class="btn btn-warning w-100 rounded-pill py-3 fw-bold shadow mb-3" style="background-color: var(--cafe-gold); border: none; color: var(--cafe-dark);">
+                    <i class="bi bi-plus-circle-fill me-2"></i> สั่งอาหารเพิ่ม
+                </a>
+                <p class="small text-muted mb-0"><i class="bi bi-info-circle me-1"></i> เมื่อชำระเงินที่เคาน์เตอร์เสร็จสิ้น ระบบจะทำการปิดบิลและคืนสถานะให้อัตโนมัติ</p>
             </div>
         </div>
 

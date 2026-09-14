@@ -21,9 +21,17 @@ body {
 .menu-card {
     background: white; border-radius: 20px; overflow: hidden;
     transition: 0.3s; cursor: pointer; border: 1px solid #eee;
+    position: relative;
 }
 .menu-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
 .price-normal { color: #d32f2f; font-weight: bold; font-size: 1.1rem; }
+.featured-badge {
+    position: absolute; top: 8px; left: 8px; z-index: 2;
+    background-color: #f5b301; color: #fff; border-radius: 50px;
+    font-size: 0.7rem; font-weight: bold; padding: 3px 10px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    display: flex; align-items: center; gap: 3px;
+}
 
 /* การแยกกลุ่มท็อปปิ้งใน Modal */
 .topping-group-title {

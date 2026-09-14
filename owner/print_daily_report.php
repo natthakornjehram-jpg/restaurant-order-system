@@ -16,19 +16,22 @@ $restaurant_name = !empty($rest_data['restaurant_name']) ? $rest_data['restauran
 
 // 3. ดึงข้อมูลสรุปยอดขาย โดย JOIN ระหว่าง orders กับ payment
 // ใช้ total_amount แทน total_price และดึงวิธีจ่าย (method) จากตาราง payment
-$summary_sql = "SELECT 
+// เดิมมีแค่ cash/transfer ทำให้ยอดที่จ่ายด้วย qr_counter (สแกน QR หน้าเคาน์เตอร์) หายไปจากยอดแยกประเภท
+// ทั้งที่นับรวมอยู่ใน total ด้วย เพิ่ม qr แยกออกมาให้ครบทุกวิธีจ่ายที่ระบบรองรับจริง
+$summary_sql = "SELECT
     SUM(CASE WHEN p.method = 'cash' THEN o.total_amount ELSE 0 END) as cash,
     SUM(CASE WHEN p.method = 'transfer' THEN o.total_amount ELSE 0 END) as transfer,
+    SUM(CASE WHEN p.method = 'qr_counter' THEN o.total_amount ELSE 0 END) as qr,
     SUM(o.total_amount) as total,
     COUNT(o.order_id) as count
     FROM orders o
-    LEFT JOIN payment p ON o.order_id = p.order_id 
+    LEFT JOIN payment p ON o.order_id = p.order_id
     WHERE o.payment_status = 'paid' AND DATE(o.created_at) = ?";
 
 $stmt_sum = $conn->prepare($summary_sql);
 
 if (!$stmt_sum) {
-    die("<div class='alert alert-danger'>SQL Error: " . $conn->error . "</div>");
+    die("<div class='alert alert-danger'>เกิดข้อผิดพลาดในการดึงข้อมูลรายงาน</div>");
 }
 
 $stmt_sum->bind_param("s", $date);
@@ -36,12 +39,13 @@ $stmt_sum->execute();
 $summary = $stmt_sum->get_result()->fetch_assoc();
 
 // กำหนดค่าเริ่มต้นถ้าไม่มีข้อมูล
-$summary = $summary ?: ['cash'=>0, 'transfer'=>0, 'total'=>0, 'count'=>0];
+$summary = $summary ?: ['cash'=>0, 'transfer'=>0, 'qr'=>0, 'total'=>0, 'count'=>0];
 ?>
 <!DOCTYPE html>
 <html lang="th">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>รายงานสรุปรายได้ - <?php echo htmlspecialchars($restaurant_name); ?></title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <style>
@@ -55,6 +59,7 @@ $summary = $summary ?: ['cash'=>0, 'transfer'=>0, 'total'=>0, 'count'=>0];
         .card { border-radius: 20px; padding: 25px; text-align: center; flex: 1; border: 1px solid transparent; }
         .card-cash { background-color: #f0fdf4; border-color: #dcfce7; color: #16a34a; }
         .card-transfer { background-color: #f0f9ff; border-color: #e0f2fe; color: #0284c7; }
+        .card-qr { background-color: #f8fafc; border-color: #e2e8f0; color: #334155; }
         .card-grand { 
             background-color: #f8fafc; 
             border: 2px solid #e2e8f0; 
@@ -97,22 +102,27 @@ $summary = $summary ?: ['cash'=>0, 'transfer'=>0, 'total'=>0, 'count'=>0];
         <div class="row-top">
             <div class="card card-cash">
                 <span class="label">ยอดเงินสด</span>
-                <p class="value">฿<?php echo number_format($summary['cash'] ?? 0, 2); ?></p>
+                <p class="value">฿<?php echo number_format(floatval($summary['cash'] ?? 0), 2); ?></p>
             </div>
 
             <div class="card card-transfer">
                 <span class="label">ยอดเงินโอน</span>
-                <p class="value">฿<?php echo number_format($summary['transfer'] ?? 0, 2); ?></p>
+                <p class="value">฿<?php echo number_format(floatval($summary['transfer'] ?? 0), 2); ?></p>
+            </div>
+
+            <div class="card card-qr">
+                <span class="label">ยอด QR เคาน์เตอร์</span>
+                <p class="value">฿<?php echo number_format(floatval($summary['qr'] ?? 0), 2); ?></p>
             </div>
         </div>
 
         <div class="card-grand">
             <div>
                 <span class="label" style="color: #64748b;">ยอดขายรวมสุทธิ</span>
-                <p class="value" style="font-size: 40px; color: #0f172a;">฿<?php echo number_format($summary['total'] ?? 0, 2); ?></p>
+                <p class="value" style="font-size: 40px; color: #0f172a;">฿<?php echo number_format(floatval($summary['total'] ?? 0), 2); ?></p>
             </div>
             <div class="badge-count">
-                <i class="bi bi-receipt"></i> <?php echo number_format($summary['count'] ?? 0); ?> ออเดอร์
+                <i class="bi bi-receipt"></i> <?php echo number_format(floatval($summary['count'] ?? 0)); ?> ออเดอร์
             </div>
         </div>
 

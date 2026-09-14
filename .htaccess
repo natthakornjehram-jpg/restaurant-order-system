@@ -1,0 +1,4 @@
+# บังคับ MIME type ให้ถูกต้องสำหรับไฟล์ CSS/JS
+# กันปัญหาเบราว์เซอร์ปฏิเสธไม่โหลดสไตล์ชีต เมื่อโฮสต์ส่ง Content-Type ผิด
+AddType text/css .css
+AddType text/javascript .js

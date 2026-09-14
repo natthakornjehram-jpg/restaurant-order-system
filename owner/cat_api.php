@@ -4,6 +4,7 @@ session_start();
 error_reporting(0);
 require_once '../includes/db.php';
 require_once 'auth_owner.php';
+require_once '../includes/csrf.php';
 header('Content-Type: application/json');
 
 // ไม่ต้องดึงหา restaurant_id เพราะเป็นระบบร้านเดียว
@@ -22,6 +23,12 @@ if ($action == 'list') {
 
 // --- เพิ่มหมวดหมู่ ---
 if ($action == 'add') {
+    if (!csrf_verify($_POST['csrf_token'] ?? '')) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
+        exit;
+    }
+
     $name = trim($_POST['category_name']);
     if (empty($name)) {
         echo json_encode(['success' => false, 'message' => 'กรุณากรอกชื่อหมวดหมู่']);
@@ -35,7 +42,7 @@ if ($action == 'add') {
     if ($stmt->execute()) {
         echo json_encode(['success' => true]);
     } else {
-        echo json_encode(['success' => false, 'message' => 'เกิดข้อผิดพลาดในการบันทึก: ' . $conn->error]);
+        echo json_encode(['success' => false, 'message' => 'เกิดข้อผิดพลาดในการบันทึก']);
     }
     $stmt->close();
     exit;
@@ -43,8 +50,14 @@ if ($action == 'add') {
 
 // --- ลบหมวดหมู่ ---
 if ($action == 'delete') {
-    $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
-    
+    if (!csrf_verify($_POST['csrf_token'] ?? '')) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
+        exit;
+    }
+
+    $id = isset($_POST['id']) ? intval($_POST['id']) : 0;
+
     // เช็คว่ามีเมนูค้างอยู่ไหม (ในฐานข้อมูลของคุณ ตารางเมนูชื่อ 'item')
     $check_stmt = $conn->prepare("SELECT item_id FROM item WHERE category_id = ? LIMIT 1");
     $check_stmt->bind_param("i", $id);
@@ -71,7 +84,13 @@ if ($action == 'delete') {
 
 // --- เปิด/ปิด หมวดหมู่ (Toggle) - ซ่อนจากเมนูลูกค้าโดยไม่ต้องลบ ---
 if ($action == 'toggle') {
-    $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
+    if (!csrf_verify($_POST['csrf_token'] ?? '')) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
+        exit;
+    }
+
+    $id = isset($_POST['id']) ? intval($_POST['id']) : 0;
     $stmt = $conn->prepare("UPDATE category SET is_active = NOT is_active WHERE category_id = ?");
     $stmt->bind_param("i", $id);
 

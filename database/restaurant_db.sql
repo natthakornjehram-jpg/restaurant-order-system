@@ -1,6 +1,6 @@
 -- MariaDB dump 10.19  Distrib 10.4.32-MariaDB, for Win64 (AMD64)
 --
--- Host: localhost    Database: restaurant_db
+-- Host: localhost    Database: restaurant_db1
 -- ------------------------------------------------------
 -- Server version	10.4.32-MariaDB
 
@@ -27,7 +27,7 @@ CREATE TABLE `category` (
   `category_name` varchar(100) NOT NULL,
   `is_active` tinyint(1) DEFAULT 1,
   PRIMARY KEY (`category_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -36,39 +36,8 @@ CREATE TABLE `category` (
 
 LOCK TABLES `category` WRITE;
 /*!40000 ALTER TABLE `category` DISABLE KEYS */;
-INSERT INTO `category` VALUES (1,'เมนูแนะนำ',1);
+INSERT INTO `category` VALUES (2,'เมนูผัด',1),(3,'เมนูเส้น',1);
 /*!40000 ALTER TABLE `category` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `customer`
---
-
-DROP TABLE IF EXISTS `customer`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `customer` (
-  `customer_id` int(11) NOT NULL AUTO_INCREMENT,
-  `username` varchar(50) DEFAULT NULL,
-  `password` varchar(255) NOT NULL,
-  `name` varchar(100) DEFAULT NULL,
-  `phone` varchar(20) DEFAULT NULL,
-  `email` varchar(100) DEFAULT NULL,
-  `created_at` datetime DEFAULT current_timestamp(),
-  `is_active` tinyint(1) DEFAULT 1,
-  PRIMARY KEY (`customer_id`),
-  UNIQUE KEY `username` (`username`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `customer`
---
-
-LOCK TABLES `customer` WRITE;
-/*!40000 ALTER TABLE `customer` DISABLE KEYS */;
-INSERT INTO `customer` VALUES (1,'นางสาวณฐกร เจะรัมย์','$2y$10$q1SnuQXjsYCYDCt9f/dPYOx5GqCBeO5cgAhGTR6BdQFjjDmuRAz82','ณฐกร เจะรัมย์','0917967142','ncearamy11@gmail.com','2026-04-12 13:36:55',1);
-/*!40000 ALTER TABLE `customer` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -88,12 +57,15 @@ CREATE TABLE `item` (
   `image_url` varchar(255) DEFAULT NULL,
   `is_active` tinyint(1) DEFAULT 1,
   `created_at` datetime DEFAULT current_timestamp(),
+  `stock_qty` int(11) NOT NULL DEFAULT 50,
+  `use_stock` tinyint(1) NOT NULL DEFAULT 1,
+  `is_featured` tinyint(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`item_id`),
   KEY `category_id` (`category_id`),
   KEY `subcategory_id` (`subcategory_id`),
   CONSTRAINT `item_ibfk_1` FOREIGN KEY (`category_id`) REFERENCES `category` (`category_id`) ON DELETE SET NULL,
   CONSTRAINT `item_ibfk_2` FOREIGN KEY (`subcategory_id`) REFERENCES `subcategory` (`subcategory_id`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -102,8 +74,62 @@ CREATE TABLE `item` (
 
 LOCK TABLES `item` WRITE;
 /*!40000 ALTER TABLE `item` DISABLE KEYS */;
-INSERT INTO `item` VALUES (1,'??????',35.00,1,NULL,NULL,'default_food.png',1,'2026-03-31 16:08:00');
+INSERT INTO `item` VALUES (1,'เมนูกระเพรา',35.00,2,NULL,NULL,'item_1787557931_6a8bf82bd689a.jpg',1,'2026-03-31 16:08:00',49,1,0),(2,'เมนูทอดกระเทียม',35.00,2,NULL,NULL,'item_1787557827_6a8bf7c3d5b30.jpg',1,'2026-08-24 14:50:27',50,1,0),(3,'เมนูข้าวผัด',35.00,2,NULL,NULL,'item_1787557920_6a8bf8202ebe4.jpg',1,'2026-08-24 14:52:00',49,1,0),(4,'สุกิ',35.00,3,NULL,NULL,'item_1787558229_6a8bf955d5847.jpg',1,'2026-08-24 14:56:15',50,1,0);
 /*!40000 ALTER TABLE `item` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `login_attempts`
+--
+
+DROP TABLE IF EXISTS `login_attempts`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `login_attempts` (
+  `attempt_id` int(11) NOT NULL AUTO_INCREMENT,
+  `username` varchar(50) NOT NULL,
+  `ip_address` varchar(45) NOT NULL,
+  `success` tinyint(1) NOT NULL DEFAULT 0,
+  `created_at` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`attempt_id`),
+  KEY `username` (`username`,`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `login_attempts`
+--
+
+LOCK TABLES `login_attempts` WRITE;
+/*!40000 ALTER TABLE `login_attempts` DISABLE KEYS */;
+/*!40000 ALTER TABLE `login_attempts` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `join_pin_attempts`
+--
+
+DROP TABLE IF EXISTS `join_pin_attempts`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `join_pin_attempts` (
+  `attempt_id` int(11) NOT NULL AUTO_INCREMENT,
+  `table_id` int(11) NOT NULL,
+  `ip_address` varchar(45) NOT NULL,
+  `success` tinyint(1) NOT NULL DEFAULT 0,
+  `created_at` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`attempt_id`),
+  KEY `table_id` (`table_id`,`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `join_pin_attempts`
+--
+
+LOCK TABLES `join_pin_attempts` WRITE;
+/*!40000 ALTER TABLE `join_pin_attempts` DISABLE KEYS */;
+/*!40000 ALTER TABLE `join_pin_attempts` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -129,6 +155,7 @@ CREATE TABLE `menu_toppings` (
 
 LOCK TABLES `menu_toppings` WRITE;
 /*!40000 ALTER TABLE `menu_toppings` DISABLE KEYS */;
+INSERT INTO `menu_toppings` VALUES (1,1),(1,2),(1,3),(2,1),(2,2),(2,3),(3,1),(3,2),(3,3),(4,2),(4,3);
 /*!40000 ALTER TABLE `menu_toppings` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -152,7 +179,7 @@ CREATE TABLE `orderdetail` (
   KEY `item_id` (`item_id`),
   CONSTRAINT `orderdetail_ibfk_1` FOREIGN KEY (`order_id`) REFERENCES `orders` (`order_id`) ON DELETE CASCADE,
   CONSTRAINT `orderdetail_ibfk_2` FOREIGN KEY (`item_id`) REFERENCES `item` (`item_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=18 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -161,7 +188,7 @@ CREATE TABLE `orderdetail` (
 
 LOCK TABLES `orderdetail` WRITE;
 /*!40000 ALTER TABLE `orderdetail` DISABLE KEYS */;
-INSERT INTO `orderdetail` VALUES (1,1,1,2,45.00,'','2026-04-12 19:45:08'),(2,2,1,1,35.00,'','2026-04-12 20:46:34'),(3,2,1,1,35.00,'','2026-04-12 20:46:34');
+INSERT INTO `orderdetail` VALUES (1,1,1,2,45.00,'','2026-04-12 19:45:08'),(2,2,1,1,35.00,'','2026-04-12 20:46:34'),(3,2,1,1,35.00,'','2026-04-12 20:46:34'),(9,8,1,3,35.00,'','2026-08-24 12:53:31'),(10,9,1,1,35.00,'','2026-08-24 13:51:05'),(11,10,1,1,35.00,'','2026-08-24 14:02:01'),(12,11,1,1,35.00,'','2026-08-24 14:05:02'),(13,12,1,3,35.00,'','2026-08-24 14:20:19'),(17,16,3,1,45.00,'','2026-08-24 15:15:58');
 /*!40000 ALTER TABLE `orderdetail` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -182,7 +209,7 @@ CREATE TABLE `orderdetail_topping` (
   KEY `topping_id` (`topping_id`),
   CONSTRAINT `orderdetail_topping_ibfk_1` FOREIGN KEY (`order_detail_id`) REFERENCES `orderdetail` (`order_detail_id`) ON DELETE CASCADE,
   CONSTRAINT `orderdetail_topping_ibfk_2` FOREIGN KEY (`topping_id`) REFERENCES `topping` (`topping_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -191,7 +218,7 @@ CREATE TABLE `orderdetail_topping` (
 
 LOCK TABLES `orderdetail_topping` WRITE;
 /*!40000 ALTER TABLE `orderdetail_topping` DISABLE KEYS */;
-INSERT INTO `orderdetail_topping` VALUES (1,1,1,'2026-04-12 19:45:08'),(2,2,2,'2026-04-12 20:46:34'),(3,3,3,'2026-04-12 20:46:34');
+INSERT INTO `orderdetail_topping` VALUES (1,1,1,'2026-04-12 19:45:08'),(2,2,2,'2026-04-12 20:46:34'),(3,3,3,'2026-04-12 20:46:34'),(4,17,1,'2026-08-24 15:15:58');
 /*!40000 ALTER TABLE `orderdetail_topping` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -204,7 +231,6 @@ DROP TABLE IF EXISTS `orders`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `orders` (
   `order_id` int(11) NOT NULL AUTO_INCREMENT,
-  `customer_id` int(11) DEFAULT NULL,
   `table_id` int(11) DEFAULT NULL,
   `total_amount` decimal(10,2) DEFAULT 0.00,
   `order_date` datetime DEFAULT current_timestamp(),
@@ -215,12 +241,13 @@ CREATE TABLE `orders` (
   `online_customer_name` varchar(100) DEFAULT NULL,
   `online_customer_phone` varchar(20) DEFAULT NULL,
   `note` text DEFAULT NULL,
+  `daily_order_no` int(11) DEFAULT NULL,
+  `cancel_reason` varchar(255) DEFAULT NULL,
+  `slip_resubmitted` tinyint(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`order_id`),
-  KEY `customer_id` (`customer_id`),
   KEY `table_id` (`table_id`),
-  CONSTRAINT `orders_ibfk_1` FOREIGN KEY (`customer_id`) REFERENCES `customer` (`customer_id`) ON DELETE SET NULL,
   CONSTRAINT `orders_ibfk_2` FOREIGN KEY (`table_id`) REFERENCES `restauranttable` (`table_id`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -229,8 +256,34 @@ CREATE TABLE `orders` (
 
 LOCK TABLES `orders` WRITE;
 /*!40000 ALTER TABLE `orders` DISABLE KEYS */;
-INSERT INTO `orders` VALUES (1,1,NULL,90.00,'2026-04-12 19:45:08','2026-04-12 19:45:08','served','unpaid','takeaway',NULL,NULL,''),(2,1,NULL,70.00,'2026-04-12 20:46:34','2026-04-12 20:46:34','pending','unpaid','takeaway',NULL,NULL,'');
+INSERT INTO `orders` VALUES (1,NULL,90.00,'2026-04-12 19:45:08','2026-04-12 19:45:08','canceled','unpaid','takeaway',NULL,NULL,'',NULL,NULL,0),(2,NULL,70.00,'2026-04-12 20:46:34','2026-04-12 20:46:34','canceled','unpaid','takeaway',NULL,NULL,'',NULL,NULL,0),(8,1,999.00,'2026-08-24 12:53:31','2026-08-24 12:53:31','canceled','unpaid','dine_in','ทดสอบ','0812345678','',1,'?????????????????',0),(9,NULL,35.00,'2026-08-24 13:51:05','2026-08-24 13:51:05','served','paid','takeaway','SlipTest','0899999999','',2,NULL,0),(10,NULL,35.00,'2026-08-24 14:02:00','2026-08-24 14:02:00','served','paid','takeaway','Test2','0888888888','',3,NULL,1),(11,NULL,35.00,'2026-08-24 14:05:02','2026-08-24 14:05:02','served','paid','takeaway','RestoreTest','0877777777','',4,NULL,0),(12,1,105.00,'2026-08-24 14:20:19','2026-08-24 14:20:19','served','paid','takeaway','บาส','0850444647','',5,NULL,0),(16,1,45.00,'2026-08-24 15:15:58','2026-08-24 15:15:58','served','paid','takeaway','บาส','0850444647','',6,NULL,0);
 /*!40000 ALTER TABLE `orders` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `otp_verify_attempts`
+--
+
+DROP TABLE IF EXISTS `otp_verify_attempts`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `otp_verify_attempts` (
+  `attempt_id` int(11) NOT NULL AUTO_INCREMENT,
+  `phone` varchar(20) NOT NULL,
+  `success` tinyint(1) NOT NULL DEFAULT 0,
+  `created_at` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`attempt_id`),
+  KEY `phone` (`phone`,`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `otp_verify_attempts`
+--
+
+LOCK TABLES `otp_verify_attempts` WRITE;
+/*!40000 ALTER TABLE `otp_verify_attempts` DISABLE KEYS */;
+/*!40000 ALTER TABLE `otp_verify_attempts` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -255,7 +308,6 @@ CREATE TABLE `owner` (
   `open_time` time DEFAULT NULL,
   `close_time` time DEFAULT NULL,
   `is_shop_open` tinyint(1) DEFAULT 0,
-  `is_online_open` tinyint(1) DEFAULT 0,
   `max_queue` int(11) DEFAULT 20,
   `close_reason` varchar(255) DEFAULT '',
   `created_at` datetime DEFAULT current_timestamp(),
@@ -272,7 +324,7 @@ CREATE TABLE `owner` (
 
 LOCK TABLES `owner` WRITE;
 /*!40000 ALTER TABLE `owner` DISABLE KEYS */;
-INSERT INTO `owner` VALUES (1,'admin','$2y$10$UiM54d5MG.AFw2QlFLxQNOOnqcebAq9LASSxfvAteOQkxQV2PtLpi',NULL,NULL,'0917967142','default_logo.png',NULL,'','RANNAIBAAN','',NULL,NULL,1,1,17,'','2026-03-31 04:01:38',NULL,1);
+INSERT INTO `owner` VALUES (1,'admin','$2y$10$UiM54d5MG.AFw2QlFLxQNOOnqcebAq9LASSxfvAteOQkxQV2PtLpi',NULL,NULL,'0917967142','default_logo.png',NULL,'','RANNAIBAAN','',NULL,NULL,1,17,'','2026-03-31 04:01:38',NULL,1);
 /*!40000 ALTER TABLE `owner` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -286,7 +338,6 @@ DROP TABLE IF EXISTS `password_reset`;
 CREATE TABLE `password_reset` (
   `reset_id` int(11) NOT NULL AUTO_INCREMENT,
   `owner_id` int(11) NOT NULL,
-  `customer_id` int(11) DEFAULT NULL,
   `phone` varchar(20) DEFAULT NULL,
   `otp` varchar(10) DEFAULT NULL,
   `expires_at` datetime DEFAULT NULL,
@@ -294,9 +345,7 @@ CREATE TABLE `password_reset` (
   `created_at` datetime DEFAULT current_timestamp(),
   PRIMARY KEY (`reset_id`),
   KEY `owner_id` (`owner_id`),
-  KEY `customer_id` (`customer_id`),
-  CONSTRAINT `password_reset_ibfk_1` FOREIGN KEY (`owner_id`) REFERENCES `owner` (`owner_id`),
-  CONSTRAINT `password_reset_ibfk_2` FOREIGN KEY (`customer_id`) REFERENCES `customer` (`customer_id`)
+  CONSTRAINT `password_reset_ibfk_1` FOREIGN KEY (`owner_id`) REFERENCES `owner` (`owner_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -328,7 +377,7 @@ CREATE TABLE `payment` (
   PRIMARY KEY (`payment_id`),
   KEY `order_id` (`order_id`),
   CONSTRAINT `payment_ibfk_1` FOREIGN KEY (`order_id`) REFERENCES `orders` (`order_id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -337,7 +386,7 @@ CREATE TABLE `payment` (
 
 LOCK TABLES `payment` WRITE;
 /*!40000 ALTER TABLE `payment` DISABLE KEYS */;
-INSERT INTO `payment` VALUES (1,1,90.00,'โอนเงิน','pending',NULL,'slip_ORD1_1775997908.png','2026-04-12 19:45:08'),(2,2,70.00,'โอนเงิน','pending',NULL,'slip_ORD2_1776001594.png','2026-04-12 20:46:34');
+INSERT INTO `payment` VALUES (1,1,90.00,'โอนเงิน','failed',NULL,'slip_ORD1_1775997908.png','2026-04-12 19:45:08'),(2,2,70.00,'โอนเงิน','failed',NULL,'slip_ORD2_1776001594.png','2026-04-12 20:46:34'),(5,9,35.00,'cash','completed',NULL,'slip_order9_retry_1787554295_6a8be9f71a754.png','2026-08-24 13:51:05'),(6,10,35.00,'cash','completed',NULL,'slip_order10_retry_1787554921_6a8bec69296b0.png','2026-08-24 14:02:01'),(7,11,35.00,'cash','completed',NULL,'slip_order11_1787555102_6a8bed1e1fbfa.png','2026-08-24 14:05:02'),(10,12,105.00,'cash','completed',NULL,NULL,'2026-08-24 15:13:15'),(12,16,45.00,'cash','completed',NULL,NULL,'2026-08-24 15:15:58');
 /*!40000 ALTER TABLE `payment` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -353,6 +402,8 @@ CREATE TABLE `restauranttable` (
   `table_number` varchar(20) NOT NULL,
   `status` varchar(20) DEFAULT 'available',
   `created_at` datetime DEFAULT current_timestamp(),
+  `join_code` varchar(10) DEFAULT NULL,
+  `qr_token` varchar(32) DEFAULT NULL,
   PRIMARY KEY (`table_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -363,7 +414,7 @@ CREATE TABLE `restauranttable` (
 
 LOCK TABLES `restauranttable` WRITE;
 /*!40000 ALTER TABLE `restauranttable` DISABLE KEYS */;
-INSERT INTO `restauranttable` VALUES (1,'A2','available','2026-03-31 04:40:10'),(2,'A9','available','2026-08-21 21:43:59');
+INSERT INTO `restauranttable` VALUES (1,'A2','available','2026-03-31 04:40:10',NULL,'a1f3c9e7b2d84f60'),(2,'A9','available','2026-08-21 21:43:59',NULL,'6e0d5a2b9c4f1387');
 /*!40000 ALTER TABLE `restauranttable` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -407,10 +458,12 @@ CREATE TABLE `topping` (
   `topping_cat_id` int(11) DEFAULT NULL,
   `is_active` tinyint(1) DEFAULT 1,
   `created_at` datetime DEFAULT current_timestamp(),
+  `stock_qty` int(11) NOT NULL DEFAULT 50,
+  `use_stock` tinyint(1) NOT NULL DEFAULT 1,
   PRIMARY KEY (`topping_id`),
   KEY `FK_Topping_cat` (`topping_cat_id`),
   CONSTRAINT `FK_Topping_cat` FOREIGN KEY (`topping_cat_id`) REFERENCES `topping_categories` (`topping_cat_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -419,7 +472,7 @@ CREATE TABLE `topping` (
 
 LOCK TABLES `topping` WRITE;
 /*!40000 ALTER TABLE `topping` DISABLE KEYS */;
-INSERT INTO `topping` VALUES (1,'หมูกรอบ',10.00,1,1,'2026-03-31 13:48:18'),(2,'ไก่สับ',0.00,1,1,'2026-03-31 13:51:29'),(3,'หมูสับ',0.00,1,1,'2026-03-31 13:51:44');
+INSERT INTO `topping` VALUES (1,'หมูกรอบ',10.00,1,1,'2026-03-31 13:48:18',50,1),(2,'ไก่สับ',0.00,1,1,'2026-03-31 13:51:29',50,1),(3,'หมูสับ',0.00,1,1,'2026-03-31 13:51:44',50,1),(4,'ทะเล',10.00,1,1,'2026-08-24 14:57:59',50,1),(5,'จานธรรมดาบ',0.00,2,1,'2026-08-24 14:58:34',50,1),(6,'จานพิเศษ',5.00,2,1,'2026-08-24 14:59:09',50,1);
 /*!40000 ALTER TABLE `topping` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -433,6 +486,7 @@ DROP TABLE IF EXISTS `topping_categories`;
 CREATE TABLE `topping_categories` (
   `topping_cat_id` int(11) NOT NULL AUTO_INCREMENT,
   `topping_cat_name` varchar(100) NOT NULL,
+  `sort_order` int(11) NOT NULL DEFAULT 0,
   PRIMARY KEY (`topping_cat_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -443,9 +497,13 @@ CREATE TABLE `topping_categories` (
 
 LOCK TABLES `topping_categories` WRITE;
 /*!40000 ALTER TABLE `topping_categories` DISABLE KEYS */;
-INSERT INTO `topping_categories` VALUES (1,'ประเภทเนื้อสัตว์'),(2,'ขนาน'),(3,'เส้น'),(4,'ระดับความเผ็ด');
+INSERT INTO `topping_categories` VALUES (1,'ประเภทเนื้อสัตว์',0),(2,'ขนาน',1),(3,'เส้น',2),(4,'ระดับความเผ็ด',3);
 /*!40000 ALTER TABLE `topping_categories` ENABLE KEYS */;
 UNLOCK TABLES;
+
+--
+-- Dumping routines for database 'restaurant_db1'
+--
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
@@ -456,4 +514,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-08-21 22:17:05
+-- Dump completed on 2026-08-24 15:22:02

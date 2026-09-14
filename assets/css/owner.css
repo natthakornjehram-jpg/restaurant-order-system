@@ -61,14 +61,32 @@ h1, h2, h3, h4, h5, .font-mitr {
     min-height: 100vh;
 }
 
+/* จอมือถือ/แท็บเล็ต (< lg): ใช้โหมด offcanvas ของ Bootstrap ซึ่งอ่านความกว้างจากตัวแปร
+   --bs-offcanvas-width เท่านั้น (property "width" ธรรมดาถูก override เพราะ selector ของ
+   Bootstrap .offcanvas-lg.offcanvas-start มี specificity สูงกว่า .owner-sidebar เฉยๆ)
+   ตั้งให้แคบลงจากค่า default 400px ของ Bootstrap เพื่อให้เห็นพื้นหลังจางๆ ข้างหลังเมนู
+   แทนที่จะเต็มจอเหมือนเดิม */
 .owner-sidebar {
-    width: 280px;
+    --bs-offcanvas-width: min(78vw, 300px);
+}
+
+@media (min-width: 992px) and (max-width: 1199.98px) {
+    .owner-sidebar {
+        width: 220px;
+    }
+    .owner-nav-link {
+        font-size: 0.9rem;
+    }
 }
 
 @media (min-width: 992px) {
     .owner-sidebar {
-        width: 260px;
+        width: 230px;
         flex-shrink: 0;
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        overflow-y: auto;
     }
 }
 
@@ -76,14 +94,18 @@ h1, h2, h3, h4, h5, .font-mitr {
     min-width: 0; /* กัน flex item ดันความกว้างเกินจอตอนมีตาราง/เนื้อหากว้างๆ ข้างใน */
 }
 
-/* ปุ่มย้อนกลับบนสุดของแต่ละหน้า (ยกเว้น dashboard) - จอมือถือมี navbar แบบ fixed-top ทับอยู่ ต้องเว้นระยะให้พ้น */
-.owner-back-bar {
-    margin-top: 56px;
+/* จอมือถือ (< lg) มี navbar แบบ fixed-top (สูง 56px) ทับอยู่ด้านบน ต้องใส่ padding-top บน body ให้เนื้อหาทั้งหมดอยู่ต่ำกว่าแถบดำ 100% */
+@media (max-width: 991.98px) {
+    body {
+        padding-top: 60px !important;
+    }
+    .owner-shell {
+        margin-top: 0 !important;
+    }
 }
-
 @media (min-width: 992px) {
-    .owner-back-bar {
-        margin-top: 0;
+    body {
+        padding-top: 0 !important;
     }
 }
 
@@ -94,7 +116,8 @@ h1, h2, h3, h4, h5, .font-mitr {
 .owner-nav-link {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
+    font-size: 0.95rem;
     border-left: 4px solid transparent;
     opacity: 0.85;
     transition: 0.2s;
@@ -118,12 +141,12 @@ h1, h2, h3, h4, h5, .font-mitr {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 38px;
-    height: 38px;
-    min-width: 38px;
-    border-radius: 12px;
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    border-radius: 10px;
     background-color: rgba(255, 255, 255, 0.06);
-    font-size: 1.1rem;
+    font-size: 1rem;
     transition: 0.2s;
 }
 
@@ -134,4 +157,24 @@ h1, h2, h3, h4, h5, .font-mitr {
 
 .owner-nav-link:hover .owner-nav-icon {
     background-color: rgba(255, 255, 255, 0.15);
+}
+
+/* --- Responsive table & mobile cards for owner system --- */
+.table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 576px) {
+    .card-owner {
+        border-radius: 16px;
+        padding: 16px 12px !important;
+    }
+    .btn-brown {
+        padding: 8px 16px;
+        font-size: 0.9rem;
+    }
+    .table {
+        font-size: 0.85rem;
+    }
 }

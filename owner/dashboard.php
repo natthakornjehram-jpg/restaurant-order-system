@@ -16,24 +16,17 @@ if ($store_res && $store_res->num_rows > 0) {
     $store = $store_res->fetch_assoc();
 } else {
     // กรณีเพิ่งสมัคร
-    $store = ['is_shop_open' => 0, 'is_online_open' => 0];
+    $store = ['is_shop_open' => 0];
 }
 
 // --- 2. ดึงข้อมูลสถิติ ---
 // ยอดขายวันนี้
 $sales_sql = "SELECT SUM(total_amount) as daily_total FROM orders WHERE payment_status = 'paid' AND DATE(created_at) = CURDATE()";
 $sales_res = $conn->query($sales_sql);
-$daily_total = ($sales_res && $row = $sales_res->fetch_assoc()) ? $row['daily_total'] : 0;
+$daily_total = ($sales_res && $row = $sales_res->fetch_assoc()) ? floatval($row['daily_total'] ?? 0) : 0;
 
-// ออเดอร์ที่รอทำ (ไม่นับออเดอร์โอนเงินที่ยังไม่ได้ตรวจสลิป)
-$order_res = $conn->query("SELECT COUNT(*) as pending_orders FROM orders o
-    WHERE o.order_status = 'pending'
-    AND NOT EXISTS (
-        SELECT 1 FROM payment p
-        WHERE p.order_id = o.order_id
-        AND p.slip_image IS NOT NULL
-        AND p.status != 'completed'
-    )");
+// ออเดอร์ที่รอทำ
+$order_res = $conn->query("SELECT COUNT(*) as pending_orders FROM orders WHERE order_status = 'pending'");
 $pending_orders = ($order_res && $row = $order_res->fetch_assoc()) ? $row['pending_orders'] : 0;
 
 // ออเดอร์ที่ค้างชำระ
@@ -41,29 +34,23 @@ $unpaid_res = $conn->query("SELECT COUNT(*) as unpaid FROM orders WHERE order_st
 $unpaid_orders = ($unpaid_res && $row = $unpaid_res->fetch_assoc()) ? $row['unpaid'] : 0;
 
 // --- 3. ดึงรายการออเดอร์ล่าสุด 8 รายการ ---
-$pending_list_sql = "SELECT * FROM orders ORDER BY created_at DESC LIMIT 8";
+$pending_list_sql = "SELECT * FROM orders WHERE DATE(created_at) = CURDATE() ORDER BY created_at DESC LIMIT 8";
 $pending_list_res = $conn->query($pending_list_sql);
 ?>
 
-<link rel="stylesheet" href="<?= BASE_URL ?>assets/css/owner-dashboard.css">
+<link rel="stylesheet" href="<?= BASE_URL ?>assets/css/owner-dashboard.css?v=<?= time() ?>">
 
 <div class="dashboard-scope container-fluid px-4 text-dark">
     <div class="pb-3 mb-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center border-bottom border-secondary border-opacity-10">
         <div>
-            <h2 class="fw-bold m-0 text-dark">หน้าจัดการร้านอาหาร</h2>
+            <h4 class="fw-bold m-0 text-dark">หน้าจัดการร้านอาหาร</h4>
             <p class="text-muted small mb-0">ยินดีต้อนรับกลับมาครับ อัปเดตล่าสุด <?php echo date('H:i'); ?> น.</p>
         </div>
         <div class="d-flex gap-2 mt-3 mt-md-0">
             <button data-id="shop" data-type="shop_status" 
                     onclick="toggleStatus('shop', 'shop_status', <?= $store['is_shop_open']; ?>)" 
                     class="btn btn-toggle shadow-sm <?= ($store['is_shop_open'] == 1) ? 'bg-shop-open' : 'bg-status-closed'; ?>">
-                <?= ($store['is_shop_open'] == 1) ? '<i class="bi bi-shop me-1"></i> ร้านเปิดอยู่' : '<i class="bi bi-shop me-1"></i> ร้านปิดอยู่' ?>
-            </button>
-            
-            <button data-id="online" data-type="shop_status" 
-                    onclick="toggleStatus('online', 'shop_status', <?= $store['is_online_open']; ?>)" 
-                    class="btn btn-toggle shadow-sm <?= ($store['is_online_open'] == 1) ? 'bg-online-open' : 'bg-status-closed'; ?>">
-                <?= ($store['is_online_open'] == 1) ? '<i class="bi bi-bag-check me-1"></i> เปิดรับกลับบ้าน' : '<i class="bi bi-bag-check me-1"></i> ปิดรับกลับบ้าน' ?>
+                <?= ($store['is_shop_open'] == 1) ? '<i class="bi bi-shop me-1"></i> ร้านเปิดอยู่ (รับออเดอร์)' : '<i class="bi bi-shop me-1"></i> ร้านปิดอยู่' ?>
             </button>
         </div>
     </div>
@@ -114,6 +101,8 @@ $pending_list_res = $conn->query($pending_list_sql);
 
                 if($pay_status == 'paid') {
                     $st_border = "st-border-paid"; $st_text = "เสร็จสิ้น"; $st_badge = "bg-success text-white";
+                } elseif($status == 'canceled') {
+                    $st_border = "st-border-pending"; $st_text = "ถูกปฏิเสธ/ยกเลิก"; $st_badge = "bg-secondary text-white";
                 } elseif($status == 'cooking') {
                     $st_border = "st-border-cooking"; $st_text = "กำลังทำ"; $st_badge = "bg-primary text-white";
                 } elseif($status == 'served' || $status == 'ready') {
@@ -134,18 +123,18 @@ $pending_list_res = $conn->query($pending_list_sql);
 
                     <div class="p-4 text-center">
                         <div class="table-title mb-1">
-                            ออเดอร์ #<?php echo str_pad($row['order_id'], 4, '0', STR_PAD_LEFT); ?>
+                            ออเดอร์ #<?php echo str_pad($row['daily_order_no'] ?: $row['order_id'], 3, '0', STR_PAD_LEFT); ?>
                         </div>
                         <div class="text-muted small mb-1"><?php echo $type_display; ?></div>
                         <div class="text-muted small mb-3"><?php echo date('H:i', strtotime($row['created_at'])); ?> น.</div>
-                        
+
                         <div class="status-badge <?php echo $st_badge; ?> d-inline-block mb-3">
                             <?php echo $st_text; ?>
                         </div>
 
                         <div class="pt-3 border-top d-flex justify-content-between align-items-center">
                             <span class="text-muted small fw-bold">ยอดสุทธิ</span>
-                            <span class="fs-4 fw-bold text-dark">฿<?php echo number_format($row['total_amount'], 0); ?></span>
+                            <span class="fs-4 fw-bold text-dark">฿<?php echo number_format(floatval($row['total_amount'] ?? 0), 0); ?></span>
                         </div>
                     </div>
                 </div>

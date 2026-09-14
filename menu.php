@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once 'includes/db.php';
+require_once 'includes/csrf.php';
 
 $_SESSION['order_type'] = 'takeaway';
 // ล้างข้อมูลโต๊ะทิ้ง (เผื่อลูกค้าเคยสแกนโต๊ะมาก่อน แล้วกดเข้าหน้าออนไลน์)
@@ -8,7 +9,7 @@ unset($_SESSION['table_id']);
 unset($_SESSION['table_number']);
 
 // 🏪 ดึงสถานะร้าน
-$store_res = $conn->query("SELECT is_online_open, restaurant_name FROM owner LIMIT 1");
+$store_res = $conn->query("SELECT is_shop_open, restaurant_name, logo_url FROM owner LIMIT 1");
 $store = $store_res->fetch_assoc();
 
 include 'includes/header_customer.php';
@@ -21,26 +22,31 @@ include 'includes/nav_customer.php';
     <div class="member-badge-section d-flex justify-content-between align-items-center mt-5">
         <div>
             <h5 class="fw-bold mb-1">ยินดีต้อนรับครับ ✨</h5>
-            <p class="mb-0 small opacity-75">สั่งกลับบ้านง่ายๆ ไม่ต้องสมัครสมาชิก</p>
+            <p class="mb-0 small opacity-75">สั่งอาหารหน้าร้านได้ง่ายๆ ไม่ต้องสมัครสมาชิก</p>
         </div>
         <div class="text-end">
             <span class="badge bg-light text-dark rounded-pill px-3 py-2 fw-bold shadow-sm">
-                <i class="bi bi-shop text-warning"></i> <?= htmlspecialchars($store['restaurant_name'] ?? 'ร้านของเรา') ?>
+                <?php if (!empty($store['logo_url']) && $store['logo_url'] !== 'default_logo.png'): ?>
+                    <img src="<?= BASE_URL ?>assets/images/logos/<?= htmlspecialchars($store['logo_url']) ?>" alt="logo" style="width:18px;height:18px;object-fit:cover;border-radius:50%;">
+                <?php else: ?>
+                    <i class="bi bi-shop text-warning"></i>
+                <?php endif; ?>
+                <?= htmlspecialchars($store['restaurant_name'] ?? 'ร้านของเรา') ?>
             </span>
         </div>
     </div>
 
-    <?php if($store['is_online_open'] == 0): ?>
-        <div class="alert alert-warning text-center rounded-4 shadow-sm border-0 py-5">
-            <h4 class="fw-bold mb-2"><i class="bi bi-exclamation-triangle-fill text-warning"></i> ร้านงดรับออเดอร์กลับบ้านชั่วคราว</h4>
-            <p class="mb-0 text-muted">ขออภัยค่ะ ขณะนี้คิวหน้าร้านเต็ม หรือปิดปรับปรุงระบบ</p>
+    <?php if($store['is_shop_open'] == 0): ?>
+        <div class="alert alert-danger text-center rounded-4 shadow-sm border-0 py-5">
+            <h4 class="fw-bold mb-2"><i class="bi bi-door-closed-fill text-danger"></i> ขณะนี้ร้านปิดให้บริการ</h4>
+            <p class="mb-0 text-muted">ขออภัยในความไม่สะดวกครับ ไว้มาอุดหนุนใหม่โอกาสหน้านะครับ</p>
         </div>
     <?php else: ?>
 
     <div class="row g-3">
         <?php
-        // 🟢 ดึงข้อมูลจากตาราง item ที่ตั้งค่า is_active = 1 (พร้อมขาย)
-        $items = $conn->query("SELECT * FROM item WHERE is_active = 1 ORDER BY item_id DESC");
+        // 🟢 ดึงข้อมูลจากตาราง item ที่ตั้งค่า is_active = 1 (พร้อมขาย) และหมวดหมู่เปิดใช้งานอยู่
+        $items = $conn->query("SELECT i.* FROM item i LEFT JOIN category c ON i.category_id = c.category_id WHERE i.is_active = 1 AND (c.is_active = 1 OR i.category_id IS NULL) ORDER BY i.item_id DESC");
         
         while($m = $items->fetch_assoc()): 
             $m_id = $m['item_id'];
@@ -49,6 +55,9 @@ include 'includes/nav_customer.php';
         ?>
             <div class="col-6 col-md-4 col-lg-3">
                 <div class="menu-card h-100 shadow-sm" data-bs-toggle="modal" data-bs-target="#itemModal<?= $m_id ?>">
+                    <?php if (!empty($m['is_featured'])): ?>
+                        <span class="featured-badge"><i class="bi bi-star-fill"></i> แนะนำ</span>
+                    <?php endif; ?>
                     <img src="<?= htmlspecialchars($img_path) ?>" class="w-100" style="height: 140px; object-fit: cover;" onerror="this.src='assets/images/items/default_food.jpg'">
                     <div class="p-3">
                         <div class="fw-bold small text-truncate mb-1"><?= htmlspecialchars($m['name']) ?></div>
@@ -63,6 +72,7 @@ include 'includes/nav_customer.php';
             <div class="modal fade text-start" id="itemModal<?= $m_id ?>" tabindex="-1">
                 <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
                     <form class="modal-content border-0 rounded-4 shadow" action="member/cart_action.php?action=add" method="POST">
+                        <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
                         <input type="hidden" name="item_id" value="<?= $m_id ?>">
                         
                         <div class="modal-header border-0 pb-0">

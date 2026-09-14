@@ -35,10 +35,11 @@ function loadCategories() {
 function saveCategory() {
     const nameInput = document.getElementById('cat_name');
     const name = nameInput.value.trim();
-    if (!name) { alert('กรุณากรอกชื่อหมวดหมู่'); return; }
+    if (!name) { ownerNotify('กรุณากรอกชื่อหมวดหมู่', 'error'); return; }
 
     const formData = new FormData();
     formData.append('category_name', name);
+    formData.append('csrf_token', CSRF_TOKEN);
 
     fetch('cat_api.php?action=add', {
         method: 'POST',
@@ -48,25 +49,32 @@ function saveCategory() {
     .then(data => {
         if (data.success) {
             nameInput.value = ''; // ล้างช่องกรอกข้อมูล
+            ownerNotify('เพิ่มหมวดหมู่เรียบร้อยแล้ว');
             loadCategories(); // โหลดตารางใหม่
         } else {
-            alert('เกิดข้อผิดพลาด: ' + data.message);
+            ownerNotify('เกิดข้อผิดพลาด: ' + data.message, 'error');
         }
     })
     .catch(error => console.error('Error saving category:', error));
 }
 
-// 3. ฟังก์ชันลบข้อมูล
+// 3. ฟังก์ชันลบข้อมูล (ลบทันทีไม่ต้องยืนยันซ้ำ ให้ลื่นไหล)
 function deleteCategory(id) {
-    if (!confirm('ยืนยันการลบหมวดหมู่? (หมวดหมู่ที่มีเมนูอาหารค้างอยู่จะไม่สามารถลบได้)')) return;
+    const formData = new FormData();
+    formData.append('id', id);
+    formData.append('csrf_token', CSRF_TOKEN);
 
-    fetch('cat_api.php?action=delete&id=' + id)
+    fetch('cat_api.php?action=delete', {
+        method: 'POST',
+        body: formData
+    })
     .then(res => res.json())
     .then(data => {
         if (data.success) {
+            ownerNotify('ลบหมวดหมู่แล้ว');
             loadCategories();
         } else {
-            alert(data.message || 'ไม่สามารถลบได้');
+            ownerNotify(data.message || 'ไม่สามารถลบได้', 'error');
         }
     })
     .catch(error => console.error('Error deleting category:', error));
@@ -74,13 +82,20 @@ function deleteCategory(id) {
 
 // 4. ฟังก์ชันซ่อน/แสดงหมวดหมู่ (ไม่ลบ แค่ไม่โชว์ในเมนูลูกค้า)
 function toggleCategory(id) {
-    fetch('cat_api.php?action=toggle&id=' + id)
+    const formData = new FormData();
+    formData.append('id', id);
+    formData.append('csrf_token', CSRF_TOKEN);
+
+    fetch('cat_api.php?action=toggle', {
+        method: 'POST',
+        body: formData
+    })
     .then(res => res.json())
     .then(data => {
         if (data.success) {
             loadCategories();
         } else {
-            alert(data.message || 'ไม่สามารถเปลี่ยนสถานะได้');
+            ownerNotify(data.message || 'ไม่สามารถเปลี่ยนสถานะได้', 'error');
         }
     })
     .catch(error => console.error('Error toggling category:', error));

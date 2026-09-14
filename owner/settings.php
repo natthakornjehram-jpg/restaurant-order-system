@@ -3,22 +3,28 @@ session_start();
 include '../includes/db.php';
 include '../includes/upload_helper.php';
 require_once 'auth_owner.php';
+require_once '../includes/csrf.php';
 
 $success_msg = "";
 $error_msg = "";
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ?? '')) {
+    $error_msg = "คำขอไม่ถูกต้อง (CSRF token ไม่ถูกต้อง) กรุณาลองใหม่อีกครั้ง";
+} elseif ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $res_name = trim($_POST['restaurant_name']);
     $res_phone = trim($_POST['phone']);
+    $res_email = trim($_POST['email'] ?? '');
     $address = trim($_POST['address']);
     $max_queue = intval($_POST['max_queue']);
-    $is_online = isset($_POST['is_online_open']) ? 1 : 0;
     $is_shop = isset($_POST['is_shop_open']) ? 1 : 0;
     $close_reason = trim($_POST['close_reason']);
     $bank_info = trim($_POST['bank_info']); // รับค่าข้อมูลบัญชีธนาคาร
 
     // ดึงข้อมูลเดิมเพื่อเช็กชื่อไฟล์รูปเก่า
-    $old_data = $conn->query("SELECT logo_url, promptpay_qr FROM owner WHERE owner_id = $owner_id")->fetch_assoc();
+    $old_data_stmt = $conn->prepare("SELECT logo_url, promptpay_qr FROM owner WHERE owner_id = ?");
+    $old_data_stmt->bind_param("i", $owner_id);
+    $old_data_stmt->execute();
+    $old_data = $old_data_stmt->get_result()->fetch_assoc();
     $logo_name = $old_data['logo_url'];
     $qr_name = $old_data['promptpay_qr'];
 
@@ -49,18 +55,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 
     // --- อัปเดตข้อมูลลงฐานข้อมูล ---
-    $sql = "UPDATE owner SET 
-            restaurant_name = ?, phone = ?, address = ?, 
-            max_queue = ?, is_online_open = ?, is_shop_open = ?, 
-            close_reason = ?, logo_url = ?, promptpay_qr = ?, bank_info = ? 
+    $sql = "UPDATE owner SET
+            restaurant_name = ?, phone = ?, email = ?, address = ?,
+            max_queue = ?, is_shop_open = ?,
+            close_reason = ?, logo_url = ?, promptpay_qr = ?, bank_info = ?
             WHERE owner_id = ?";
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("sssiisssssi", $res_name, $res_phone, $address, $max_queue, $is_online, $is_shop, $close_reason, $logo_name, $qr_name, $bank_info, $owner_id);
+    $stmt->bind_param("ssssisssssi", $res_name, $res_phone, $res_email, $address, $max_queue, $is_shop, $close_reason, $logo_name, $qr_name, $bank_info, $owner_id);
     
     if ($stmt->execute()) {
         $success_msg = "อัปเดตข้อมูลร้านค้าและช่องทางชำระเงินเรียบร้อยแล้ว!";
     } else {
-        $error_msg = "เกิดข้อผิดพลาด: " . $conn->error;
+        $error_msg = "เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง";
     }
 }
 
@@ -74,18 +80,27 @@ include '../includes/header_owner.php';
 include '../includes/nav_owner.php'; 
 ?>
 
-<div class="main-content container py-5">
+<div class="main-content container py-3 py-md-4">
     <div class="row justify-content-center">
         <div class="col-lg-10">
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2 class="fw-bold m-0"><i class="bi bi-gear-fill text-secondary me-2"></i>ตั้งค่าร้านค้า</h2>
+                <div class="d-flex align-items-center">
+                    <a href="dashboard.php" class="btn btn-white rounded-circle me-3 shadow-sm d-flex align-items-center justify-content-center" style="width: 45px; height: 45px; border: 1px solid #edf2f7; background: #ffffff; color: #4a5568;" title="ย้อนกลับ">
+                        <i class="bi bi-arrow-left fs-4"></i>
+                    </a>
+                    <h4 class="fw-bold m-0" style="font-size: 1.25rem;"><i class="bi bi-gear-fill text-secondary me-2"></i>ตั้งค่าร้านค้า</h4>
+                </div>
             </div>
 
             <?php if($success_msg): ?>
-                <div class="alert alert-success border-0 shadow-sm rounded-4 mb-4"><i class="bi bi-check-circle-fill me-2"></i><?= $success_msg ?></div>
+                <div class="alert alert-success border-0 shadow-sm rounded-4 mb-4"><i class="bi bi-check-circle-fill me-2"></i><?= htmlspecialchars($success_msg) ?></div>
+            <?php endif; ?>
+            <?php if($error_msg): ?>
+                <div class="alert alert-danger border-0 shadow-sm rounded-4 mb-4"><i class="bi bi-exclamation-triangle-fill me-2"></i><?= htmlspecialchars($error_msg) ?></div>
             <?php endif; ?>
 
             <form action="" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
                 <div class="row g-4">
                     <div class="col-md-7">
                         <div class="card border-0 shadow-sm rounded-4 h-100">
@@ -112,6 +127,10 @@ include '../includes/nav_owner.php';
                                     <input type="text" name="phone" class="form-control rounded-3" value="<?= htmlspecialchars($store['phone']) ?>" required>
                                 </div>
                                 <div class="mb-3">
+                                    <label class="fw-bold mb-1">อีเมล (ใช้รับรหัส OTP ตอนลืมรหัสผ่าน)</label>
+                                    <input type="email" name="email" class="form-control rounded-3" value="<?= htmlspecialchars($store['email'] ?? '') ?>" placeholder="เช่น owner@gmail.com">
+                                </div>
+                                <div class="mb-3">
                                     <label class="fw-bold mb-1">ที่อยู่ร้าน</label>
                                     <textarea name="address" class="form-control rounded-3" rows="2"><?= htmlspecialchars($store['address']) ?></textarea>
                                 </div>
@@ -128,13 +147,9 @@ include '../includes/nav_owner.php';
                                 </div>
 
                                 <div class="border-top pt-3">
-                                    <div class="form-check form-switch h5 mb-2">
-                                        <input class="form-check-input" type="checkbox" name="is_shop_open" <?= ($store['is_shop_open'] == 1) ? 'checked' : '' ?>>
-                                        <label class="form-check-label">เปิดรับลูกค้าหน้าร้าน</label>
-                                    </div>
                                     <div class="form-check form-switch h5">
-                                        <input class="form-check-input" type="checkbox" name="is_online_open" <?= ($store['is_online_open'] == 1) ? 'checked' : '' ?>>
-                                        <label class="form-check-label">เปิดรับออเดอร์กลับบ้าน</label>
+                                        <input class="form-check-input" type="checkbox" name="is_shop_open" <?= ($store['is_shop_open'] == 1) ? 'checked' : '' ?>>
+                                        <label class="form-check-label">เปิดรับลูกค้า (ทานที่ร้าน/กลับบ้าน)</label>
                                     </div>
                                 </div>
                             </div>

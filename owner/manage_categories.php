@@ -10,8 +10,13 @@ include '../includes/nav_owner.php';
 
 <div class="main-content container-fluid text-dark">
     <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-4 border-bottom">
-        <h1 class="h2 fw-bold"><i class="bi bi-tags me-2 text-primary"></i>จัดการหมวดหมู่อาหาร</h1>
-        <a href="manage_menu.php" class="btn btn-secondary rounded-pill px-4">กลับหน้าจัดการเมนู</a>
+        <div class="d-flex align-items-center">
+            <a href="manage_menu.php" class="btn btn-white rounded-circle me-3 shadow-sm d-flex align-items-center justify-content-center" style="width: 45px; height: 45px; border: 1px solid #edf2f7; background: #ffffff; color: #4a5568;" title="ย้อนกลับ">
+                <i class="bi bi-arrow-left fs-4"></i>
+            </a>
+            <h4 class="fw-bold mb-0 text-dark" style="font-size: 1.25rem;"><i class="bi bi-tags me-2 text-primary"></i>จัดการหมวดหมู่อาหาร</h4>
+        </div>
+        <a href="manage_menu.php" class="btn btn-outline-secondary rounded-pill px-4 fw-bold">กลับหน้าจัดการเมนู</a>
     </div>
 
     <div class="row">

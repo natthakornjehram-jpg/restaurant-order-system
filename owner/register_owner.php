@@ -2,11 +2,21 @@
 // owner/register_owner.php
 session_start();
 require_once '../includes/db.php';
+require_once '../includes/csrf.php';
+
+// ระบบร้านเดียว มีเจ้าของร้านได้แค่คนเดียวเท่านั้น - ถ้ามีอยู่แล้วห้ามสมัครซ้ำ (กันคนนอกมาสร้างบัญชีแอบแฝง)
+$owner_exists = $conn->query("SELECT COUNT(*) AS c FROM owner")->fetch_assoc()['c'] > 0;
+if ($owner_exists) {
+    header("Location: ../login.php");
+    exit;
+}
 
 $success_message = "";
 $error_message = "";
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ?? '')) {
+    $error_message = "คำขอไม่ถูกต้อง (CSRF token ไม่ถูกต้อง) กรุณาลองใหม่อีกครั้ง";
+} elseif ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $username = trim($_POST['username']);
     $password_input = $_POST['password'];
     $fullname = trim($_POST['fullname']);
@@ -52,9 +62,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <html lang="th">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ลงทะเบียนเปิดร้าน - Raauaibaan</title>
     <link href="https://fonts.googleapis.com/css2?family=Mitr&family=Sarabun&display=swap" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/register-owner.css">
 </head>
@@ -72,6 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             <?php endif; ?>
 
             <form method="POST">
+                <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
                 <div class="row">
                     <div class="col-md-6 mb-3">
                         <label>ชื่อผู้ใช้งาน (Username)</label>

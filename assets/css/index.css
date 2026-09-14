@@ -1,9 +1,9 @@
-/* Styles for index.php (landing page) */
+/* Styles for index.php (landing page) - โทนอบอุ่น สบายตา สำหรับลูกค้า แยกจากโทนเข้ม/ทางการของฝั่งเจ้าของร้าน */
 body, html {
     height: 100%;
     margin: 0;
     font-family: 'Sarabun', sans-serif;
-    background-color: #3e2723;
+    background-color: #fdfaf5;
 }
 
 h1, h2, h3, .font-mitr {
@@ -11,23 +11,42 @@ h1, h2, h3, .font-mitr {
 }
 
 .hero-section {
-    height: 100vh;
+    min-height: 100vh;
+    height: auto;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    background: linear-gradient(135deg, rgba(62, 39, 35, 0.9), rgba(121, 85, 72, 0.8));
-    color: white;
+    background: linear-gradient(160deg, #fff8ec 0%, #fdfaf5 45%, #fbeed4 100%);
+    color: #3e2723;
     text-align: center;
-    padding: 20px;
+    padding: 60px 20px 40px;
     position: relative;
 }
 
+.store-icon-circle {
+    width: 110px;
+    height: 110px;
+    border-radius: 50%;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 24px;
+    box-shadow: 0 10px 30px rgba(201, 162, 39, 0.25);
+}
+
 .store-icon {
-    font-size: 5rem;
-    color: #ffb300;
-    margin-bottom: 20px;
-    text-shadow: 0 4px 15px rgba(255, 179, 0, 0.3);
+    font-size: 3rem;
+    color: #c9a227;
+}
+
+.hero-title {
+    color: #3e2723;
+}
+
+.hero-lead {
+    color: #6d5a52;
 }
 
 .btn-order {
@@ -40,7 +59,7 @@ h1, h2, h3, .font-mitr {
     transition: all 0.3s ease;
     text-decoration: none;
     margin-top: 20px;
-    box-shadow: 0 8px 25px rgba(255, 152, 0, 0.4);
+    box-shadow: 0 10px 25px rgba(255, 152, 0, 0.35);
     border: 2px solid transparent;
 }
 
@@ -48,40 +67,60 @@ h1, h2, h3, .font-mitr {
     background-color: #e68a00;
     color: white;
     transform: translateY(-5px);
-    box-shadow: 0 12px 30px rgba(255, 152, 0, 0.5);
+    box-shadow: 0 14px 30px rgba(255, 152, 0, 0.45);
 }
 
 .btn-order-outline {
     background-color: transparent;
-    color: #ffb300;
-    border: 2px solid #ffb300;
+    color: #795548;
+    border: 2px solid #d7ccc8;
     box-shadow: none;
     margin-top: 0;
 }
 
 .btn-order-outline:hover {
-    background-color: rgba(255, 179, 0, 0.15);
-    color: #ffb300;
+    background-color: rgba(121, 85, 72, 0.08);
+    color: #3e2723;
     box-shadow: none;
 }
 
 .owner-link {
     position: absolute;
-    bottom: 30px;
-    color: rgba(255, 255, 255, 0.5);
-    font-size: 0.9rem;
+    top: 20px;
+    right: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.85);
+    color: #795548;
+    font-size: 0.85rem;
     text-decoration: none;
+    padding: 8px 16px;
+    border-radius: 50px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
     transition: 0.3s;
+    z-index: 10;
 }
 
 .owner-link:hover {
-    color: white;
-    text-decoration: underline;
+    background: #fff;
+    color: #3e2723;
+    text-decoration: none;
 }
 
 .status-alert {
     max-width: 400px;
     width: 100%;
     border-radius: 15px;
-    box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.08);
+}
+
+@media (max-width: 576px) {
+    .hero-section { padding: 70px 15px 30px; }
+    .store-icon-circle { width: 90px; height: 90px; margin-bottom: 18px; }
+    .store-icon { font-size: 2.5rem; }
+    .hero-title { font-size: 1.8rem !important; }
+    .hero-lead { font-size: 1rem !important; }
+    .btn-order { font-size: 1.1rem; padding: 12px 30px; width: 100%; max-width: 300px; }
+    .owner-link { top: 12px; right: 12px; font-size: 0.78rem; padding: 6px 12px; }
 }

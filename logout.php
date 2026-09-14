@@ -19,7 +19,7 @@ session_destroy();
 setcookie('remember_role', '', time() - 3600, '/');
 setcookie('remember_id', '', time() - 3600, '/');
 
-// 4. ส่งผู้ใช้งานกลับไปที่หน้า Login หลัก
-header("Location: menu.php");
+// 4. ส่งผู้ใช้งานกลับไปที่หน้า Login เจ้าของร้าน
+header("Location: login.php");
 exit;
 ?>
