@@ -26,6 +26,18 @@ if ($type === 'shop_status') {
     $stmt->bind_param("ii", $new_status, $owner_id);
     $success = $stmt->execute();
 
+} elseif ($type === 'dinein_status') {
+    // 🟢 กดจากหน้า Dashboard (เปิด/ปิดรับออเดอร์ทานที่ร้าน แยกจากสวิตช์หลัก is_shop_open)
+    $stmt = $conn->prepare("UPDATE owner SET is_dinein_open = ? WHERE owner_id = ?");
+    $stmt->bind_param("ii", $new_status, $owner_id);
+    $success = $stmt->execute();
+
+} elseif ($type === 'takeaway_status') {
+    // 🟢 กดจากหน้า Dashboard (เปิด/ปิดรับออเดอร์สั่งกลับบ้าน แยกจากสวิตช์หลัก is_shop_open)
+    $stmt = $conn->prepare("UPDATE owner SET is_takeaway_open = ? WHERE owner_id = ?");
+    $stmt->bind_param("ii", $new_status, $owner_id);
+    $success = $stmt->execute();
+
 } elseif ($type === 'menu' || $type === 'item') {
     // 🟢 กดจากหน้า จัดการเมนูอาหาร
     $item_id = intval($id);

@@ -73,6 +73,52 @@ if (isset($_GET['type']) && in_array($_GET['type'], ['dine_in', 'takeaway'], tru
     $_SESSION['order_type'] = $_GET['type'];
 }
 
+// เช็คสิทธิ์ของประเภทออเดอร์ที่เลือก/ถูกกำหนดไว้ฝั่งเซิร์ฟเวอร์อีกชั้น กันกรณีแก้ URL (?type=) ตรงๆ
+// หรือ session เดิมค้างมาจากก่อนที่ร้านเพิ่งกดปิดรับประเภทนั้นชั่วคราว (เช็คเฉพาะตอนร้านยังเปิดภาพรวมอยู่
+// เพราะถ้าปิดทั้งร้านมีข้อความแจ้งแยกต่างหากอยู่แล้วด้านล่าง ไม่ต้องมาชนกับ logic ตรงนี้)
+if ($store['is_shop_open'] != 0 && isset($_SESSION['order_type'])) {
+    if ($_SESSION['order_type'] === 'dine_in' && empty($store['is_dinein_open'])) {
+        unset($_SESSION['order_type']);
+    } elseif ($_SESSION['order_type'] === 'takeaway' && empty($store['is_takeaway_open'])) {
+        unset($_SESSION['order_type']);
+    }
+}
+
+// ไม่มีโต๊ะเลย (เข้าทางลิงก์ตรงๆ ไม่ผ่านการสแกน QR) แปลว่าเป็นสั่งกลับบ้านอย่างเดียว ไม่มี "ทานที่ร้าน" ให้เลือกแทน
+// ถ้าร้านงดรับสั่งกลับบ้านอยู่ตอนนี้ ต้องแจ้งปิดตรงนี้เลย ไม่ปล่อยผ่านไปเมนู (ต่างจากกรณีมีโต๊ะที่ยังเลือก
+// "ทานที่ร้าน" แทนได้ที่หน้าเลือกประเภทด้านล่าง)
+if (!isset($_SESSION['table_id']) && !isset($_SESSION['order_type']) && $store['is_shop_open'] != 0 && empty($store['is_takeaway_open'])) {
+    include '../includes/header_dinein.php';
+    ?>
+    <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/menu-dinein.css">
+    <div class="container py-5 text-center" style="max-width: 460px;">
+        <div class="alert alert-warning text-center rounded-4 shadow-sm border-0 py-5">
+            <h4 class="fw-bold mb-2"><i class="bi bi-bag-x-fill text-warning"></i> ขณะนี้งดรับสั่งกลับบ้านชั่วคราว</h4>
+            <p class="mb-0 text-muted">ขออภัยในความไม่สะดวกครับ กรุณาติดต่อร้านโดยตรงหรือลองใหม่อีกครั้งภายหลัง</p>
+        </div>
+    </div>
+    <?php
+    include '../includes/footer_dinein.php';
+    exit;
+}
+
+// มีโต๊ะอยู่ แต่ร้านงดรับทั้งสองประเภทพร้อมกันชั่วคราว (กรณีนี้ไม่มีตัวเลือกไหนให้กดได้เลยที่หน้าเลือกด้านล่าง)
+if (isset($_SESSION['table_id']) && !isset($_SESSION['order_type']) && $store['is_shop_open'] != 0
+    && empty($store['is_dinein_open']) && empty($store['is_takeaway_open'])) {
+    include '../includes/header_dinein.php';
+    ?>
+    <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/menu-dinein.css">
+    <div class="container py-5 text-center" style="max-width: 460px;">
+        <div class="alert alert-warning text-center rounded-4 shadow-sm border-0 py-5">
+            <h4 class="fw-bold mb-2"><i class="bi bi-door-closed-fill text-warning"></i> ขณะนี้งดรับออเดอร์ชั่วคราว</h4>
+            <p class="mb-0 text-muted">ทั้งทานที่ร้านและสั่งกลับบ้านปิดรับอยู่ ขออภัยในความไม่สะดวกครับ</p>
+        </div>
+    </div>
+    <?php
+    include '../includes/footer_dinein.php';
+    exit;
+}
+
 // ถ้ายังไม่ได้เลือกประเภทออเดอร์ ให้แสดงหน้าเลือกก่อน ยังไม่เข้าเมนู
 if (!isset($_SESSION['order_type'])) {
     $table_no_for_choice = $_SESSION['table_number'] ?? '';
@@ -94,22 +140,41 @@ if (!isset($_SESSION['order_type'])) {
         </span>
         <p class="text-muted mb-4">กรุณาเลือกรูปแบบการสั่งอาหารเพื่อเริ่มต้น</p>
 
+        <?php $dinein_open = !empty($store['is_dinein_open']); $takeaway_open = !empty($store['is_takeaway_open']); ?>
         <div class="row g-3">
             <div class="col-6">
+                <?php if ($dinein_open): ?>
                 <a href="?table=<?= urlencode($table_no_for_choice) ?>&type=dine_in" class="order-type-card dine-in">
                     <i class="bi bi-cup-hot-fill"></i>
                     <div class="ot-title">ทานที่ร้าน</div>
                     <div class="ot-sub">นั่งทานที่ร้าน<br>รอเสิร์ฟที่โต๊ะ</div>
                     <span class="ot-pill">โต๊ะ <?= htmlspecialchars($table_no_for_choice) ?> &rarr;</span>
                 </a>
+                <?php else: ?>
+                <div class="order-type-card dine-in" style="opacity:.45; pointer-events:none; cursor:not-allowed;">
+                    <i class="bi bi-cup-hot-fill"></i>
+                    <div class="ot-title">ทานที่ร้าน</div>
+                    <div class="ot-sub">งดรับชั่วคราว</div>
+                    <span class="ot-pill">ปิดรับอยู่</span>
+                </div>
+                <?php endif; ?>
             </div>
             <div class="col-6">
+                <?php if ($takeaway_open): ?>
                 <a href="?table=<?= urlencode($table_no_for_choice) ?>&type=takeaway" class="order-type-card takeaway">
                     <i class="bi bi-bag-fill"></i>
                     <div class="ot-title">สั่งกลับบ้าน</div>
                     <div class="ot-sub">สั่งใส่กล่อง<br>นำกลับบ้าน</div>
                     <span class="ot-pill">Takeaway &rarr;</span>
                 </a>
+                <?php else: ?>
+                <div class="order-type-card takeaway" style="opacity:.45; pointer-events:none; cursor:not-allowed;">
+                    <i class="bi bi-bag-fill"></i>
+                    <div class="ot-title">สั่งกลับบ้าน</div>
+                    <div class="ot-sub">งดรับชั่วคราว</div>
+                    <span class="ot-pill">ปิดรับอยู่</span>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>

@@ -139,6 +139,12 @@ function toggleStatus(id, type, currentStatus) {
                 if (type === 'shop_status') {
                     btn.className = (newStatus === 1) ? 'btn btn-toggle bg-shop-open' : 'btn btn-toggle bg-status-closed';
                     btn.innerHTML = (newStatus === 1) ? '<i class="bi bi-shop me-1"></i> ร้านเปิดอยู่ (รับออเดอร์)' : '<i class="bi bi-shop me-1"></i> ร้านปิดอยู่';
+                } else if (type === 'dinein_status') {
+                    btn.className = (newStatus === 1) ? 'btn btn-toggle bg-shop-open' : 'btn btn-toggle bg-status-closed';
+                    btn.innerHTML = (newStatus === 1) ? '<i class="bi bi-cup-hot me-1"></i> รับทานที่ร้าน' : '<i class="bi bi-cup-hot me-1"></i> งดรับทานที่ร้าน';
+                } else if (type === 'takeaway_status') {
+                    btn.className = (newStatus === 1) ? 'btn btn-toggle bg-shop-open' : 'btn btn-toggle bg-status-closed';
+                    btn.innerHTML = (newStatus === 1) ? '<i class="bi bi-bag-check me-1"></i> รับสั่งกลับบ้าน' : '<i class="bi bi-bag-check me-1"></i> งดรับสั่งกลับบ้าน';
                 } else if (type === 'menu' || type === 'topping' || type === 'item') {
                     // ปรับแต่งปุ่ม เมนู, ท็อปปิ้ง (มีของ/หมด)
                     if (newStatus == 1) {

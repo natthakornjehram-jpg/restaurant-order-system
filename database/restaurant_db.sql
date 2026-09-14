@@ -308,6 +308,8 @@ CREATE TABLE `owner` (
   `open_time` time DEFAULT NULL,
   `close_time` time DEFAULT NULL,
   `is_shop_open` tinyint(1) DEFAULT 0,
+  `is_dinein_open` tinyint(1) NOT NULL DEFAULT 1,
+  `is_takeaway_open` tinyint(1) NOT NULL DEFAULT 1,
   `max_queue` int(11) DEFAULT 20,
   `close_reason` varchar(255) DEFAULT '',
   `created_at` datetime DEFAULT current_timestamp(),
@@ -324,7 +326,7 @@ CREATE TABLE `owner` (
 
 LOCK TABLES `owner` WRITE;
 /*!40000 ALTER TABLE `owner` DISABLE KEYS */;
-INSERT INTO `owner` VALUES (1,'admin','$2y$10$UiM54d5MG.AFw2QlFLxQNOOnqcebAq9LASSxfvAteOQkxQV2PtLpi',NULL,NULL,'0917967142','default_logo.png',NULL,'','RANNAIBAAN','',NULL,NULL,1,17,'','2026-03-31 04:01:38',NULL,1);
+INSERT INTO `owner` VALUES (1,'admin','$2y$10$UiM54d5MG.AFw2QlFLxQNOOnqcebAq9LASSxfvAteOQkxQV2PtLpi',NULL,NULL,'0917967142','default_logo.png',NULL,'','RANNAIBAAN','',NULL,NULL,1,1,1,17,'','2026-03-31 04:01:38',NULL,1);
 /*!40000 ALTER TABLE `owner` ENABLE KEYS */;
 UNLOCK TABLES;
 

@@ -46,11 +46,21 @@ $pending_list_res = $conn->query($pending_list_sql);
             <h4 class="fw-bold m-0 text-dark">หน้าจัดการร้านอาหาร</h4>
             <p class="text-muted small mb-0">ยินดีต้อนรับกลับมาครับ อัปเดตล่าสุด <?php echo date('H:i'); ?> น.</p>
         </div>
-        <div class="d-flex gap-2 mt-3 mt-md-0">
-            <button data-id="shop" data-type="shop_status" 
-                    onclick="toggleStatus('shop', 'shop_status', <?= $store['is_shop_open']; ?>)" 
+        <div class="d-flex flex-wrap gap-2 mt-3 mt-md-0">
+            <button data-id="shop" data-type="shop_status"
+                    onclick="toggleStatus('shop', 'shop_status', <?= $store['is_shop_open']; ?>)"
                     class="btn btn-toggle shadow-sm <?= ($store['is_shop_open'] == 1) ? 'bg-shop-open' : 'bg-status-closed'; ?>">
                 <?= ($store['is_shop_open'] == 1) ? '<i class="bi bi-shop me-1"></i> ร้านเปิดอยู่ (รับออเดอร์)' : '<i class="bi bi-shop me-1"></i> ร้านปิดอยู่' ?>
+            </button>
+            <button data-id="dinein" data-type="dinein_status"
+                    onclick="toggleStatus('dinein', 'dinein_status', <?= $store['is_dinein_open']; ?>)"
+                    class="btn btn-toggle shadow-sm <?= ($store['is_dinein_open'] == 1) ? 'bg-shop-open' : 'bg-status-closed'; ?>">
+                <?= ($store['is_dinein_open'] == 1) ? '<i class="bi bi-cup-hot me-1"></i> รับทานที่ร้าน' : '<i class="bi bi-cup-hot me-1"></i> งดรับทานที่ร้าน' ?>
+            </button>
+            <button data-id="takeaway" data-type="takeaway_status"
+                    onclick="toggleStatus('takeaway', 'takeaway_status', <?= $store['is_takeaway_open']; ?>)"
+                    class="btn btn-toggle shadow-sm <?= ($store['is_takeaway_open'] == 1) ? 'bg-shop-open' : 'bg-status-closed'; ?>">
+                <?= ($store['is_takeaway_open'] == 1) ? '<i class="bi bi-bag-check me-1"></i> รับสั่งกลับบ้าน' : '<i class="bi bi-bag-check me-1"></i> งดรับสั่งกลับบ้าน' ?>
             </button>
         </div>
     </div>

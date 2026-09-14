@@ -40,6 +40,16 @@ $table_id = $_SESSION['table_id'] ?? NULL;
 // (ออเดอร์ dine_in จะไม่ insert แถว payment เลย เพราะปกติจ่ายตอนปิดบิลที่เคาน์เตอร์แทน)
 $order_type = ($_POST['order_type'] ?? '') === 'dine_in' && $table_id ? 'dine_in' : 'takeaway';
 
+// 1.6 เช็คสถานะเปิด/ปิดรับออเดอร์ตามประเภทฝั่งเซิร์ฟเวอร์อีกครั้ง (หน้าเลือกประเภท/ตะกร้าปิดปุ่มไว้แค่ฝั่ง client
+//     เช่นเดียวกับข้อ 1.5 ยิง POST ตรงมาที่ไฟล์นี้ตอนร้านเพิ่งปิดรับประเภทนั้นได้ถ้าไม่เช็คซ้ำตรงนี้)
+if (($order_type === 'dine_in' && empty($store['is_dinein_open'])) || ($order_type === 'takeaway' && empty($store['is_takeaway_open']))) {
+    echo "<script>
+        alert('ขณะนี้ร้านงดรับออเดอร์ประเภทนี้ชั่วคราว กรุณาเลือกใหม่อีกครั้ง');
+        window.location.href = " . json_encode($menu_fallback_url, JSON_UNESCAPED_SLASHES) . ";
+    </script>";
+    exit;
+}
+
 // รับชื่อและเบอร์โทรเพิ่มมาตรงนี้
 $online_name = $_POST['customer_name_online'] ?? ($_POST['takeaway_name'] ?? '');
 $online_phone = $_POST['customer_phone_online'] ?? '';

@@ -58,6 +58,11 @@ if ($is_localhost) {
         "ALTER TABLE item ADD COLUMN is_featured TINYINT(1) NOT NULL DEFAULT 0",
         "ALTER TABLE topping_categories ADD COLUMN sort_order INT NOT NULL DEFAULT 0",
         "ALTER TABLE owner DROP COLUMN is_online_open",
+        // เปิด/ปิดรับออเดอร์แยกอิสระระหว่าง "ทานที่ร้าน" กับ "สั่งกลับบ้าน" ได้ (เดิมมีสวิตช์เดียว is_shop_open
+        // ควบคุมทั้งร้านพร้อมกันหมด) is_shop_open ยังอยู่เป็นสวิตช์หลักเหมือนเดิม ถ้าปิดคือปิดร้านทั้งหมดจริงๆ
+        // ส่วน 2 คอลัมน์นี้มีผลก็ต่อเมื่อ is_shop_open ยังเปิดอยู่เท่านั้น (เช่น เปิดร้านอยู่แต่งดรับทานที่ร้านชั่วคราว)
+        "ALTER TABLE owner ADD COLUMN is_dinein_open TINYINT(1) NOT NULL DEFAULT 1",
+        "ALTER TABLE owner ADD COLUMN is_takeaway_open TINYINT(1) NOT NULL DEFAULT 1",
         "CREATE TABLE IF NOT EXISTS login_attempts (
             attempt_id INT NOT NULL AUTO_INCREMENT,
             username VARCHAR(50) NOT NULL,
