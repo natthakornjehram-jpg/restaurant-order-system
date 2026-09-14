@@ -49,18 +49,18 @@ $pending_list_res = $conn->query($pending_list_sql);
         <div class="d-flex flex-column gap-2 mt-3 mt-md-0">
             <button data-id="shop" data-type="shop_status"
                     onclick="toggleStatus('shop', 'shop_status', <?= $store['is_shop_open']; ?>)"
-                    class="btn btn-toggle shadow-sm <?= ($store['is_shop_open'] == 1) ? 'bg-shop-open' : 'bg-status-closed'; ?>">
+                    class="btn btn-toggle shadow-sm bg-toggle-shop <?= ($store['is_shop_open'] == 1) ? '' : 'is-closed'; ?>">
                 <?= ($store['is_shop_open'] == 1) ? '<i class="bi bi-shop me-1"></i> ร้านเปิดอยู่ (รับออเดอร์)' : '<i class="bi bi-shop me-1"></i> ร้านปิดอยู่' ?>
             </button>
             <div class="d-flex gap-2 toggle-row-split">
                 <button data-id="dinein" data-type="dinein_status"
                         onclick="toggleStatus('dinein', 'dinein_status', <?= $store['is_dinein_open']; ?>)"
-                        class="btn btn-toggle shadow-sm <?= ($store['is_dinein_open'] == 1) ? 'bg-shop-open' : 'bg-status-closed'; ?>">
+                        class="btn btn-toggle shadow-sm bg-toggle-dinein <?= ($store['is_dinein_open'] == 1) ? '' : 'is-closed'; ?>">
                     <?= ($store['is_dinein_open'] == 1) ? '<i class="bi bi-cup-hot me-1"></i> รับทานที่ร้าน' : '<i class="bi bi-cup-hot me-1"></i> งดรับทานที่ร้าน' ?>
                 </button>
                 <button data-id="takeaway" data-type="takeaway_status"
                         onclick="toggleStatus('takeaway', 'takeaway_status', <?= $store['is_takeaway_open']; ?>)"
-                        class="btn btn-toggle shadow-sm <?= ($store['is_takeaway_open'] == 1) ? 'bg-shop-open' : 'bg-status-closed'; ?>">
+                        class="btn btn-toggle shadow-sm bg-toggle-takeaway <?= ($store['is_takeaway_open'] == 1) ? '' : 'is-closed'; ?>">
                     <?= ($store['is_takeaway_open'] == 1) ? '<i class="bi bi-bag-check me-1"></i> รับสั่งกลับบ้าน' : '<i class="bi bi-bag-check me-1"></i> งดรับสั่งกลับบ้าน' ?>
                 </button>
             </div>
