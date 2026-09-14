@@ -11,6 +11,10 @@
 .env
 .env.local
 
+# มี Gmail App Password ของจริงอยู่ข้างใน ห้าม commit เด็ดขาด (ดู includes/email_config.php
+# สำหรับวิธีตั้งค่า - ไฟล์นี้ต้องสร้างเองในเครื่อง/เซิร์ฟเวอร์ที่ deploy จริง ไม่ commit ไปกับโค้ด)
+includes/email_config.php
+
 # ไฟล์ของระบบปฏิบัติการ/เอดิเตอร์
 .DS_Store
 Thumbs.db

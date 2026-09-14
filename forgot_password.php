@@ -59,8 +59,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
                 $stmt = $conn->prepare("INSERT INTO password_reset (owner_id, phone, otp, expires_at) VALUES (?, ?, ?, ?)");
                 $stmt->bind_param("isss", $matched_owner_id, $phone, $otp, $expires_at);
                 if ($stmt->execute()) {
-                    // พยายามส่งอีเมลจริงก่อน (ถ้ามีอีเมลให้ลอง) แต่ยังไม่ได้ตั้งค่า Brevo เสร็จก็ไม่บล็อกการทำงาน
-                    // บน localhost ยังโชว์ผ่าน alert() ได้เหมือนเดิมเผื่อไว้ใช้เดโม/ทดสอบก่อน
+                    // พยายามส่งอีเมลจริงก่อน (ถ้ามีอีเมลให้ลอง) แต่ยังไม่ได้ตั้งค่า Gmail SMTP เสร็จก็ไม่บล็อกการทำงาน
+                    // บน localhost ยังโชว์รหัส OTP บนหน้าเว็บได้เหมือนเดิมเผื่อไว้ใช้เดโม/ทดสอบก่อน
                     $send_result = !empty($owner_row['email'])
                         ? send_email_otp($owner_row['email'], $owner_row['name'] ?? '', (string) $otp)
                         : ['success' => false, 'error' => 'ยังไม่ได้ตั้งอีเมลไว้'];
@@ -68,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
                     if ($send_result['success']) {
                         $_SESSION['reset_email'] = $owner_row['email'];
                     } elseif (!$is_localhost) {
-                        // ไม่โชว์รายละเอียด error ดิบจาก Brevo ให้ผู้ใช้เห็นบนโฮสต์จริง (อาจมีรายละเอียดภายในระบบหลุดไป)
+                        // ไม่โชว์รายละเอียด error ดิบจาก Gmail SMTP ให้ผู้ใช้เห็นบนโฮสต์จริง (อาจมีรายละเอียดภายในระบบหลุดไป)
                         // เก็บรายละเอียดไว้ใน error_log ฝั่งเซิร์ฟเวอร์แทนสำหรับดีบั๊ก
                         error_log('send_email_otp failed: ' . $send_result['error']);
                         $error = "ส่งอีเมล OTP ไม่สำเร็จ กรุณาลองใหม่อีกครั้งภายหลัง หรือติดต่อผู้ดูแลระบบ";
@@ -275,6 +275,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
                 <?php else: ?>
                     <p class="text-center text-muted mb-4 small">รหัส OTP 6 หลัก สำหรับเบอร์<br><strong class="text-dark"><?= htmlspecialchars($_SESSION['reset_phone'] ?? '') ?></strong></p>
                 <?php endif; ?>
+
+                <?php if(isset($_SESSION['mock_otp'])): ?>
+                    <!-- โหมดทดสอบ (localhost เท่านั้น): โชว์รหัส OTP ลงบนหน้าเว็บตรงๆ แทนการพึ่ง alert() อย่างเดียว
+                         เพราะเบราว์เซอร์/เว็บวิวหลายตัวบล็อก alert() ได้ (เช่น เปิดผ่านแอปในเครือข่ายสังคม, ตั้งค่า
+                         "block additional dialogs" ของ Chrome) ทำให้บางทีไม่เห็นรหัสเลยแม้ระบบจะสร้างให้แล้วก็ตาม -->
+                    <div class="alert alert-warning text-center rounded-4 border-0 mb-4 shadow-sm py-3">
+                        <div class="small fw-bold mb-1">📲 โหมดทดสอบ (localhost) — รหัส OTP ของคุณคือ</div>
+                        <div class="fw-bold" style="font-size: 1.8rem; letter-spacing: 4px;"><?= htmlspecialchars((string) $_SESSION['mock_otp']) ?></div>
+                        <div class="small text-muted mt-1">รหัสมีอายุ 5 นาที (โหมดนี้จะไม่โชว์บนโฮสต์จริงที่ตั้งค่าส่งอีเมลไว้แล้ว)</div>
+                    </div>
+                <?php endif; ?>
+
                 <form method="POST">
                     <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
                     <div class="mb-4">
@@ -283,14 +295,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
                     <button type="submit" name="verify_otp" class="btn-brown shadow">ยืนยันรหัส OTP</button>
                     <div class="text-center mt-3"><a href="?cancel=1" class="text-muted small text-decoration-none">ยกเลิกการทำรายการ</a></div>
                 </form>
-
-                <?php if(isset($_SESSION['mock_otp'])): ?>
-                    <script>
-                        setTimeout(function() {
-                            alert("📲 จำลอง SMS เข้ามือถือ:\n\nรหัส OTP สำหรับรีเซ็ตรหัสผ่านของคุณคือ: [ <?= $_SESSION['mock_otp'] ?> ]\nรหัสมีอายุ 5 นาที");
-                        }, 500);
-                    </script>
-                <?php endif; ?>
             <?php endif; ?>
 
             <?php if($step == 3): ?>
