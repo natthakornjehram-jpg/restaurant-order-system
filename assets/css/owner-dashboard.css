@@ -75,5 +75,7 @@ body { background-color: #f0f4f7; }
     .dashboard-scope .stat-label { font-size: 0.9rem; }
     .dashboard-scope .stat-icon { width: 46px; height: 46px; font-size: 1.3rem; margin-bottom: 8px; border-radius: 12px; }
     .dashboard-scope .btn-toggle { width: 100%; min-width: 100%; }
+    /* ปุ่ม "รับทานที่ร้าน"/"รับสั่งกลับบ้าน" ให้อยู่แถวเดียวกันแบบซ้าย-ขวาแทนเต็มแถวแยกกัน ประหยัดพื้นที่จอมือถือ */
+    .dashboard-scope .toggle-row-split .btn-toggle { width: auto; min-width: 0; flex: 1 1 0; padding-left: 10px; padding-right: 10px; }
     .dashboard-scope .table-title { font-size: 1.4rem; }
 }
