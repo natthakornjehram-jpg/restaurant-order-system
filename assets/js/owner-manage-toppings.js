@@ -62,6 +62,17 @@ function addSubOptionRow(id = '', name = '', price = '0.00') {
         '<input type="number" step="0.01" min="0" name="row_price[]" class="form-control rounded-3" style="max-width: 110px;" value="' + escapeHtmlAttr(price) + '">' +
         '<button type="button" class="btn btn-outline-danger rounded-3 flex-shrink-0" onclick="removeSubOptionRow(this)"><i class="bi bi-trash"></i></button>';
     container.appendChild(row);
+
+    // แถวใหม่ไถลลงมาพร้อมจางเข้า แทนที่จะโผล่มาทันทีเฉยๆ (ใช้ anime.js)
+    if (typeof anime !== 'undefined') {
+        anime({
+            targets: row,
+            opacity: [0, 1],
+            translateY: [-12, 0],
+            duration: 280,
+            easing: 'easeOutQuad'
+        });
+    }
 }
 
 // ลบแถวตัวเลือกย่อยออกจากหน้าจอ ถ้าแถวนี้มีอยู่ในฐานข้อมูลแล้วจะมาร์คไว้ให้ลบจริงตอนกดบันทึก
@@ -75,7 +86,25 @@ function removeSubOptionRow(btn) {
         del.value = hiddenId.value;
         document.getElementById('catGroupForm').appendChild(del);
     }
-    row.remove();
+
+    // จางออก+ยุบความสูงลงก่อนค่อยลบออกจริงจาก DOM แทนที่จะหายวับไปทันที (ใช้ anime.js)
+    if (typeof anime !== 'undefined') {
+        const rowHeight = row.offsetHeight;
+        const rowMarginBottom = parseFloat(getComputedStyle(row).marginBottom) || 0;
+        row.style.overflow = 'hidden';
+        anime({
+            targets: row,
+            opacity: [1, 0],
+            translateX: [0, 16],
+            height: [rowHeight, 0],
+            marginBottom: [rowMarginBottom, 0],
+            duration: 220,
+            easing: 'easeInQuad',
+            complete: () => row.remove()
+        });
+    } else {
+        row.remove();
+    }
 }
 
 // ฟังก์ชันเปิด Modal ตัวเลือกเสริม (ค่าเริ่มต้นตอนเพิ่มใหม่: ปิดติดตามคลังสินค้า, เปิดขาย)
