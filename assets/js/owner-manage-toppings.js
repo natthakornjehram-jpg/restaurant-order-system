@@ -61,16 +61,22 @@ function addSubOptionRow(id = '', name = '', price = '0.00') {
         '<span class="fw-bold text-muted">+</span>' +
         '<input type="number" step="0.01" min="0" name="row_price[]" class="form-control rounded-3" style="max-width: 110px;" value="' + escapeHtmlAttr(price) + '">' +
         '<button type="button" class="btn btn-outline-danger rounded-3 flex-shrink-0" onclick="removeSubOptionRow(this)"><i class="bi bi-trash"></i></button>';
+    // ตั้งค่าเริ่มต้นไว้ก่อน append กันเห็นแถวโผล่เต็มๆ วูบเดียวก่อน anime.js จะเริ่มทำงาน
+    if (typeof anime !== 'undefined') {
+        row.style.opacity = '0';
+        row.style.transform = 'translateY(-14px) scale(0.97)';
+    }
     container.appendChild(row);
 
-    // แถวใหม่ไถลลงมาพร้อมจางเข้า แทนที่จะโผล่มาทันทีเฉยๆ (ใช้ anime.js)
+    // แถวใหม่ไถลลงมาพร้อมจางเข้าแบบนุ่มนวล แทนที่จะโผล่มาทันทีเฉยๆ (ใช้ anime.js)
     if (typeof anime !== 'undefined') {
         anime({
             targets: row,
             opacity: [0, 1],
-            translateY: [-12, 0],
-            duration: 280,
-            easing: 'easeOutQuad'
+            translateY: [-14, 0],
+            scale: [0.97, 1],
+            duration: 450,
+            easing: 'easeOutCubic'
         });
     }
 }
@@ -87,21 +93,27 @@ function removeSubOptionRow(btn) {
         document.getElementById('catGroupForm').appendChild(del);
     }
 
-    // จางออก+ยุบความสูงลงก่อนค่อยลบออกจริงจาก DOM แทนที่จะหายวับไปทันที (ใช้ anime.js)
+    // จางออก+ไถลนิดหน่อยก่อน แล้วค่อยยุบความสูงตามทีหลัง (แยกจังหวะกันแทนทำพร้อมกันทั้งหมด ดูนุ่มนวลกว่า)
+    // ยุบจริงถึงจะลบออกจาก DOM (ใช้ anime.js timeline)
     if (typeof anime !== 'undefined') {
         const rowHeight = row.offsetHeight;
         const rowMarginBottom = parseFloat(getComputedStyle(row).marginBottom) || 0;
         row.style.overflow = 'hidden';
-        anime({
-            targets: row,
-            opacity: [1, 0],
-            translateX: [0, 16],
-            height: [rowHeight, 0],
-            marginBottom: [rowMarginBottom, 0],
-            duration: 220,
-            easing: 'easeInQuad',
-            complete: () => row.remove()
-        });
+        anime.timeline({ easing: 'easeInOutCubic' })
+            .add({
+                targets: row,
+                opacity: [1, 0],
+                translateX: [0, 18],
+                scale: [1, 0.98],
+                duration: 260
+            })
+            .add({
+                targets: row,
+                height: [rowHeight, 0],
+                marginBottom: [rowMarginBottom, 0],
+                duration: 280,
+                complete: () => row.remove()
+            }, '-=40');
     } else {
         row.remove();
     }
