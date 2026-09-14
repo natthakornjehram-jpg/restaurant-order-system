@@ -45,10 +45,11 @@ body { background-color: #f0f4f7; }
     border-radius: 15px; font-weight: 700; padding: 10px 20px; border: none;
     transition: 0.3s; min-width: 150px; color: #fff !important;
 }
-/* สีประจำตัวของปุ่มแต่ละอัน (ร้าน=เขียว, ทานที่ร้าน=ส้ม, กลับบ้าน=ฟ้า) กันสามปุ่มดูเหมือนกันหมดตอนเปิดพร้อมกัน
-   ตอนปิดไม่เปลี่ยนเป็นสีแดงเหมือนกันหมดแล้ว แต่ใช้ .is-closed จางสีเดิมลงแทน ยังพอเดาได้ว่าปุ่มไหนคือปุ่มไหน */
+/* สีประจำตัวของปุ่มแต่ละอัน (ร้าน=เขียว, ทานที่ร้าน=น้ำตาล เข้าธีมกาแฟเหมือนฝั่งลูกค้า, กลับบ้าน=ฟ้า)
+   กันสามปุ่มดูเหมือนกันหมดตอนเปิดพร้อมกัน ตอนปิดไม่เปลี่ยนเป็นสีแดงเหมือนกันหมดแล้ว แต่ใช้ .is-closed
+   จางสีเดิมลงแทน ยังพอเดาได้ว่าปุ่มไหนคือปุ่มไหน */
 .dashboard-scope .bg-toggle-shop { background-color: #27ae60; }
-.dashboard-scope .bg-toggle-dinein { background-color: #e67e22; }
+.dashboard-scope .bg-toggle-dinein { background-color: #795548; }
 .dashboard-scope .bg-toggle-takeaway { background-color: #2980b9; }
 .dashboard-scope .btn-toggle.is-closed { opacity: .45; filter: grayscale(35%); }
 
