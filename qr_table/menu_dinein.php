@@ -68,13 +68,6 @@ if (isset($_GET['table']) && !empty($_GET['table'])) {
     }
 }
 
-// ลูกค้ากดปุ่ม "เปลี่ยนประเภทออเดอร์" ที่หน้าเมนู (ดูปุ่มด้านล่าง) กดผิดตอนแรกแล้วอยากแก้ - ล้างค่าเดิมทิ้ง
-// เพื่อให้ตกไปเจอหน้าเลือกประเภทอีกครั้งด้านล่าง อนุญาตเฉพาะตอนยังไม่ได้ยืนยันสั่งออเดอร์ไหนเลยในรอบนี้ (has_ordered)
-// กันสับสนกับรหัสร่วมโต๊ะ/บิลทานที่ร้านที่อาจเปิดค้างไว้แล้วถ้าสลับประเภทหลังสั่งไปแล้ว
-if (isset($_GET['switch_type']) && empty($_SESSION['has_ordered'])) {
-    unset($_SESSION['order_type']);
-}
-
 // รับค่าประเภทออเดอร์จากหน้าเลือก (ทานที่ร้าน / กลับบ้าน)
 if (isset($_GET['type']) && in_array($_GET['type'], ['dine_in', 'takeaway'], true)) {
     $_SESSION['order_type'] = $_GET['type'];
@@ -267,21 +260,6 @@ include '../includes/nav_dinein.php';
             <span class="badge bg-dark text-warning rounded-pill px-3 py-2 fw-bold shadow-sm">
                 <i class="bi bi-key-fill text-warning me-1"></i> รหัสร่วมโต๊ะ: <?= htmlspecialchars($db_join_code) ?>
             </span>
-        </div>
-    <?php endif; ?>
-
-    <?php
-    // ปุ่ม "เปลี่ยนประเภทออเดอร์" ไว้ให้ลูกค้ากดผิดตอนหน้าเลือกแล้วอยากแก้ - โชว์เฉพาะตอนมีโต๊ะจริง (มีทางเลือกอื่นให้สลับ)
-    // ยังไม่ได้ยืนยันสั่งออเดอร์ไหนเลยในรอบนี้ และประเภทที่จะสลับไปยังเปิดรับอยู่จริง (ไม่งั้นกดไปก็เจอแค่หน้าเลือกที่ปิดอยู่)
-    $can_switch_to_dinein = $_SESSION['order_type'] === 'takeaway' && !empty($store['is_dinein_open']);
-    $can_switch_to_takeaway = $_SESSION['order_type'] === 'dine_in' && !empty($store['is_takeaway_open']);
-    $can_switch_type = isset($_SESSION['table_id']) && empty($_SESSION['has_ordered']) && ($can_switch_to_dinein || $can_switch_to_takeaway);
-    ?>
-    <?php if ($can_switch_type): ?>
-        <div class="d-flex justify-content-end mb-3">
-            <a href="menu_dinein.php<?= dinein_url('switch_type=1') ?>" class="badge bg-white text-dark border rounded-pill px-3 py-2 fw-bold shadow-sm text-decoration-none">
-                <i class="bi bi-arrow-left-right me-1"></i> เปลี่ยนเป็น<?= $can_switch_to_dinein ? 'ทานที่ร้าน' : 'สั่งกลับบ้าน' ?>
-            </a>
         </div>
     <?php endif; ?>
 
