@@ -416,7 +416,7 @@ include '../includes/nav_dinein.php';
                 </div>
             <?php endif; ?>
 
-            <form action="../member/submit_order.php" method="POST">
+            <form action="../member/submit_order.php" method="POST" enctype="multipart/form-data" id="dineinOrderForm">
                 <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
                 <input type="hidden" name="order_type" value="<?= htmlspecialchars($_SESSION['order_type']) ?>">
                 <input type="hidden" name="total_amount" value="<?= $total_price ?>">
@@ -444,20 +444,40 @@ include '../includes/nav_dinein.php';
 
                 <?php if ($_SESSION['order_type'] === 'takeaway'): ?>
                 <div class="card cart-card p-3 mb-4 customer-info-card">
-                    <label class="small fw-bold text-muted d-block mb-2"><i class="bi bi-wallet2 me-1"></i> วิธีชำระเงิน (จ่ายที่หน้าเคาน์เตอร์ตอนมารับอาหาร)</label>
+                    <label class="small fw-bold text-muted d-block mb-2"><i class="bi bi-wallet2 me-1"></i> วิธีชำระเงิน</label>
                     <div class="d-flex flex-column gap-2">
                         <div class="form-check">
-                            <input class="form-check-input" type="radio" name="payment_method" id="dineinPayQr" value="qr_counter" checked>
-                            <label class="form-check-label fw-bold" for="dineinPayQr"><i class="bi bi-qr-code me-1"></i>สแกน QR หน้าเคาน์เตอร์</label>
+                            <input class="form-check-input" type="radio" name="payment_method" id="dineinPayQr" value="qr_counter" checked onchange="dineinToggleTransferProof()">
+                            <label class="form-check-label fw-bold" for="dineinPayQr"><i class="bi bi-qr-code me-1"></i>สแกน QR หน้าเคาน์เตอร์ (จ่ายตอนมารับ)</label>
                         </div>
                         <div class="form-check">
-                            <input class="form-check-input" type="radio" name="payment_method" id="dineinPayCash" value="cash">
-                            <label class="form-check-label fw-bold" for="dineinPayCash"><i class="bi bi-cash-coin me-1"></i>เงินสดหน้าเคาน์เตอร์</label>
+                            <input class="form-check-input" type="radio" name="payment_method" id="dineinPayCash" value="cash" onchange="dineinToggleTransferProof()">
+                            <label class="form-check-label fw-bold" for="dineinPayCash"><i class="bi bi-cash-coin me-1"></i>เงินสดหน้าเคาน์เตอร์ (จ่ายตอนมารับ)</label>
                         </div>
                         <div class="form-check">
-                            <input class="form-check-input" type="radio" name="payment_method" id="dineinPayTransfer" value="transfer">
-                            <label class="form-check-label fw-bold" for="dineinPayTransfer"><i class="bi bi-bank me-1"></i>โอนเงินเอง แล้วโชว์สลิปตอนมารับ</label>
+                            <input class="form-check-input" type="radio" name="payment_method" id="dineinPayTransfer" value="transfer" onchange="dineinToggleTransferProof()">
+                            <label class="form-check-label fw-bold" for="dineinPayTransfer"><i class="bi bi-bank me-1"></i>โอนเงินเอง แนบสลิปตอนนี้เลย</label>
                         </div>
+                    </div>
+
+                    <!-- โชว์ QR พร้อมเพย์/เลขบัญชีของร้าน + ช่องแนบสลิป เฉพาะตอนเลือก "โอนเงินเอง" เท่านั้น
+                         ต้องแนบสลิปมาพร้อมตอนสั่งเลย (ไม่ใช่โชว์ตอนมารับเหมือนเดิม) กันลูกค้าสั่งทิ้งไว้ไม่มารับ/ไม่จ่ายจริง
+                         ออเดอร์ยังเข้าครัวทันทีหลังแนบสลิป ไม่ต้องรอร้านกดยืนยันก่อน แต่ร้านตรวจสลิปย้อนหลังได้ที่หน้าจัดการชำระเงิน -->
+                    <div id="dineinTransferProofBox" class="mt-3 pt-3 border-top" style="display: none;">
+                        <?php if (!empty($store['promptpay_qr'])): ?>
+                            <div class="text-center mb-3">
+                                <img src="../assets/images/logos/<?= htmlspecialchars($store['promptpay_qr']) ?>" alt="QR พร้อมเพย์" class="rounded-3 shadow-sm" style="max-width: 220px; width: 100%;">
+                            </div>
+                        <?php endif; ?>
+                        <?php if (!empty($store['bank_info'])): ?>
+                            <div class="small text-muted mb-3" style="white-space: pre-line;"><?= htmlspecialchars($store['bank_info']) ?></div>
+                        <?php endif; ?>
+                        <?php if (empty($store['promptpay_qr']) && empty($store['bank_info'])): ?>
+                            <div class="small text-danger mb-3">ร้านยังไม่ได้ตั้งค่าช่องทางรับเงิน กรุณาเลือกวิธีชำระเงินแบบอื่นแทนครับ</div>
+                        <?php endif; ?>
+                        <label class="small fw-bold text-muted">แนบสลิปการโอนเงิน *</label>
+                        <input type="file" name="payment_slip" id="dineinPaymentSlip" class="form-control rounded-3" accept="image/*">
+                        <div class="form-text">รองรับไฟล์ภาพ (JPG, PNG, WEBP)</div>
                     </div>
                 </div>
                 <?php endif; ?>
@@ -468,7 +488,7 @@ include '../includes/nav_dinein.php';
                         <span class="h3 mb-0 fw-bold text-success">฿<?= number_format($total_price, 0) ?></span>
                     </div>
 
-                    <button type="submit" class="btn btn-success w-100 rounded-pill py-3 fw-bold shadow-sm fs-5" onclick="this.innerHTML='กำลังส่งออเดอร์...'; this.disabled=true; this.form.submit();">
+                    <button type="submit" id="dineinSubmitOrderBtn" class="btn btn-success w-100 rounded-pill py-3 fw-bold shadow-sm fs-5">
                         <i class="bi bi-send-fill me-2"></i> ยืนยันส่งออเดอร์
                     </button>
                 </div>
@@ -531,6 +551,31 @@ function dineinFillLastCustomer() {
     if (nameInput) nameInput.value = <?= json_encode($_SESSION['dinein_last_name'] ?? '') ?>;
     if (phoneInput) phoneInput.value = <?= json_encode($_SESSION['dinein_last_phone'] ?? '') ?>;
 }
+
+// โชว์/ซ่อนกล่องแนบสลิป (QR พร้อมเพย์ + ช่องอัปโหลด) เฉพาะตอนเลือกวิธีจ่าย "โอนเงินเอง" เท่านั้น
+// และตั้ง required ให้ช่องอัปโหลดเฉพาะตอนที่กล่องนี้โชว์อยู่ (กันกรอกวิธีอื่นแล้วโดนบังคับแนบไฟล์ไปด้วย)
+function dineinToggleTransferProof() {
+    var box = document.getElementById('dineinTransferProofBox');
+    var slipInput = document.getElementById('dineinPaymentSlip');
+    var transferRadio = document.getElementById('dineinPayTransfer');
+    if (!box || !transferRadio) return;
+    var isTransfer = transferRadio.checked;
+    box.style.display = isTransfer ? 'block' : 'none';
+    if (slipInput) slipInput.required = isTransfer;
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    var form = document.getElementById('dineinOrderForm');
+    if (!form) return;
+    // ใช้ submit event ธรรมดา (ไม่เรียก form.submit() ตรงๆ) เพื่อให้ required/validation ของเบราว์เซอร์ทำงานปกติ
+    form.addEventListener('submit', function () {
+        var btn = document.getElementById('dineinSubmitOrderBtn');
+        if (btn) {
+            btn.innerHTML = 'กำลังส่งออเดอร์...';
+            btn.disabled = true;
+        }
+    });
+});
 </script>
 
 <?php include '../includes/footer_dinein.php'; ?>

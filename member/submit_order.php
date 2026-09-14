@@ -3,6 +3,7 @@
 session_start();
 require_once '../includes/db.php';
 require_once '../includes/csrf.php';
+require_once '../includes/upload_helper.php';
 
 if (!csrf_verify($_POST['csrf_token'] ?? '')) {
     echo "<script>
@@ -44,6 +45,23 @@ $online_name = $_POST['customer_name_online'] ?? ($_POST['takeaway_name'] ?? '')
 $online_phone = $_POST['customer_phone_online'] ?? '';
 $note = $_POST['note'] ?? '';
 $payment_method = in_array($_POST['payment_method'] ?? '', ['cash', 'transfer', 'qr_counter'], true) ? $_POST['payment_method'] : 'cash';
+
+// 2.6 "โอนเงินเอง" ต้องแนบสลิปมาพร้อมตอนสั่งเลย (ไม่ใช่โชว์ตอนมารับเหมือนเดิม) กันลูกค้าสั่งทิ้งไว้ไม่มารับ/ไม่จ่ายจริง
+// อัปโหลดก่อนเปิดทรานแซกชัน เพราะการเขียนไฟล์ไม่ได้อยู่ในทรานแซกชันของฐานข้อมูลด้วย ถ้าอัปโหลดไม่ผ่านต้องเช็คให้เสร็จตั้งแต่ตรงนี้
+$slip_filename = null;
+if ($payment_method === 'transfer' && $order_type !== 'dine_in') {
+    $slip_filename = !empty($_FILES['payment_slip']['name'])
+        ? handle_image_upload($_FILES['payment_slip'], '../assets/images/slips/', 'slip')
+        : false;
+
+    if ($slip_filename === false) {
+        echo "<script>
+            alert('กรุณาแนบไฟล์รูปสลิปการโอนเงิน (JPG, PNG, WEBP) ก่อนส่งออเดอร์ครับ');
+            window.history.back();
+        </script>";
+        exit;
+    }
+}
 
 // 2.5 ห้ามเชื่อ total_amount ที่ส่งมาจากฟอร์ม (ลูกค้าแก้ค่าใน request ได้) และห้ามเชื่อราคาที่แคชไว้ในตะกร้าตอนกดเพิ่มลงตะกร้า
 //     (ราคาอาจเปลี่ยนไปแล้วระหว่างที่ลูกค้าเลือกของ) ต้องคำนวณยอดใหม่จากราคาปัจจุบันในฐานข้อมูลทุกครั้งตอนสั่งจริง
@@ -153,15 +171,17 @@ try {
     // 4. บันทึกข้อมูลการชำระเงิน (เฉพาะออเดอร์กลับบ้าน/ออนไลน์ - ทานที่ร้านจ่ายตอนปิดบิลแทน)
     // เช็คจาก order_type ไม่ใช่ table_id เพราะลูกค้าที่สแกนโต๊ะแล้วเลือก "สั่งกลับบ้าน" ก็ยังมี table_id ติดมาด้วย
     // (ถ้าเช็คจาก table_id ออเดอร์กลับบ้านที่สแกนโต๊ะจะไม่มีแถว payment เลย และไม่โผล่ในหน้าจัดการชำระเงินฝั่งร้าน)
-    // จ่ายที่หน้าเคาน์เตอร์เสมอ (เงินสดหรือโอน ไม่มีแนบสลิป) - บันทึกไว้เป็นหลักฐานว่าตกลงจ่ายแบบไหน รอร้านยืนยันรับเงินตอนลูกค้ามารับของ
+    // จ่ายเงินสด/สแกน QR หน้าเคาน์เตอร์ตอนมารับ - บันทึกไว้เป็นหลักฐานว่าตกลงจ่ายแบบไหน รอร้านยืนยันรับเงินตอนลูกค้ามารับของ
+    // ส่วน "โอนเงินเอง" แนบสลิปมาแล้วตั้งแต่ก่อนเปิดทรานแซกชัน (ดูขั้นตอนที่ 2.6) บันทึกชื่อไฟล์สลิปลง slip_image ไปด้วย
     if ($order_type !== 'dine_in') {
-        $stmt_pay = $conn->prepare("INSERT INTO payment (order_id, amount, method) VALUES (?, ?, ?)");
+        $stmt_pay = $conn->prepare("INSERT INTO payment (order_id, amount, method, slip_image) VALUES (?, ?, ?, ?)");
         $stmt_pay->bind_param(
-            "ids", 
-            $order_id, 
-            $total_amount, 
-            $payment_method);
-            
+            "idss",
+            $order_id,
+            $total_amount,
+            $payment_method,
+            $slip_filename);
+
         $stmt_pay->execute();
     }
 

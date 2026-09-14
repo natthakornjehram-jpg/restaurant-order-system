@@ -10,7 +10,8 @@ include '../includes/nav_owner.php';
 // --- แยกการดึงข้อมูลเป็น 2 กลุ่ม ---
 
 // 1. ออนไลน์ (สั่งกลับบ้าน จ่ายเงินสดตอนมารับ รอร้านยืนยันปิดออเดอร์)
-$sql_online = "SELECT o.*, p.status AS pay_status, p.method AS pay_method, p.transaction_ref
+// เพิ่ม p.slip_image เข้ามาด้วย เพื่อโชว์สลิปที่ลูกค้าแนบมาตอนสั่งจริง (กรณีเลือกโอนเงินเอง) ให้ร้านตรวจสอบได้
+$sql_online = "SELECT o.*, p.status AS pay_status, p.method AS pay_method, p.transaction_ref, p.slip_image
         FROM orders o
         JOIN payment p ON o.order_id = p.order_id
         WHERE o.payment_status = 'unpaid' AND o.order_type != 'dine_in' AND p.status = 'pending'
@@ -168,7 +169,7 @@ $res_served = $conn->query($sql_served);
                                 </div>
                                 <div class="mb-3 mt-3">
                                     <?php if ($row['pay_method'] === 'transfer'): ?>
-                                        <span class="badge-soft-info"><i class="bi bi-bank"></i> โอนเงินเองแล้วโชว์สลิป</span>
+                                        <span class="badge-soft-info"><i class="bi bi-bank"></i> โอนเงินเอง<?= !empty($row['slip_image']) ? ' (แนบสลิปแล้ว)' : ' (ยังไม่แนบสลิป)' ?></span>
                                     <?php elseif ($row['pay_method'] === 'qr_counter'): ?>
                                         <span class="badge-soft-info"><i class="bi bi-qr-code"></i> สแกน QR หน้าเคาน์เตอร์</span>
                                     <?php else: ?>
@@ -261,8 +262,16 @@ $res_served = $conn->query($sql_served);
 
                                 <div class="p-3 bg-light rounded-3 text-center mb-3 border">
                                     <?php if ($row['pay_method'] === 'transfer'): ?>
-                                        <i class="bi bi-bank text-primary fs-3 mb-1 d-block"></i>
-                                        <p class="fw-bold mb-0 text-dark">ลูกค้าเลือกโอนเงินเอง แล้วจะโชว์สลิปตอนมารับที่ร้าน</p>
+                                        <?php if (!empty($row['slip_image'])): ?>
+                                            <p class="fw-bold mb-2 text-dark"><i class="bi bi-bank me-1"></i>ลูกค้าเลือกโอนเงินเอง แนบสลิปมาด้วย - กรุณาตรวจสอบก่อนยืนยัน</p>
+                                            <a href="../assets/images/slips/<?= htmlspecialchars($row['slip_image']) ?>" target="_blank">
+                                                <img src="../assets/images/slips/<?= htmlspecialchars($row['slip_image']) ?>" alt="สลิปการโอนเงิน" class="img-fluid rounded-3 shadow-sm border" style="max-height: 320px;">
+                                            </a>
+                                            <div class="small text-muted mt-1">กดที่รูปเพื่อดูขนาดเต็ม</div>
+                                        <?php else: ?>
+                                            <i class="bi bi-exclamation-triangle text-warning fs-3 mb-1 d-block"></i>
+                                            <p class="fw-bold mb-0 text-dark">ลูกค้าเลือกโอนเงินเอง แต่ยังไม่มีสลิปแนบมา กรุณาตรวจสอบก่อนยืนยัน</p>
+                                        <?php endif; ?>
                                     <?php elseif ($row['pay_method'] === 'qr_counter'): ?>
                                         <i class="bi bi-qr-code text-primary fs-3 mb-1 d-block"></i>
                                         <p class="fw-bold mb-0 text-dark">ลูกค้าเลือกสแกน QR จ่ายที่หน้าเคาน์เตอร์</p>
