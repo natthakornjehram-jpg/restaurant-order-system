@@ -172,7 +172,7 @@ include '../includes/nav_owner.php';
                                     <label class="fw-bold mb-2 d-block">QR Code รับเงิน (พร้อมเพย์/ธนาคาร)</label>
                                     <div class="border rounded-4 bg-white p-2 mb-2 mx-auto" style="width: 200px; height: 200px; overflow: hidden; position: relative;">
                                         <!-- วงกลมแจ้งสถานะ: ✓ เขียว = มี QR อยู่แล้ว, ! แดง = ยังไม่มี/ถูกลบไป ต้องแนบก่อนลูกค้าถึงจะเห็น QR ตอนเลือกโอนเงิน -->
-                                        <span id="qr_status_badge" class="position-absolute d-flex align-items-center justify-content-center rounded-circle shadow-sm <?= !empty($store['promptpay_qr']) ? 'bg-success' : 'bg-danger'; ?>" style="width: 28px; height: 28px; top: -8px; right: -8px; color: #fff; z-index: 2;">
+                                        <span id="qr_status_badge" class="position-absolute d-flex align-items-center justify-content-center rounded-circle shadow-sm <?= !empty($store['promptpay_qr']) ? 'bg-success' : 'bg-danger'; ?>" style="width: 28px; height: 28px; top: 8px; right: 8px; color: #fff; z-index: 2;">
                                             <i class="bi <?= !empty($store['promptpay_qr']) ? 'bi-check-lg' : 'bi-exclamation-lg'; ?>"></i>
                                         </span>
                                         <?php if(!empty($store['promptpay_qr'])): ?>
