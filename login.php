@@ -141,6 +141,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
         .form-control:focus { border-color: #795548; box-shadow: none; background: #fff; }
         label { font-weight: bold; font-size: 0.9rem; color: #5d4037; margin-bottom: 5px; margin-left: 5px; }
 
+        /* แอนิเมชันไอคอนลูกตาโชว์/ซ่อนรหัสผ่าน - เด้งเล็กน้อยตอนสลับ ให้รู้สึกว่ากดแล้วมีอะไรเกิดขึ้นจริง */
+        .password-toggle-btn { transition: transform 0.15s ease; }
+        .password-toggle-btn:active { transform: translateY(-50%) scale(0.85) !important; }
+        @keyframes eyeIconPop {
+            0% { transform: scale(0.4); opacity: 0; }
+            60% { transform: scale(1.25); opacity: 1; }
+            100% { transform: scale(1); }
+        }
+        .password-toggle-btn i.icon-pop { display: inline-block; animation: eyeIconPop 0.28s ease; }
+
         @media (max-width: 576px) {
             body { padding: 16px 12px; }
             .login-card { padding: 25px 20px; border-radius: 22px; }
@@ -178,7 +188,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
                 </div>
                 <div class="mb-3">
                     <label>รหัสผ่าน (Password)</label>
-                    <input type="password" name="password" class="form-control" placeholder="กรอกรหัสผ่าน" required>
+                    <div class="position-relative">
+                        <input type="password" name="password" id="password" class="form-control pe-5" placeholder="กรอกรหัสผ่าน" required>
+                        <button type="button" class="btn btn-link position-absolute top-50 end-0 translate-middle-y text-muted p-0 me-3 password-toggle-btn" style="z-index: 5;" tabindex="-1" onclick="togglePasswordField('password', this)">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                    </div>
                 </div>
                 
                 <div class="d-flex justify-content-between align-items-center mb-4 px-2">
@@ -195,5 +210,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
             </form>
         </div>
     </div>
+    <script>
+        // สลับโชว์/ซ่อนรหัสผ่าน (ปุ่มรูปลูกตา) - สลับ type ระหว่าง password กับ text แล้วเปลี่ยนไอคอนตาม
+        // พร้อมแอนิเมชันเด้งเล็กน้อย (icon-pop) ทุกครั้งที่สลับ ให้รู้สึกตอบสนองมากขึ้น
+        function togglePasswordField(inputId, btn) {
+            const input = document.getElementById(inputId);
+            const icon = btn.querySelector('i');
+            const showing = input.type === 'text';
+            input.type = showing ? 'password' : 'text';
+            icon.classList.toggle('bi-eye', showing);
+            icon.classList.toggle('bi-eye-slash', !showing);
+
+            icon.classList.remove('icon-pop');
+            void icon.offsetWidth; // บังคับ reflow ให้เล่นแอนิเมชันซ้ำได้ทุกครั้งแม้กดรัวๆ
+            icon.classList.add('icon-pop');
+        }
+    </script>
 </body>
 </html>

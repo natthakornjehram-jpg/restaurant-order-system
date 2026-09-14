@@ -8,6 +8,16 @@ h2 { font-family: 'Mitr', sans-serif; color: #3e2723; text-align: center; font-s
 .form-control:focus { border-color: #795548; box-shadow: none; background: #fff; }
 label { font-weight: bold; font-size: 0.9rem; color: #5d4037; margin-bottom: 5px; margin-left: 5px; }
 
+/* แอนิเมชันไอคอนลูกตาโชว์/ซ่อนรหัสผ่าน - เด้งเล็กน้อยตอนสลับ ให้รู้สึกว่ากดแล้วมีอะไรเกิดขึ้นจริง */
+.password-toggle-btn { transition: transform 0.15s ease; }
+.password-toggle-btn:active { transform: translateY(-50%) scale(0.85) !important; }
+@keyframes eyeIconPop {
+    0% { transform: scale(0.4); opacity: 0; }
+    60% { transform: scale(1.25); opacity: 1; }
+    100% { transform: scale(1); }
+}
+.password-toggle-btn i.icon-pop { display: inline-block; animation: eyeIconPop 0.28s ease; }
+
 @media (max-width: 576px) {
     body { padding: 10px 5px; }
     .reg-card { margin: 15px auto; padding: 25px 20px; border-radius: 24px; }

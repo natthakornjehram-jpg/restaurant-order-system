@@ -91,7 +91,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
                     </div>
                     <div class="col-md-6 mb-3">
                         <label>รหัสผ่าน (Password)</label>
-                        <input type="password" name="password" class="form-control" placeholder="ระบุรหัสผ่าน" required>
+                        <div class="position-relative">
+                            <input type="password" name="password" id="password" class="form-control pe-5" placeholder="ระบุรหัสผ่าน" required>
+                            <button type="button" class="btn btn-link position-absolute top-50 end-0 translate-middle-y text-muted p-0 me-3 password-toggle-btn" style="z-index: 5;" tabindex="-1" onclick="togglePasswordField('password', this)">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="mb-3">
@@ -119,5 +124,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
             </form>
         </div>
     </div>
+    <script>
+        // สลับโชว์/ซ่อนรหัสผ่าน (ปุ่มรูปลูกตา) - สลับ type ระหว่าง password กับ text แล้วเปลี่ยนไอคอนตาม
+        // พร้อมแอนิเมชันเด้งเล็กน้อย (icon-pop) ทุกครั้งที่สลับ ให้รู้สึกตอบสนองมากขึ้น
+        function togglePasswordField(inputId, btn) {
+            const input = document.getElementById(inputId);
+            const icon = btn.querySelector('i');
+            const showing = input.type === 'text';
+            input.type = showing ? 'password' : 'text';
+            icon.classList.toggle('bi-eye', showing);
+            icon.classList.toggle('bi-eye-slash', !showing);
+
+            icon.classList.remove('icon-pop');
+            void icon.offsetWidth; // บังคับ reflow ให้เล่นแอนิเมชันซ้ำได้ทุกครั้งแม้กดรัวๆ
+            icon.classList.add('icon-pop');
+        }
+    </script>
 </body>
 </html>
