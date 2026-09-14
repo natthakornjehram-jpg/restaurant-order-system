@@ -99,13 +99,6 @@ include '../includes/nav_owner.php';
                 </div>
             </div>
 
-            <?php if($success_msg): ?>
-                <div class="alert alert-success border-0 shadow-sm rounded-4 mb-4"><i class="bi bi-check-circle-fill me-2"></i><?= htmlspecialchars($success_msg) ?></div>
-            <?php endif; ?>
-            <?php if($error_msg): ?>
-                <div class="alert alert-danger border-0 shadow-sm rounded-4 mb-4"><i class="bi bi-exclamation-triangle-fill me-2"></i><?= htmlspecialchars($error_msg) ?></div>
-            <?php endif; ?>
-
             <form id="settings_form" action="" method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
                 <div class="row g-4">
@@ -270,7 +263,7 @@ function removeQr() {
     document.getElementById('qr_remove_btn').style.display = 'none';
 }
 
-// ปุ่มบันทึก: โชว์วงกลมหมุนระหว่างกำลังส่งข้อมูล กันกดซ้ำ (พอบันทึกเสร็จหน้าจะโหลดใหม่พร้อมข้อความติ๊กถูกยืนยันด้านบนอยู่แล้ว)
+// ปุ่มบันทึก: โชว์วงกลมหมุนระหว่างกำลังส่งข้อมูล กันกดซ้ำ (พอบันทึกเสร็จหน้าจะโหลดใหม่แล้วเด้งกล่องข้อความติ๊กถูก/! ยืนยันด้านล่าง)
 document.getElementById('settings_form').addEventListener('submit', function () {
     var btn = document.getElementById('settings_save_btn');
     btn.disabled = true;
@@ -279,3 +272,10 @@ document.getElementById('settings_form').addEventListener('submit', function () 
 </script>
 
 <?php include '../includes/footer_owner.php'; ?>
+
+<?php if ($success_msg || $error_msg): ?>
+<script>
+// เด้งกล่องข้อความแบบเดียวกับหน้าอื่นๆ ในระบบ (วงกลมเขียว+ติ๊กถูก ตอนสำเร็จ / วงกลมแดง+! ตอนผิดพลาด) แทนกรอบ alert แบบเดิม
+ownerNotify(<?= json_encode($success_msg ?: $error_msg, JSON_UNESCAPED_UNICODE) ?>, <?= json_encode($success_msg ? 'success' : 'error') ?>);
+</script>
+<?php endif; ?>
