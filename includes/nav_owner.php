@@ -92,7 +92,7 @@ $owner_nav_items = [
       </ul>
 
       <div class="p-3 border-top border-secondary">
-        <a href="../logout.php" class="btn btn-outline-danger w-100 rounded-pill fw-bold" onclick="return confirm('ยืนยันออกจากระบบ?')">
+        <a href="../logout.php" class="btn btn-outline-danger w-100 rounded-pill fw-bold" onclick="return ownerConfirmNavigate(event, 'ยืนยันออกจากระบบ?', '../logout.php')">
             <i class="bi bi-box-arrow-right me-2"></i>ออกจากระบบ
         </a>
       </div>

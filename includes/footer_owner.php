@@ -64,6 +64,44 @@ function ownerNotify(message, icon = 'success') {
 })();
 
 /**
+ * 0.6 ใช้แทน confirm() ของเบราว์เซอร์ทุกจุด เพราะเบราว์เซอร์/เว็บวิวบางตัว (เช่น แอปในเครือข่ายสังคม,
+ *     การตั้งค่า "block additional dialogs" ของ Chrome หลังเจอ popup ถี่ๆ) บล็อก confirm()/alert() แบบเงียบๆ
+ *     โดยคืนค่า false ทันทีโดยไม่ถามผู้ใช้เลย ทำให้ปุ่มที่พึ่ง onclick="return confirm(...)" ไม่ทำงานเลย
+ *     แต่ไม่มีสัญญาณเตือนอะไรให้เห็นว่าทำไม (บั๊กที่ตรวจจับยากมาก เจอจากผู้ใช้รายงานว่า "ออกจากระบบไม่ได้")
+ *     ใช้ modal ของ SweetAlert2 แทน เพราะเป็น modal ในหน้าเว็บจริงๆ ไม่ใช่ dialog ของเบราว์เซอร์ จึงไม่โดนบล็อก
+ */
+function ownerConfirm(message) {
+    return Swal.fire({
+        title: message,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'ยืนยัน',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#dc3545',
+        reverseButtons: true
+    }).then((result) => result.isConfirmed);
+}
+
+// ใช้แทน onclick="return confirm(...)" บนลิงก์ <a> (เช่น ปุ่มออกจากระบบ)
+function ownerConfirmNavigate(event, message, url) {
+    event.preventDefault();
+    ownerConfirm(message).then(function (ok) {
+        if (ok) window.location.href = url;
+    });
+    return false;
+}
+
+// ใช้แทน onsubmit="return confirm(...)" บนฟอร์ม (เช่น ปุ่มลบ)
+function ownerConfirmSubmit(event, message) {
+    event.preventDefault();
+    const form = event.target;
+    ownerConfirm(message).then(function (ok) {
+        if (ok) form.submit();
+    });
+    return false;
+}
+
+/**
  * 1. ฟังก์ชันสลับสถานะ (Toggle) แบบ AJAX + SweetAlert2
  */
 function toggleStatus(id, type, currentStatus) {

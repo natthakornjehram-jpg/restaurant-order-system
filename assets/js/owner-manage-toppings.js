@@ -104,11 +104,15 @@ function toggleStockQtyField() {
 }
 
 // popup ยืนยันก่อนลบเสมอ (ส่งเป็น POST ผ่านฟอร์มที่ซ่อนไว้ พร้อม CSRF token แทนการยิง GET ตรงๆ)
+// ใช้ ownerConfirm() (SweetAlert2) แทน confirm() ของเบราว์เซอร์ เพราะ confirm() ถูกบล็อกแบบเงียบๆ
+// ในเบราว์เซอร์/เว็บวิวบางตัว ทำให้กดลบแล้วไม่มีอะไรเกิดขึ้นเลยโดยไม่รู้สาเหตุ
 function confirmDeleteTopping(id, name) {
-    if (confirm('ต้องการลบ "' + name + '" ใช่หรือไม่? การลบไม่สามารถกู้คืนได้')) {
-        document.getElementById('delete_topping_id').value = id;
-        document.getElementById('deleteToppingForm').submit();
-    }
+    ownerConfirm('ต้องการลบ "' + name + '" ใช่หรือไม่? การลบไม่สามารถกู้คืนได้').then(function (ok) {
+        if (ok) {
+            document.getElementById('delete_topping_id').value = id;
+            document.getElementById('deleteToppingForm').submit();
+        }
+    });
 }
 
 // สลับสถานะเปิด/ปิดขายจากหน้ารายการโดยตรง (ไม่ต้องเปิด Modal)

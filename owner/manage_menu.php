@@ -226,7 +226,7 @@ include '../includes/nav_owner.php';
                                 <div class="fw-bold text-dark fs-4 m-0">฿<?php echo number_format($menu['price'], 0); ?></div>
                                 <div class="d-flex gap-2">
                                     <button class="btn btn-warning rounded-pill px-3 btn-sm fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#editMenu_<?php echo $menu['item_id']; ?>">แก้ไข</button>
-                                    <form method="POST" action="manage_menu.php" class="d-inline" onsubmit="return confirm('ยืนยันลบเมนูนี้?');">
+                                    <form method="POST" action="manage_menu.php" class="d-inline" onsubmit="return ownerConfirmSubmit(event, 'ยืนยันลบเมนูนี้?');">
                                         <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
                                         <input type="hidden" name="delete_id" value="<?php echo $menu['item_id']; ?>">
                                         <button type="submit" class="btn btn-outline-danger rounded-pill px-3 btn-sm fw-bold shadow-sm">ลบ</button>

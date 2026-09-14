@@ -117,7 +117,7 @@ include '../includes/nav_owner.php';
                             </button>
                         <?php endif; ?>
 
-                        <form method="POST" action="manage_tables.php" class="d-inline" onsubmit="return confirm('ยืนยันลบโต๊ะนี้?');">
+                        <form method="POST" action="manage_tables.php" class="d-inline" onsubmit="return ownerConfirmSubmit(event, 'ยืนยันลบโต๊ะนี้?');">
                             <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
                             <input type="hidden" name="delete_table" value="<?php echo $t['table_id']; ?>">
                             <button type="submit" class="btn btn-link btn-sm text-<?php echo $is_busy ? 'white' : 'danger'; ?> text-decoration-none x-small">ลบโต๊ะ</button>
