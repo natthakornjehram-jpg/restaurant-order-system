@@ -58,14 +58,6 @@ $owner_nav_items = [
             <?= htmlspecialchars($restaurant_name) ?>
         </a>
     </div>
-
-    <div class="d-flex text-white align-items-center pe-2">
-        <?php if (!empty($owner_logo_url) && $owner_logo_url !== 'default_logo.png'): ?>
-            <img src="<?= BASE_URL ?>assets/images/logos/<?= htmlspecialchars($owner_logo_url) ?>" alt="logo" style="width:32px;height:32px;object-fit:cover;border-radius:50%;">
-        <?php else: ?>
-            <i class="bi bi-person-circle fs-5 text-warning"></i>
-        <?php endif; ?>
-    </div>
   </div>
 </nav>
 
@@ -74,7 +66,7 @@ $owner_nav_items = [
     <div class="offcanvas-header border-bottom border-secondary">
       <h5 class="offcanvas-title fw-bold text-warning m-0">
         <?php if (!empty($owner_logo_url) && $owner_logo_url !== 'default_logo.png'): ?>
-            <img src="<?= BASE_URL ?>assets/images/logos/<?= htmlspecialchars($owner_logo_url) ?>" alt="logo" style="width:22px;height:22px;object-fit:cover;border-radius:50%;" class="me-2">
+            <img src="<?= BASE_URL ?>assets/images/logos/<?= htmlspecialchars($owner_logo_url) ?>" alt="logo" style="width:36px;height:36px;object-fit:cover;border-radius:50%;" class="me-2">
         <?php else: ?>
             <i class="bi bi-shop me-2"></i>
         <?php endif; ?>
