@@ -48,15 +48,16 @@ $owner_nav_items = [
           <span class="navbar-toggler-icon"></span>
         </button>
         <a class="navbar-brand fw-bold d-flex align-items-center" href="../owner/dashboard.php">
-            <?php if (!empty($owner_logo_url) && $owner_logo_url !== 'default_logo.png'): ?>
-                <img src="<?= BASE_URL ?>assets/images/logos/<?= htmlspecialchars($owner_logo_url) ?>" alt="logo" style="width:22px;height:22px;object-fit:cover;border-radius:50%;" class="me-2">
-            <?php endif; ?>
             <?= htmlspecialchars($restaurant_name) ?>
         </a>
     </div>
 
     <div class="d-flex text-white align-items-center pe-2">
-        <i class="bi bi-person-circle fs-5 text-warning"></i>
+        <?php if (!empty($owner_logo_url) && $owner_logo_url !== 'default_logo.png'): ?>
+            <img src="<?= BASE_URL ?>assets/images/logos/<?= htmlspecialchars($owner_logo_url) ?>" alt="logo" style="width:32px;height:32px;object-fit:cover;border-radius:50%;">
+        <?php else: ?>
+            <i class="bi bi-person-circle fs-5 text-warning"></i>
+        <?php endif; ?>
     </div>
   </div>
 </nav>
