@@ -95,7 +95,22 @@ if ($is_localhost) {
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (attempt_id),
             KEY table_id (table_id, created_at)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci",
+        // "กลุ่มสต็อกร่วม" (Stock Pool) - ให้หลายเมนู/ท็อปปิ้งที่ใช้วัตถุดิบตัวเดียวกันจริง (เช่น "ข้าวผัดไก่"
+        // กับ "กระเพราไก่" ใช้ไก่ก้อนเดียวกัน) หักสต็อกจากกองเดียวกันแทนที่จะแยกนับกันคนละตัวเหมือนเดิม
+        // ซึ่งเดิมถ้าขายเมนูหนึ่งไป อีกเมนูที่ใช้วัตถุดิบร่วมกันจะไม่ถูกตัดตามไปด้วย ทำให้ระบบยังขายเมนูที่ของ
+        // จริงหมดแล้วได้ ต้องผูก item/topping เข้ากับ pool เอง (ที่ manage_stock.php) ไม่บังคับ - ไม่ผูกก็ยัง
+        // นับสต็อกแยกของตัวเองแบบเดิมได้ปกติ
+        "CREATE TABLE IF NOT EXISTS stock_pool (
+            pool_id INT NOT NULL AUTO_INCREMENT,
+            pool_name VARCHAR(100) NOT NULL,
+            stock_qty INT NOT NULL DEFAULT 0,
+            PRIMARY KEY (pool_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci",
+        "ALTER TABLE item ADD COLUMN stock_pool_id INT DEFAULT NULL",
+        "ALTER TABLE item ADD CONSTRAINT fk_item_stock_pool FOREIGN KEY (stock_pool_id) REFERENCES stock_pool(pool_id) ON DELETE SET NULL",
+        "ALTER TABLE topping ADD COLUMN stock_pool_id INT DEFAULT NULL",
+        "ALTER TABLE topping ADD CONSTRAINT fk_topping_stock_pool FOREIGN KEY (stock_pool_id) REFERENCES stock_pool(pool_id) ON DELETE SET NULL"
     ];
 
     foreach ($migrations as $sql) {

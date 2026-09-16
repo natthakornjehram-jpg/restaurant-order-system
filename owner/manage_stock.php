@@ -103,6 +103,96 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             echo json_encode(['success' => false, 'error' => 'เกิดข้อผิดพลาดในการบันทึกข้อมูล']);
         }
         exit;
+    } elseif ($action === 'save_pool') {
+        // สร้าง/แก้ไข "กลุ่มสต็อกร่วม" - ให้หลายเมนู/ท็อปปิ้งที่ใช้วัตถุดิบตัวเดียวกันจริง หักสต็อกจากกองเดียวกัน
+        // (ดูเหตุผลที่ includes/db.php) pool_id > 0 คือแก้ไขของเดิม, = 0 คือสร้างใหม่
+        header('Content-Type: application/json');
+        $pool_id = intval($_POST['pool_id'] ?? 0);
+        $pool_name = trim($_POST['pool_name'] ?? '');
+        $pool_qty = max(0, intval($_POST['stock_qty'] ?? 0));
+
+        if ($pool_name === '') {
+            echo json_encode(['success' => false, 'error' => 'กรุณากรอกชื่อกลุ่มสต็อก']);
+            exit;
+        }
+
+        if ($pool_id > 0) {
+            $stmt = $conn->prepare("UPDATE stock_pool SET pool_name = ?, stock_qty = ? WHERE pool_id = ?");
+            $stmt->bind_param("sii", $pool_name, $pool_qty, $pool_id);
+        } else {
+            $stmt = $conn->prepare("INSERT INTO stock_pool (pool_name, stock_qty) VALUES (?, ?)");
+            $stmt->bind_param("si", $pool_name, $pool_qty);
+        }
+
+        if ($stmt->execute()) {
+            echo json_encode(['success' => true]);
+        } else {
+            echo json_encode(['success' => false, 'error' => 'เกิดข้อผิดพลาดในการบันทึกข้อมูล']);
+        }
+        exit;
+    } elseif ($action === 'delete_pool') {
+        // กันลบกลุ่มที่ยังมีเมนู/ท็อปปิ้งผูกอยู่ (เหมือนตอนลบตัวเลือกเสริมที่เคยถูกใช้ในคำสั่งซื้อแล้ว)
+        // เพื่อไม่ให้เมนูที่ผูกไว้เหลือ stock_pool_id ชี้ไปยังกลุ่มที่ไม่มีอยู่แล้วโดยไม่ตั้งใจ
+        header('Content-Type: application/json');
+        $pool_id = intval($_POST['pool_id'] ?? 0);
+
+        $check_item = $conn->prepare("SELECT COUNT(*) AS c FROM item WHERE stock_pool_id = ?");
+        $check_item->bind_param("i", $pool_id);
+        $check_item->execute();
+        $used_item = (int) $check_item->get_result()->fetch_assoc()['c'];
+
+        $check_top = $conn->prepare("SELECT COUNT(*) AS c FROM topping WHERE stock_pool_id = ?");
+        $check_top->bind_param("i", $pool_id);
+        $check_top->execute();
+        $used_top = (int) $check_top->get_result()->fetch_assoc()['c'];
+
+        if (($used_item + $used_top) > 0) {
+            echo json_encode(['success' => false, 'error' => 'ลบไม่ได้ เพราะยังมีเมนู/ท็อปปิ้งผูกกับกลุ่มนี้อยู่ กรุณายกเลิกการผูกก่อน']);
+            exit;
+        }
+
+        $stmt = $conn->prepare("DELETE FROM stock_pool WHERE pool_id = ?");
+        $stmt->bind_param("i", $pool_id);
+        echo json_encode(['success' => $stmt->execute()]);
+        exit;
+    } elseif ($action === 'quick_adjust_pool') {
+        $pool_id = intval($_POST['pool_id']);
+        $change = intval($_POST['change']);
+
+        $stmt = $conn->prepare("UPDATE stock_pool SET stock_qty = GREATEST(0, stock_qty + ?) WHERE pool_id = ?");
+        $stmt->bind_param("ii", $change, $pool_id);
+        $stmt->execute();
+
+        if ($is_ajax_stock) {
+            header('Content-Type: application/json');
+            $qty_stmt = $conn->prepare("SELECT stock_qty FROM stock_pool WHERE pool_id = ?");
+            $qty_stmt->bind_param("i", $pool_id);
+            $qty_stmt->execute();
+            $new_qty = $qty_stmt->get_result()->fetch_assoc()['stock_qty'];
+            echo json_encode(['success' => true, 'new_qty' => $new_qty]);
+            exit;
+        }
+    } elseif ($action === 'link_item_pool') {
+        // ผูก/ยกเลิกผูกเมนูกับกลุ่มสต็อกร่วม (pool_id = 0 หมายถึงยกเลิกผูก กลับไปนับสต็อกของตัวเองตามปกติ)
+        header('Content-Type: application/json');
+        $item_id = intval($_POST['item_id'] ?? 0);
+        $pool_id = intval($_POST['pool_id'] ?? 0);
+        $pool_val = $pool_id > 0 ? $pool_id : null;
+
+        $stmt = $conn->prepare("UPDATE item SET stock_pool_id = ? WHERE item_id = ?");
+        $stmt->bind_param("ii", $pool_val, $item_id);
+        echo json_encode(['success' => $stmt->execute()]);
+        exit;
+    } elseif ($action === 'link_topping_pool') {
+        header('Content-Type: application/json');
+        $topping_id = intval($_POST['topping_id'] ?? 0);
+        $pool_id = intval($_POST['pool_id'] ?? 0);
+        $pool_val = $pool_id > 0 ? $pool_id : null;
+
+        $stmt = $conn->prepare("UPDATE topping SET stock_pool_id = ? WHERE topping_id = ?");
+        $stmt->bind_param("ii", $pool_val, $topping_id);
+        echo json_encode(['success' => $stmt->execute()]);
+        exit;
     }
 }
 
@@ -112,7 +202,8 @@ function stock_count_alerts_items($rows) {
     $out = 0; $low = 0;
     foreach ($rows as $m) {
         if (empty($m['use_stock'])) continue;
-        $q = (int) $m['stock_qty'];
+        // เมนูที่ผูกกับกลุ่มสต็อกร่วมไว้ ให้นับตามจำนวนคงเหลือของกลุ่มแทนของตัวเอง
+        $q = !empty($m['stock_pool_id']) ? (int) $m['pool_stock_qty'] : (int) $m['stock_qty'];
         if ($q <= 0) $out++;
         elseif ($q <= 5) $low++;
     }
@@ -122,18 +213,38 @@ function stock_count_alerts_items($rows) {
 function stock_count_alerts_toppings($rows) {
     $out = 0; $low = 0;
     foreach ($rows as $t) {
-        $q = (int) $t['stock_qty'];
+        $q = !empty($t['stock_pool_id']) ? (int) $t['pool_stock_qty'] : (int) $t['stock_qty'];
         if (empty($t['is_active']) || $q <= 0) $out++;
         elseif ($q <= 5) $low++;
     }
     return [$out, $low];
 }
 
+// เมนูเลือกกลุ่มสต็อกร่วม (ใช้ซ้ำทั้งการ์ดเมนูและการ์ดท็อปปิ้ง) - $current_pool_id = 0/NULL คือยังไม่ผูก
+function render_pool_link_select($current_pool_id, $all_pools, $onchange_js) {
+    if (empty($all_pools)) return; // ยังไม่มีกลุ่มสต็อกร่วมในระบบเลย ไม่ต้องโชว์ dropdown เปล่าๆ
+    ?>
+    <div class="mt-2 text-start">
+        <label class="small text-muted mb-1 d-block"><i class="bi bi-link-45deg"></i> กลุ่มสต็อกร่วม</label>
+        <select class="form-select form-select-sm rounded-3" onchange="<?= $onchange_js ?>">
+            <option value="">— ไม่ผูก (นับของตัวเอง) —</option>
+            <?php foreach ($all_pools as $p): ?>
+                <option value="<?= $p['pool_id'] ?>" <?= (intval($current_pool_id) === intval($p['pool_id'])) ? 'selected' : '' ?>>
+                    <?= htmlspecialchars($p['pool_name']) ?> (คงเหลือ <?= (int) $p['stock_qty'] ?>)
+                </option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+    <?php
+}
+
 // การ์ดเมนูอาหาร 1 ใบ (แยกเป็นฟังก์ชันเพื่อเรียกซ้ำได้ทั้งตอนจัดกลุ่มตามหมวดหมู่ และกลุ่ม "ไม่มีหมวดหมู่")
-function render_stock_item_card($m) {
+function render_stock_item_card($m, $all_pools = []) {
     $m_id = $m['item_id'];
-    $stock = $m['stock_qty'];
     $use_stock = $m['use_stock'];
+    $is_pooled = !empty($m['stock_pool_id']);
+    // เมนูที่ผูกกับกลุ่มสต็อกร่วมไว้ ให้แสดง/อิงจำนวนคงเหลือของกลุ่มแทนของตัวเอง (ดูเหตุผลที่ includes/db.php)
+    $stock = $is_pooled ? intval($m['pool_stock_qty']) : intval($m['stock_qty']);
     $img_path = !empty($m['image_url']) ? "../assets/images/items/" . $m['image_url'] : "../assets/images/items/default_food.jpg";
 
     $stock_badge = "bg-success";
@@ -166,18 +277,27 @@ function render_stock_item_card($m) {
                     <span class="badge rounded-pill <?= $stock_badge ?> px-3 py-1"><?= $stock_text ?></span>
                 </div>
 
-                <div class="d-flex align-items-center justify-content-center gap-3 my-2">
-                    <button type="button" class="btn btn-outline-danger btn-qty shadow-sm" onclick="adjustStock(<?= $m_id ?>, -1)">-</button>
-                    <span class="h2 fw-bold m-0" id="stock_display_<?= $m_id ?>" style="min-width: 60px;"><?= $stock ?></span>
-                    <button type="button" class="btn btn-outline-success btn-qty shadow-sm" onclick="adjustStock(<?= $m_id ?>, 1)">+</button>
-                </div>
+                <?php if ($is_pooled): ?>
+                    <div class="small text-primary fw-bold mb-1"><i class="bi bi-link-45deg"></i> ใช้ร่วมกับกลุ่ม "<?= htmlspecialchars($m['pool_name']) ?>"</div>
+                    <div class="h2 fw-bold m-0"><?= $stock ?></div>
+                    <div class="form-text mb-0">ปรับจำนวนได้ที่แท็บ "กลุ่มสต็อกร่วม"</div>
+                <?php else: ?>
+                    <div class="d-flex align-items-center justify-content-center gap-3 my-2">
+                        <button type="button" class="btn btn-outline-danger btn-qty shadow-sm" onclick="adjustStock(<?= $m_id ?>, -1)">-</button>
+                        <span class="h2 fw-bold m-0" id="stock_display_<?= $m_id ?>" style="min-width: 60px;"><?= $stock ?></span>
+                        <button type="button" class="btn btn-outline-success btn-qty shadow-sm" onclick="adjustStock(<?= $m_id ?>, 1)">+</button>
+                    </div>
+                <?php endif; ?>
             </div>
 
             <div class="mt-auto">
+                <?php if (!$is_pooled): ?>
                 <div class="d-flex gap-2 mb-2">
                     <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill flex-grow-1" onclick="adjustStock(<?= $m_id ?>, 10)">+10</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill flex-grow-1" onclick="adjustStock(<?= $m_id ?>, 50)">+50</button>
                 </div>
+                <?php endif; ?>
+                <?php render_pool_link_select($m['stock_pool_id'] ?? null, $all_pools, "linkItemPool($m_id, this.value)"); ?>
             </div>
         </div>
     </div>
@@ -185,10 +305,11 @@ function render_stock_item_card($m) {
 }
 
 // การ์ดท็อปปิ้ง/วัตถุดิบเสริม 1 ใบ
-function render_stock_topping_card($top) {
+function render_stock_topping_card($top, $all_pools = []) {
     $t_id = $top['topping_id'];
     $is_active = $top['is_active'];
-    $t_stock = $top['stock_qty'];
+    $is_pooled = !empty($top['stock_pool_id']);
+    $t_stock = $is_pooled ? intval($top['pool_stock_qty']) : intval($top['stock_qty']);
 
     $top_badge = "bg-success";
     $top_text = "เปิดขาย";
@@ -210,21 +331,72 @@ function render_stock_topping_card($top) {
 
             <div class="bg-light rounded-4 p-3 mb-3 text-center">
                 <div class="small text-muted fw-bold mb-1">คลังสินค้าคงเหลือ (ชุด/จาน)</div>
+                <?php if ($is_pooled): ?>
+                    <div class="small text-primary fw-bold mb-1"><i class="bi bi-link-45deg"></i> ใช้ร่วมกับกลุ่ม "<?= htmlspecialchars($top['pool_name']) ?>"</div>
+                    <div class="h2 fw-bold m-0"><?= $t_stock ?></div>
+                    <div class="form-text mb-0">ปรับจำนวนได้ที่แท็บ "กลุ่มสต็อกร่วม"</div>
+                <?php else: ?>
+                    <div class="d-flex align-items-center justify-content-center gap-3 my-1">
+                        <button type="button" class="btn btn-outline-danger btn-qty shadow-sm" onclick="adjustToppingStock(<?= $t_id ?>, -1)">-</button>
+                        <span class="h2 fw-bold m-0" id="top_stock_display_<?= $t_id ?>" style="min-width: 60px;"><?= $t_stock ?></span>
+                        <button type="button" class="btn btn-outline-success btn-qty shadow-sm" onclick="adjustToppingStock(<?= $t_id ?>, 1)">+</button>
+                    </div>
+                <?php endif; ?>
+            </div>
+
+            <div class="mt-auto">
+                <?php if (!$is_pooled): ?>
+                <div class="d-flex gap-2 mb-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill flex-grow-1" onclick="adjustToppingStock(<?= $t_id ?>, 10)">+10</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill flex-grow-1" onclick="adjustToppingStock(<?= $t_id ?>, 50)">+50</button>
+                </div>
+                <?php endif; ?>
+                <button type="button" id="top_btn_<?= $t_id ?>" onclick="toggleToppingStock(<?= $t_id ?>, <?= $is_active ?>)" class="btn w-100 rounded-pill py-2 fw-bold shadow-sm <?= ($is_active == 1) ? 'btn-outline-danger' : 'btn-success' ?>">
+                    <?= ($is_active == 1) ? '<i class="bi bi-pause-circle me-1"></i> กดปิดขาย (ปิดชั่วคราว)' : '<i class="bi bi-play-circle me-1"></i> กดเปิดขาย (เปิดใช้งาน)' ?>
+                </button>
+                <?php render_pool_link_select($top['stock_pool_id'] ?? null, $all_pools, "linkToppingPool($t_id, this.value)"); ?>
+            </div>
+        </div>
+    </div>
+    <?php
+}
+
+// การ์ดกลุ่มสต็อกร่วม 1 ใบ
+function render_stock_pool_card($p, $linked_names) {
+    $p_id = $p['pool_id'];
+    $qty = (int) $p['stock_qty'];
+    $badge = "bg-success"; $text = "มีของพอใช้";
+    if ($qty <= 0) { $badge = "bg-danger"; $text = "ของหมด!"; }
+    elseif ($qty <= 5) { $badge = "bg-warning text-dark"; $text = "ใกล้หมด"; }
+    $names_json = htmlspecialchars(json_encode($p['pool_name'], JSON_UNESCAPED_UNICODE), ENT_QUOTES);
+    ?>
+    <div class="col-12 col-md-6 col-lg-4 col-xl-3">
+        <div class="card stock-card p-3 h-100 bg-white">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <h5 class="fw-bold mb-0"><i class="bi bi-boxes text-primary me-1"></i> <?= htmlspecialchars($p['pool_name']) ?></h5>
+                <span class="badge rounded-pill <?= $badge ?> px-3 py-1"><?= $text ?></span>
+            </div>
+            <div class="small text-muted mb-3">
+                <?= !empty($linked_names) ? 'ใช้ร่วมกับ: ' . htmlspecialchars(implode(', ', $linked_names)) : 'ยังไม่มีเมนู/ท็อปปิ้งผูกกับกลุ่มนี้' ?>
+            </div>
+
+            <div class="bg-light rounded-4 p-3 mb-3 text-center">
                 <div class="d-flex align-items-center justify-content-center gap-3 my-1">
-                    <button type="button" class="btn btn-outline-danger btn-qty shadow-sm" onclick="adjustToppingStock(<?= $t_id ?>, -1)">-</button>
-                    <span class="h2 fw-bold m-0" id="top_stock_display_<?= $t_id ?>" style="min-width: 60px;"><?= $t_stock ?></span>
-                    <button type="button" class="btn btn-outline-success btn-qty shadow-sm" onclick="adjustToppingStock(<?= $t_id ?>, 1)">+</button>
+                    <button type="button" class="btn btn-outline-danger btn-qty shadow-sm" onclick="adjustPoolStock(<?= $p_id ?>, -1)">-</button>
+                    <span class="h2 fw-bold m-0" id="pool_stock_display_<?= $p_id ?>" style="min-width: 60px;"><?= $qty ?></span>
+                    <button type="button" class="btn btn-outline-success btn-qty shadow-sm" onclick="adjustPoolStock(<?= $p_id ?>, 1)">+</button>
                 </div>
             </div>
 
             <div class="mt-auto">
                 <div class="d-flex gap-2 mb-2">
-                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill flex-grow-1" onclick="adjustToppingStock(<?= $t_id ?>, 10)">+10</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill flex-grow-1" onclick="adjustToppingStock(<?= $t_id ?>, 50)">+50</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill flex-grow-1" onclick="adjustPoolStock(<?= $p_id ?>, 10)">+10</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill flex-grow-1" onclick="adjustPoolStock(<?= $p_id ?>, 50)">+50</button>
                 </div>
-                <button type="button" id="top_btn_<?= $t_id ?>" onclick="toggleToppingStock(<?= $t_id ?>, <?= $is_active ?>)" class="btn w-100 rounded-pill py-2 fw-bold shadow-sm <?= ($is_active == 1) ? 'btn-outline-danger' : 'btn-success' ?>">
-                    <?= ($is_active == 1) ? '<i class="bi bi-pause-circle me-1"></i> กดปิดขาย (ปิดชั่วคราว)' : '<i class="bi bi-play-circle me-1"></i> กดเปิดขาย (เปิดใช้งาน)' ?>
-                </button>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill flex-grow-1" onclick='openPoolModal(<?= $p_id ?>, <?= $names_json ?>, <?= $qty ?>)'><i class="bi bi-pencil-square"></i> แก้ไข</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger rounded-pill flex-grow-1" onclick='deletePool(<?= $p_id ?>, <?= $names_json ?>)'><i class="bi bi-trash"></i> ลบ</button>
+                </div>
             </div>
         </div>
     </div>
@@ -275,7 +447,19 @@ include '../includes/nav_owner.php';
                 <i class="bi bi-plus-circle-dotted me-1"></i> ท็อปปิ้ง & วัตถุดิบเสริม (หมูกรอบ ฯลฯ)
             </button>
         </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-3 px-4 py-3 fw-bold shadow-sm" id="pools-tab" data-bs-toggle="pill" data-bs-target="#pools-pane" type="button" role="tab">
+                <i class="bi bi-boxes me-1"></i> กลุ่มสต็อกร่วม
+            </button>
+        </li>
     </ul>
+
+    <?php
+    // ดึงรายชื่อกลุ่มสต็อกร่วมทั้งหมดไว้ล่วงหน้าครั้งเดียว ใช้ทั้ง dropdown ผูกกลุ่มในการ์ดเมนู/ท็อปปิ้ง และแท็บ "กลุ่มสต็อกร่วม"
+    $all_pools = [];
+    $pools_res = $conn->query("SELECT * FROM stock_pool ORDER BY pool_name ASC");
+    if ($pools_res) { while ($p = $pools_res->fetch_assoc()) { $all_pools[] = $p; } }
+    ?>
 
     <div class="tab-content" id="stockTabsContent">
         <!-- 🟢 TAB 1: คลังสินค้าเมนูอาหารหลัก แยกเป็นหมวดหมู่ (เรียงคลังสินค้าน้อยก่อนภายในแต่ละหมวด) -->
@@ -283,7 +467,8 @@ include '../includes/nav_owner.php';
             <?php
             $items_by_cat_stock = [];
             $items_uncat_stock = [];
-            $items_all_res = $conn->query("SELECT i.*, c.category_name FROM item i LEFT JOIN category c ON i.category_id = c.category_id ORDER BY i.stock_qty ASC, i.item_id DESC");
+            // LEFT JOIN stock_pool: เมนูที่ผูกกับกลุ่มสต็อกร่วมไว้ (i.stock_pool_id) ดึงชื่อกลุ่ม+จำนวนคงเหลือของกลุ่มมาด้วย
+            $items_all_res = $conn->query("SELECT i.*, c.category_name, sp.pool_name, sp.stock_qty AS pool_stock_qty FROM item i LEFT JOIN category c ON i.category_id = c.category_id LEFT JOIN stock_pool sp ON sp.pool_id = i.stock_pool_id ORDER BY i.stock_qty ASC, i.item_id DESC");
             if ($items_all_res) {
                 while ($m = $items_all_res->fetch_assoc()) {
                     if (!empty($m['category_id'])) {
@@ -323,7 +508,7 @@ include '../includes/nav_owner.php';
                     <div id="stockItemsCat<?= $cid ?>" class="accordion-collapse collapse" data-bs-parent="#stockItemsAccordion">
                         <div class="accordion-body bg-white">
                             <div class="row g-4">
-                                <?php foreach ($items_by_cat_stock[$cid] as $m) { render_stock_item_card($m); } ?>
+                                <?php foreach ($items_by_cat_stock[$cid] as $m) { render_stock_item_card($m, $all_pools); } ?>
                             </div>
                         </div>
                     </div>
@@ -346,7 +531,7 @@ include '../includes/nav_owner.php';
                     <div id="stockItemsUncat" class="accordion-collapse collapse" data-bs-parent="#stockItemsAccordion">
                         <div class="accordion-body bg-white">
                             <div class="row g-4">
-                                <?php foreach ($items_uncat_stock as $m) { render_stock_item_card($m); } ?>
+                                <?php foreach ($items_uncat_stock as $m) { render_stock_item_card($m, $all_pools); } ?>
                             </div>
                         </div>
                     </div>
@@ -369,7 +554,7 @@ include '../includes/nav_owner.php';
             </div>
             <?php
             $toppings_by_cat_stock = [];
-            $toppings_all_res = $conn->query("SELECT t.* FROM topping t WHERE t.use_stock = 1 ORDER BY t.stock_qty ASC, t.topping_id DESC");
+            $toppings_all_res = $conn->query("SELECT t.*, sp.pool_name, sp.stock_qty AS pool_stock_qty FROM topping t LEFT JOIN stock_pool sp ON sp.pool_id = t.stock_pool_id WHERE t.use_stock = 1 ORDER BY t.stock_qty ASC, t.topping_id DESC");
             if ($toppings_all_res) {
                 while ($top = $toppings_all_res->fetch_assoc()) {
                     $toppings_by_cat_stock[$top['topping_cat_id']][] = $top;
@@ -404,7 +589,7 @@ include '../includes/nav_owner.php';
                     <div id="stockToppingsCat<?= $cid ?>" class="accordion-collapse collapse" data-bs-parent="#stockToppingsAccordion">
                         <div class="accordion-body bg-white">
                             <div class="row g-4">
-                                <?php foreach ($toppings_by_cat_stock[$cid] as $top) { render_stock_topping_card($top); } ?>
+                                <?php foreach ($toppings_by_cat_stock[$cid] as $top) { render_stock_topping_card($top, $all_pools); } ?>
                             </div>
                         </div>
                     </div>
@@ -413,6 +598,66 @@ include '../includes/nav_owner.php';
             </div>
             <?php endif; ?>
         </div>
+
+        <!-- 🟢 TAB 3: กลุ่มสต็อกร่วม - ให้หลายเมนู/ท็อปปิ้งที่ใช้วัตถุดิบตัวเดียวกันจริงหักสต็อกจากกองเดียวกัน -->
+        <div class="tab-pane fade" id="pools-pane" role="tabpanel">
+            <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center mb-3 gap-2">
+                <p class="text-muted small mb-0">
+                    เมนู/ท็อปปิ้งที่ใช้วัตถุดิบร่วมกันจริง (เช่น "ข้าวผัดไก่" กับ "กระเพราไก่" ใช้ไก่ก้อนเดียวกัน) ผูกเข้ากลุ่มเดียวกันได้ที่นี่ ขายอันไหนก็ตัดสต็อกกองเดียวกันหมด
+                    <i class="bi bi-info-circle ms-1" title="ไม่ผูกก็ยังนับสต็อกแยกของตัวเองได้ตามปกติ ไม่บังคับ"></i>
+                </p>
+                <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm flex-shrink-0" onclick="openPoolModal()">
+                    <i class="bi bi-plus-circle me-1"></i> สร้างกลุ่มใหม่
+                </button>
+            </div>
+            <?php if (empty($all_pools)): ?>
+                <div class="text-center py-5">
+                    <i class="bi bi-boxes display-1 text-muted opacity-25"></i>
+                    <p class="mt-3 text-muted">ยังไม่มีกลุ่มสต็อกร่วมในระบบ</p>
+                </div>
+            <?php else: ?>
+                <?php
+                // หาชื่อเมนู/ท็อปปิ้งที่ผูกกับแต่ละกลุ่มไว้ (โชว์ในการ์ดให้เห็นว่ากลุ่มนี้ใช้กับอะไรบ้าง)
+                $pool_links = [];
+                $link_items_res = $conn->query("SELECT stock_pool_id, name FROM item WHERE stock_pool_id IS NOT NULL");
+                if ($link_items_res) { while ($r = $link_items_res->fetch_assoc()) { $pool_links[$r['stock_pool_id']][] = $r['name']; } }
+                $link_tops_res = $conn->query("SELECT stock_pool_id, topping_name AS name FROM topping WHERE stock_pool_id IS NOT NULL");
+                if ($link_tops_res) { while ($r = $link_tops_res->fetch_assoc()) { $pool_links[$r['stock_pool_id']][] = $r['name']; } }
+                ?>
+                <div class="row g-4">
+                    <?php foreach ($all_pools as $p) { render_stock_pool_card($p, $pool_links[$p['pool_id']] ?? []); } ?>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: สร้าง/แก้ไขกลุ่มสต็อกร่วม -->
+<div class="modal fade" id="poolModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content border-0 rounded-4" id="poolForm">
+            <div class="modal-header border-0 pt-4 px-4">
+                <h5 class="fw-bold m-0" id="poolModalTitle">สร้างกลุ่มสต็อกร่วมใหม่</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body px-4">
+                <input type="hidden" name="pool_id" id="pool_id" value="0">
+                <div class="mb-3">
+                    <label class="small fw-bold mb-2">ชื่อกลุ่ม</label>
+                    <input type="text" name="pool_name" id="pool_name" class="form-control rounded-3" placeholder="เช่น ไก่, หมู, กุ้ง" required>
+                    <div class="invalid-feedback">กรุณากรอกชื่อกลุ่มสต็อก</div>
+                </div>
+                <div class="mb-3">
+                    <label class="small fw-bold mb-2">จำนวนคงเหลือ</label>
+                    <input type="number" step="1" min="0" name="stock_qty" id="pool_qty" class="form-control rounded-3" value="0" required>
+                    <div class="invalid-feedback">จำนวนต้องเป็นจำนวนเต็มและห้ามติดลบ</div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 p-4 pt-0 d-flex justify-content-between">
+                <button type="button" class="btn btn-outline-secondary rounded-pill px-4 fw-bold" data-bs-dismiss="modal">ยกเลิก</button>
+                <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold">บันทึก</button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -567,14 +812,154 @@ function toggleToppingStock(toppingId, currentStatus) {
     .catch(err => console.error(err));
 }
 
-// เปิดหลังจากรีโหลด ให้กลับไปอยู่แท็บ "ท็อปปิ้ง & วัตถุดิบเสริม" ต่อ (ไม่กระโดดกลับไปแท็บเมนูอาหาร)
+// เปิดหลังจากรีโหลด ให้กลับไปอยู่แท็บเดิมที่เพิ่งทำรายการอยู่ต่อ (ไม่กระโดดกลับไปแท็บเมนูอาหารเสมอ)
 document.addEventListener('DOMContentLoaded', function () {
-    if (sessionStorage.getItem('stockActiveTab') === 'toppings') {
+    const activeTab = sessionStorage.getItem('stockActiveTab');
+    if (activeTab) {
         sessionStorage.removeItem('stockActiveTab');
-        const trigger = document.getElementById('toppings-tab');
+        const trigger = document.getElementById(activeTab + '-tab');
         if (trigger) new bootstrap.Tab(trigger).show();
     }
 });
+
+/**
+ * กลุ่มสต็อกร่วม (Stock Pool) - +/- ปรับจำนวน, สร้าง/แก้ไข, ลบ, และผูก/ยกเลิกผูกเมนู-ท็อปปิ้งเข้ากลุ่ม
+ */
+function adjustPoolStock(poolId, change) {
+    const display = document.getElementById('pool_stock_display_' + poolId);
+    let current = parseInt(display.innerText) || 0;
+    display.innerText = Math.max(0, current + change);
+
+    const formData = new FormData();
+    formData.append('action', 'quick_adjust_pool');
+    formData.append('pool_id', poolId);
+    formData.append('change', change);
+    formData.append('csrf_token', CSRF_TOKEN);
+
+    fetch('manage_stock.php', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => { if (data.success) display.innerText = data.new_qty; })
+    .catch(err => console.error(err));
+}
+
+function openPoolModal(poolId, poolName, stockQty) {
+    const form = document.getElementById('poolForm');
+    form.reset();
+    form.classList.remove('was-validated');
+    form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+
+    const isEdit = !!poolId;
+    document.getElementById('poolModalTitle').textContent = isEdit ? 'แก้ไขกลุ่มสต็อกร่วม' : 'สร้างกลุ่มสต็อกร่วมใหม่';
+    document.getElementById('pool_id').value = poolId || 0;
+    document.getElementById('pool_name').value = poolName || '';
+    document.getElementById('pool_qty').value = (stockQty !== undefined) ? stockQty : 0;
+    new bootstrap.Modal(document.getElementById('poolModal')).show();
+}
+
+document.getElementById('poolForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+
+    const nameInput = document.getElementById('pool_name');
+    const qtyInput = document.getElementById('pool_qty');
+    let valid = true;
+    if (!nameInput.value.trim()) { nameInput.classList.add('is-invalid'); valid = false; } else { nameInput.classList.remove('is-invalid'); }
+    if (qtyInput.value === '' || !Number.isInteger(Number(qtyInput.value)) || Number(qtyInput.value) < 0) { qtyInput.classList.add('is-invalid'); valid = false; } else { qtyInput.classList.remove('is-invalid'); }
+    if (!valid) return;
+
+    const formData = new FormData(this);
+    formData.append('action', 'save_pool');
+    formData.append('csrf_token', CSRF_TOKEN);
+
+    fetch('manage_stock.php', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('poolModal')).hide();
+            sessionStorage.setItem('stockActiveTab', 'pools');
+            ownerNotify('บันทึกกลุ่มสต็อกร่วมเรียบร้อยแล้ว');
+            setTimeout(() => window.location.reload(), 700);
+        } else {
+            ownerNotify(data.error || 'เกิดข้อผิดพลาด ไม่สามารถบันทึกได้', 'error');
+        }
+    })
+    .catch(() => ownerNotify('เกิดข้อผิดพลาด ไม่สามารถบันทึกได้', 'error'));
+});
+
+function deletePool(poolId, poolName) {
+    ownerConfirm('ยืนยันลบกลุ่มสต็อกร่วม "' + poolName + '" ?').then(function (ok) {
+        if (!ok) return;
+        const formData = new FormData();
+        formData.append('action', 'delete_pool');
+        formData.append('pool_id', poolId);
+        formData.append('csrf_token', CSRF_TOKEN);
+
+        fetch('manage_stock.php', {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                sessionStorage.setItem('stockActiveTab', 'pools');
+                ownerNotify('ลบกลุ่มสต็อกร่วมเรียบร้อยแล้ว');
+                setTimeout(() => window.location.reload(), 700);
+            } else {
+                ownerNotify(data.error || 'ลบไม่สำเร็จ', 'error');
+            }
+        })
+        .catch(() => ownerNotify('เกิดข้อผิดพลาด ไม่สามารถลบได้', 'error'));
+    });
+}
+
+// ผูก/ยกเลิกผูกเมนู-ท็อปปิ้งเข้ากับกลุ่มสต็อกร่วม (เลือกจาก dropdown ในการ์ดสต็อกแต่ละใบ)
+function linkItemPool(itemId, poolId) {
+    const formData = new FormData();
+    formData.append('action', 'link_item_pool');
+    formData.append('item_id', itemId);
+    formData.append('pool_id', poolId);
+    formData.append('csrf_token', CSRF_TOKEN);
+
+    fetch('manage_stock.php', { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                sessionStorage.setItem('stockActiveTab', 'items');
+                window.location.reload();
+            } else {
+                ownerNotify('เกิดข้อผิดพลาด ไม่สามารถผูกกลุ่มสต็อกได้', 'error');
+            }
+        })
+        .catch(() => ownerNotify('เกิดข้อผิดพลาด ไม่สามารถผูกกลุ่มสต็อกได้', 'error'));
+}
+
+function linkToppingPool(toppingId, poolId) {
+    const formData = new FormData();
+    formData.append('action', 'link_topping_pool');
+    formData.append('topping_id', toppingId);
+    formData.append('pool_id', poolId);
+    formData.append('csrf_token', CSRF_TOKEN);
+
+    fetch('manage_stock.php', { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                sessionStorage.setItem('stockActiveTab', 'toppings');
+                window.location.reload();
+            } else {
+                ownerNotify('เกิดข้อผิดพลาด ไม่สามารถผูกกลุ่มสต็อกได้', 'error');
+            }
+        })
+        .catch(() => ownerNotify('เกิดข้อผิดพลาด ไม่สามารถผูกกลุ่มสต็อกได้', 'error'));
+}
 
 function openAddToppingStockModal() {
     const form = document.getElementById('newToppingStockForm');
