@@ -50,6 +50,23 @@ if (($order_type === 'dine_in' && empty($store['is_dinein_open'])) || ($order_ty
     exit;
 }
 
+// 1.65 คิวเต็ม: คนที่สั่งไปแล้วในรอบนี้ (มีออเดอร์ค้างรออยู่แล้ว) ห้ามสั่ง "เพิ่ม" อีกตอนคิวเต็ม กันครัวรับงานล้นมือ
+//      ส่วนออเดอร์แรกที่หลุดผ่านมาได้ก่อนหน้านี้ (เช่น จังหวะคิวเพิ่งเต็มพอดีตอนกำลังเลือกเมนู) ปล่อยผ่านไป
+//      ถือเป็นเคสขอบที่ยอมรับได้ - เช็คเฉพาะตอนสั่ง "เพิ่ม" เท่านั้น ไม่ใช่ออเดอร์แรก
+$is_reorder = ($order_type === 'dine_in' && !empty($_SESSION['has_ordered'])) || ($order_type === 'takeaway' && !empty($_SESSION['guest_order_ids']));
+$max_queue = intval($store['max_queue'] ?? 0);
+if ($is_reorder && $max_queue > 0) {
+    $q_res = $conn->query("SELECT COUNT(*) AS c FROM orders WHERE order_status IN ('pending', 'cooking')");
+    $active_queue_count = ($q_res && $q_row = $q_res->fetch_assoc()) ? intval($q_row['c']) : 0;
+    if ($active_queue_count >= $max_queue) {
+        echo "<script>
+            alert('ขณะนี้คิวเต็มแล้ว ออเดอร์ไม่สามารถสั่งเพิ่มได้แล้ว กรุณารอสักครู่แล้วลองใหม่อีกครั้งครับ');
+            window.location.href = " . json_encode($menu_fallback_url, JSON_UNESCAPED_SLASHES) . ";
+        </script>";
+        exit;
+    }
+}
+
 // รับชื่อและเบอร์โทรเพิ่มมาตรงนี้
 $online_name = $_POST['customer_name_online'] ?? ($_POST['takeaway_name'] ?? '');
 $online_phone = $_POST['customer_phone_online'] ?? '';
@@ -198,11 +215,32 @@ try {
     // 5. บันทึกรายการอาหารลงตาราง orderdetail และ orderdetail_topping พร้อมตัดสต็อกอัตโนมัติ
     $stmt_detail = $conn->prepare("INSERT INTO orderdetail (order_id, item_id, quantity, unit_price, note) VALUES (?, ?, ?, ?, ?)");
     $stmt_top = $conn->prepare("INSERT INTO orderdetail_topping (order_detail_id, topping_id) VALUES (?, ?)");
+
+    // เช็ก use_stock/stock_pool_id แยกก่อนตัดสต็อกจริง เพราะต้องรู้ว่าเมนู/ท็อปปิ้งนี้ผูกกับ "กลุ่มสต็อกร่วม"
+    // (stock_pool) อยู่หรือเปล่า ถ้าผูกอยู่ต้องไปตัดที่กองกลาง ไม่ใช่ตัดที่ตัวเองเฉยๆ (ดูเหตุผลที่ includes/db.php)
+    $stmt_item_info = $conn->prepare("SELECT use_stock, stock_pool_id FROM item WHERE item_id = ?");
+    $stmt_topping_info = $conn->prepare("SELECT use_stock, stock_pool_id FROM topping WHERE topping_id = ?");
+
     // เดิม GREATEST(0, ...) ปล่อยให้ตัดสต็อกติดลบไม่ได้แต่ก็ยังรับออเดอร์ผ่านอยู่ดีแม้ของจะไม่พอ
-    // เปลี่ยนเป็นเงื่อนไข stock_qty >= ? ใน WHERE แทน ให้ UPDATE ล้มเหลว (affected_rows = 0) ถ้าของไม่พอ
+    // ใช้เงื่อนไข stock_qty >= ? ใน WHERE แทน ให้ UPDATE ล้มเหลว (affected_rows = 0) ถ้าของไม่พอ
     // ซึ่งปลอดภัยต่อ race condition ด้วย เพราะ MySQL ล็อกแถวระหว่างรัน UPDATE ทีละคำสั่งอยู่แล้ว
-    $stmt_stock = $conn->prepare("UPDATE item SET stock_qty = stock_qty - ? WHERE item_id = ? AND use_stock = 1 AND stock_qty >= ?");
-    $stmt_stock_check = $conn->prepare("SELECT use_stock FROM item WHERE item_id = ?");
+    $stmt_stock_item = $conn->prepare("UPDATE item SET stock_qty = stock_qty - ? WHERE item_id = ? AND stock_qty >= ?");
+    $stmt_stock_topping = $conn->prepare("UPDATE topping SET stock_qty = stock_qty - ? WHERE topping_id = ? AND stock_qty >= ?");
+    $stmt_stock_pool = $conn->prepare("UPDATE stock_pool SET stock_qty = stock_qty - ? WHERE pool_id = ? AND stock_qty >= ?");
+
+    // ตัดสต็อก 1 หน่วย (เมนู/ท็อปปิ้งที่ผูก pool ไว้) หรือของตัวเอง (ที่ไม่ได้ผูก pool) - throw ถ้าของไม่พอ
+    $deduct_stock = function ($qty, $use_stock, $pool_id, $own_stmt, $own_id) use ($stmt_stock_pool) {
+        if (intval($use_stock) !== 1) return; // ไม่ได้ติดตามคลังสินค้าตัวนี้ ไม่ต้องทำอะไร
+        if (!empty($pool_id)) {
+            $stmt_stock_pool->bind_param("iii", $qty, $pool_id, $qty);
+            $stmt_stock_pool->execute();
+            if ($stmt_stock_pool->affected_rows === 0) throw new RuntimeException('stock_insufficient');
+            return;
+        }
+        $own_stmt->bind_param("iii", $qty, $own_id, $qty);
+        $own_stmt->execute();
+        if ($own_stmt->affected_rows === 0) throw new RuntimeException('stock_insufficient');
+    };
 
     foreach ($validated_cart as $item) {
         // บันทึกอาหารหลัก
@@ -210,24 +248,21 @@ try {
         $stmt_detail->execute();
         $order_detail_id = $conn->insert_id;
 
-        // ตัดสต็อกอาหาร (เฉพาะเมนูที่เปิดติดตามคลังสินค้า และต้องมีของพอเท่านั้น)
-        $stmt_stock->bind_param("iii", $item['quantity'], $item['item_id'], $item['quantity']);
-        $stmt_stock->execute();
-        if ($stmt_stock->affected_rows === 0) {
-            // ไม่มีแถวถูกอัปเดต อาจเพราะ (ก) เมนูนี้ไม่ได้ติดตามคลังสินค้า (use_stock=0) ซึ่งปกติดี ไม่ต้องทำอะไร
-            // หรือ (ข) ติดตามคลังสินค้าอยู่แต่ของไม่พอ ต้องยกเลิกออเดอร์ทั้งหมด (rollback) แจ้งลูกค้าว่าของหมด
-            $stmt_stock_check->bind_param("i", $item['item_id']);
-            $stmt_stock_check->execute();
-            $stock_check_row = $stmt_stock_check->get_result()->fetch_assoc();
-            if ($stock_check_row && intval($stock_check_row['use_stock']) === 1) {
-                throw new RuntimeException('stock_insufficient');
-            }
-        }
+        // ตัดสต็อกอาหาร (เฉพาะเมนูที่เปิดติดตามคลังสินค้า และต้องมีของพอเท่านั้น - รองรับกลุ่มสต็อกร่วมด้วย)
+        $stmt_item_info->bind_param("i", $item['item_id']);
+        $stmt_item_info->execute();
+        $item_info = $stmt_item_info->get_result()->fetch_assoc();
+        $deduct_stock($item['quantity'], $item_info['use_stock'] ?? 0, $item_info['stock_pool_id'] ?? null, $stmt_stock_item, $item['item_id']);
 
-        // บันทึกท็อปปิ้ง (ถ้ามี)
+        // บันทึก + ตัดสต็อกท็อปปิ้ง (ถ้ามี) - เดิมไม่เคยตัดสต็อกท็อปปิ้งเลยแม้จะติดตามคลังสินค้าไว้ก็ตาม
         foreach ($item['topping_ids'] as $tid) {
             $stmt_top->bind_param("ii", $order_detail_id, $tid);
             $stmt_top->execute();
+
+            $stmt_topping_info->bind_param("i", $tid);
+            $stmt_topping_info->execute();
+            $topping_info = $stmt_topping_info->get_result()->fetch_assoc();
+            $deduct_stock($item['quantity'], $topping_info['use_stock'] ?? 0, $topping_info['stock_pool_id'] ?? null, $stmt_stock_topping, $tid);
         }
     }
 

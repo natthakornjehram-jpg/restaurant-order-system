@@ -7,6 +7,18 @@ require_once '../includes/csrf.php';
 /** @var array $store ข้อมูลร้าน ถูกดึงไว้แล้วใน includes/db.php (แจ้ง IDE ให้รู้จักตัวแปรนี้ กันขึ้นเตือนเฉยๆ ไม่กระทบการทำงาน) */
 $store ??= [];
 
+// เช็คว่าคิวเต็มหรือยัง (จำกัดจำนวนออเดอร์ที่ยังไม่เสร็จพร้อมกัน กันครัวรับงานล้นมือ ตั้งค่าที่ owner/settings.php)
+// max_queue = 0 หรือไม่ได้ตั้งค่าไว้ ถือว่าไม่จำกัด ไม่ต้องเช็ค - เช็คเฉพาะตอนตั้งค่าไว้มากกว่า 0 เท่านั้น
+// ใช้ผลนี้กันลูกค้าใหม่เลือกประเภทออเดอร์ตอนคิวเต็ม (ด้านล่าง) ส่วนคนที่สั่งไปแล้วยังรออาหารต่อได้ตามปกติ
+// ไม่ถูกเด้งออก แค่ห้ามสั่ง "เพิ่ม" อีก (เช็คแยกอีกชั้นที่ member/submit_order.php)
+$max_queue = intval($store['max_queue'] ?? 0);
+$active_queue_count = 0;
+if ($max_queue > 0) {
+    $q_res = $conn->query("SELECT COUNT(*) AS c FROM orders WHERE order_status IN ('pending', 'cooking')");
+    $active_queue_count = ($q_res && $q_row = $q_res->fetch_assoc()) ? intval($q_row['c']) : 0;
+}
+$queue_is_full = ($max_queue > 0 && $active_queue_count >= $max_queue);
+
 // กันหน้านี้โดนแคชไว้ในเบราว์เซอร์ (สำคัญเวลากดปุ่มย้อนกลับหลังปิดออเดอร์ไปแล้ว)
 header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
 header("Pragma: no-cache");
@@ -84,35 +96,57 @@ if ($store['is_shop_open'] != 0 && isset($_SESSION['order_type'])) {
     }
 }
 
+// คิวเต็ม: กันแก้ URL (?type=) ตรงๆ เข้ามาข้ามหน้าเลือกตอนคิวเต็ม แต่เฉพาะคนที่ยังไม่เคยสั่งอะไรเลยในรอบนี้เท่านั้น
+// (คนที่สั่งไปแล้ว/มีออเดอร์ค้างรออยู่แล้ว ไม่ต้องเด้งกลับไปหน้าเลือก ปล่อยให้ดูเมนู/ตะกร้าต่อได้ตามปกติ
+// จะไปกันตอนกดส่งออเดอร์เพิ่มจริงๆ ที่ member/submit_order.php แทน)
+if ($queue_is_full && isset($_SESSION['order_type']) && empty($_SESSION['has_ordered']) && empty($_SESSION['guest_order_ids'])) {
+    unset($_SESSION['order_type']);
+}
+
 // ไม่มีโต๊ะเลย (เข้าทางลิงก์ตรงๆ ไม่ผ่านการสแกน QR) แปลว่าเป็นสั่งกลับบ้านอย่างเดียว ไม่มี "ทานที่ร้าน" ให้เลือกแทน
-// ถ้าร้านงดรับสั่งกลับบ้านอยู่ตอนนี้ ต้องแจ้งปิดตรงนี้เลย ไม่ปล่อยผ่านไปเมนู (ต่างจากกรณีมีโต๊ะที่ยังเลือก
+// ถ้าร้านงดรับสั่งกลับบ้านอยู่ตอนนี้ หรือคิวเต็มอยู่ ต้องแจ้งปิดตรงนี้เลย ไม่ปล่อยผ่านไปเมนู (ต่างจากกรณีมีโต๊ะที่ยังเลือก
 // "ทานที่ร้าน" แทนได้ที่หน้าเลือกประเภทด้านล่าง)
-if (!isset($_SESSION['table_id']) && !isset($_SESSION['order_type']) && $store['is_shop_open'] != 0 && empty($store['is_takeaway_open'])) {
+if (!isset($_SESSION['table_id']) && !isset($_SESSION['order_type']) && $store['is_shop_open'] != 0
+    && (empty($store['is_takeaway_open']) || $queue_is_full)) {
     include '../includes/header_dinein.php';
     ?>
     <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/menu-dinein.css">
     <div class="container py-5 text-center" style="max-width: 460px;">
+        <?php if ($queue_is_full): ?>
+        <div class="alert alert-warning text-center rounded-4 shadow-sm border-0 py-5">
+            <h4 class="fw-bold mb-2"><i class="bi bi-hourglass-split text-warning"></i> ขณะนี้คิวเต็มชั่วคราว</h4>
+            <p class="mb-0 text-muted">ร้านมีออเดอร์ค้างรอทำเต็มจำนวนแล้ว กรุณารอสักครู่แล้วลองใหม่อีกครั้งครับ</p>
+        </div>
+        <?php else: ?>
         <div class="alert alert-warning text-center rounded-4 shadow-sm border-0 py-5">
             <h4 class="fw-bold mb-2"><i class="bi bi-bag-x-fill text-warning"></i> ขณะนี้งดรับสั่งกลับบ้านชั่วคราว</h4>
             <p class="mb-0 text-muted">ขออภัยในความไม่สะดวกครับ กรุณาติดต่อร้านโดยตรงหรือลองใหม่อีกครั้งภายหลัง</p>
         </div>
+        <?php endif; ?>
     </div>
     <?php
     include '../includes/footer_dinein.php';
     exit;
 }
 
-// มีโต๊ะอยู่ แต่ร้านงดรับทั้งสองประเภทพร้อมกันชั่วคราว (กรณีนี้ไม่มีตัวเลือกไหนให้กดได้เลยที่หน้าเลือกด้านล่าง)
+// มีโต๊ะอยู่ แต่ร้านงดรับทั้งสองประเภทพร้อมกันชั่วคราว หรือคิวเต็มอยู่ (กรณีนี้ไม่มีตัวเลือกไหนให้กดได้เลยที่หน้าเลือกด้านล่าง)
 if (isset($_SESSION['table_id']) && !isset($_SESSION['order_type']) && $store['is_shop_open'] != 0
-    && empty($store['is_dinein_open']) && empty($store['is_takeaway_open'])) {
+    && ((empty($store['is_dinein_open']) && empty($store['is_takeaway_open'])) || $queue_is_full)) {
     include '../includes/header_dinein.php';
     ?>
     <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/menu-dinein.css">
     <div class="container py-5 text-center" style="max-width: 460px;">
+        <?php if ($queue_is_full): ?>
+        <div class="alert alert-warning text-center rounded-4 shadow-sm border-0 py-5">
+            <h4 class="fw-bold mb-2"><i class="bi bi-hourglass-split text-warning"></i> ขณะนี้คิวเต็มชั่วคราว</h4>
+            <p class="mb-0 text-muted">ร้านมีออเดอร์ค้างรอทำเต็มจำนวนแล้ว กรุณารอสักครู่แล้วลองใหม่อีกครั้งครับ</p>
+        </div>
+        <?php else: ?>
         <div class="alert alert-warning text-center rounded-4 shadow-sm border-0 py-5">
             <h4 class="fw-bold mb-2"><i class="bi bi-door-closed-fill text-warning"></i> ขณะนี้งดรับออเดอร์ชั่วคราว</h4>
             <p class="mb-0 text-muted">ทั้งทานที่ร้านและสั่งกลับบ้านปิดรับอยู่ ขออภัยในความไม่สะดวกครับ</p>
         </div>
+        <?php endif; ?>
     </div>
     <?php
     include '../includes/footer_dinein.php';
@@ -140,7 +174,12 @@ if (!isset($_SESSION['order_type'])) {
         </span>
         <p class="text-muted mb-4">กรุณาเลือกรูปแบบการสั่งอาหารเพื่อเริ่มต้น</p>
 
-        <?php $dinein_open = !empty($store['is_dinein_open']); $takeaway_open = !empty($store['is_takeaway_open']); ?>
+        <?php
+        $dinein_open = !empty($store['is_dinein_open']) && !$queue_is_full;
+        $takeaway_open = !empty($store['is_takeaway_open']) && !$queue_is_full;
+        $closed_label = $queue_is_full ? 'คิวเต็มอยู่' : 'ปิดรับอยู่';
+        $closed_sub = $queue_is_full ? 'คิวเต็มชั่วคราว' : 'งดรับชั่วคราว';
+        ?>
         <div class="row g-3">
             <div class="col-6">
                 <?php if ($dinein_open): ?>
@@ -154,8 +193,8 @@ if (!isset($_SESSION['order_type'])) {
                 <div class="order-type-card dine-in" style="opacity:.45; pointer-events:none; cursor:not-allowed;">
                     <i class="bi bi-cup-hot-fill"></i>
                     <div class="ot-title">ทานที่ร้าน</div>
-                    <div class="ot-sub">งดรับชั่วคราว</div>
-                    <span class="ot-pill">ปิดรับอยู่</span>
+                    <div class="ot-sub"><?= $closed_sub ?></div>
+                    <span class="ot-pill"><?= $closed_label ?></span>
                 </div>
                 <?php endif; ?>
             </div>
@@ -171,8 +210,8 @@ if (!isset($_SESSION['order_type'])) {
                 <div class="order-type-card takeaway" style="opacity:.45; pointer-events:none; cursor:not-allowed;">
                     <i class="bi bi-bag-fill"></i>
                     <div class="ot-title">สั่งกลับบ้าน</div>
-                    <div class="ot-sub">งดรับชั่วคราว</div>
-                    <span class="ot-pill">ปิดรับอยู่</span>
+                    <div class="ot-sub"><?= $closed_sub ?></div>
+                    <span class="ot-pill"><?= $closed_label ?></span>
                 </div>
                 <?php endif; ?>
             </div>
@@ -286,7 +325,9 @@ include '../includes/nav_dinein.php';
 
     <div class="row g-3">
         <?php
-        $items_stmt = $conn->prepare("SELECT i.* FROM item i LEFT JOIN category c ON i.category_id = c.category_id WHERE i.is_active = 1 AND (c.is_active = 1 OR i.category_id IS NULL) AND (? = 0 OR i.category_id = ?) ORDER BY i.item_id DESC");
+        // COALESCE(sp.stock_qty, i.stock_qty): เมนูที่ผูกกับ "กลุ่มสต็อกร่วม" (stock_pool_id) ให้ยึดจำนวน
+        // คงเหลือของกองกลางแทนของตัวเอง (ดูเหตุผลที่ includes/db.php) เมนูที่ไม่ได้ผูกยังนับของตัวเองตามปกติ
+        $items_stmt = $conn->prepare("SELECT i.*, COALESCE(sp.stock_qty, i.stock_qty) AS effective_stock_qty FROM item i LEFT JOIN category c ON i.category_id = c.category_id LEFT JOIN stock_pool sp ON sp.pool_id = i.stock_pool_id WHERE i.is_active = 1 AND (c.is_active = 1 OR i.category_id IS NULL) AND (? = 0 OR i.category_id = ?) ORDER BY i.item_id DESC");
         $items_stmt->bind_param("ii", $current_cat_id, $current_cat_id);
         $items_stmt->execute();
         $items = $items_stmt->get_result();
@@ -294,7 +335,7 @@ include '../includes/nav_dinein.php';
             while($m = $items->fetch_assoc()):
                 $m_id = $m['item_id'];
                 $price = $m['price'];
-                $is_out_of_stock = (!empty($m['use_stock']) && intval($m['stock_qty']) <= 0);
+                $is_out_of_stock = (!empty($m['use_stock']) && intval($m['effective_stock_qty']) <= 0);
                 $img_path = !empty($m['image_url']) ? "../assets/images/items/" . $m['image_url'] : "../assets/images/items/default_food.jpg";
         ?>
             <div class="col-6 col-md-4 col-lg-3">
@@ -336,7 +377,7 @@ include '../includes/nav_dinein.php';
                             <img src="<?= htmlspecialchars($img_path) ?>" class="w-100 rounded-4 mb-3" style="height:180px; object-fit:cover;" onerror="this.src='../assets/images/items/default_food.jpg'">
 
                             <?php
-                            $tops_stmt = $conn->prepare("SELECT t.*, tc.topping_cat_name FROM menu_toppings mt JOIN topping t ON mt.topping_id = t.topping_id JOIN topping_categories tc ON t.topping_cat_id = tc.topping_cat_id WHERE mt.item_id = ? ORDER BY tc.topping_cat_id ASC, t.topping_id ASC");
+                            $tops_stmt = $conn->prepare("SELECT t.*, tc.topping_cat_name, COALESCE(sp.stock_qty, t.stock_qty) AS effective_stock_qty FROM menu_toppings mt JOIN topping t ON mt.topping_id = t.topping_id JOIN topping_categories tc ON t.topping_cat_id = tc.topping_cat_id LEFT JOIN stock_pool sp ON sp.pool_id = t.stock_pool_id WHERE mt.item_id = ? ORDER BY tc.topping_cat_id ASC, t.topping_id ASC");
                             $tops_stmt->bind_param("i", $m_id);
                             $tops_stmt->execute();
                             $tops_query = $tops_stmt->get_result();
@@ -344,7 +385,7 @@ include '../includes/nav_dinein.php';
                             $current_cat = "";
                             if($tops_query && $tops_query->num_rows > 0):
                                 while($t = $tops_query->fetch_assoc()):
-                                    $t_out_of_stock = ($t['is_active'] == 0 || (!empty($t['use_stock']) && intval($t['stock_qty']) <= 0));
+                                    $t_out_of_stock = ($t['is_active'] == 0 || (!empty($t['use_stock']) && intval($t['effective_stock_qty']) <= 0));
                                     if ($current_cat != $t['topping_cat_name']):
                                         $current_cat = $t['topping_cat_name'];
                                         echo "<div class='topping-group-title'>".htmlspecialchars($current_cat)."</div>";

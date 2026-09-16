@@ -271,10 +271,49 @@ function checkNewOrders() {
             location.reload();
         }
 
+        checkQueueFullWarning(data.active_queue_count, data.max_queue);
+
         lastPendingCount = data.pending_count;
         lastPaymentsCount = data.payments_count;
     })
     .catch(err => console.error('API Error:', err));
+}
+
+/**
+ * 3.5 เตือนเจ้าของร้านตอนคิวเต็ม (จำนวนออเดอร์ค้าง pending+cooking ถึง max_queue ที่ตั้งไว้ใน owner/settings.php)
+ *     มีให้ติ๊ก "ไม่ต้องแจ้งเตือนอีก" ถ้าไม่ติ๊กจะเด้งเตือนซ้ำทุกรอบโพล (2 วิ) จนกว่าจะติ๊กหรือคิวลดลงต่ำกว่าลิมิต
+ *     เก็บสถานะที่ติ๊กไว้ด้วย sessionStorage ผูกกับค่า max_queue ปัจจุบัน กันค้างข้ามรอบถ้าเจ้าของร้านปรับค่าใหม่
+ */
+let queueFullDialogOpen = false;
+function checkQueueFullWarning(activeCount, maxQueue) {
+    if (!maxQueue || maxQueue <= 0) return; // ไม่ได้ตั้งลิมิตไว้ ไม่ต้องเตือน
+
+    const dismissKey = 'queueFullDismissed_' + maxQueue;
+    const isFull = activeCount >= maxQueue;
+
+    if (!isFull) {
+        sessionStorage.removeItem(dismissKey); // คิวลดลงแล้ว เคลียร์ค่าติ๊กไว้ กันไม่เตือนตอนเต็มรอบหน้า
+        return;
+    }
+    if (sessionStorage.getItem(dismissKey) === '1') return;
+    if (queueFullDialogOpen) return;
+
+    queueFullDialogOpen = true;
+    Swal.fire({
+        icon: 'warning',
+        title: 'คิวเต็มแล้ว!',
+        html: 'ตอนนี้มีออเดอร์ค้างรอทำอยู่ <b>' + activeCount + '</b> ออเดอร์ (จำกัดไว้ที่ ' + maxQueue + ') <br>ลูกค้าใหม่จะเลือกทานที่ร้าน/สั่งกลับบ้านไม่ได้ และลูกค้าเดิมจะสั่งเพิ่มไม่ได้ จนกว่าคิวจะลดลง',
+        input: 'checkbox',
+        inputPlaceholder: 'ไม่ต้องแจ้งเตือนอีกจนกว่าคิวจะลดลง',
+        confirmButtonText: 'รับทราบ',
+        allowOutsideClick: false
+    }).then((result) => {
+        queueFullDialogOpen = false;
+        if (result.isConfirmed && result.value) {
+            sessionStorage.setItem(dismissKey, '1');
+        }
+        // ไม่ติ๊ก -> ไม่บันทึกอะไร รอบโพลถัดไป (2 วิ) จะเด้งเตือนซ้ำอีกจนกว่าจะติ๊กหรือคิวลดลง
+    });
 }
 
 // เช็คทุก 2 วินาที (เกือบเรียลไทม์ โดยไม่ต้องใช้ WebSocket)

@@ -29,5 +29,24 @@ $pay_result = $pay_stmt->get_result();
 $payments_count = ($pay_result->num_rows > 0) ? $pay_result->fetch_assoc()['count'] : 0;
 $pay_stmt->close();
 
-echo json_encode(['pending_count' => $pending_count, 'payments_count' => $payments_count]);
+// จำนวนคิวที่ยังไม่เสร็จ (pending+cooking) เทียบกับ max_queue ที่ตั้งไว้ - ให้ฝั่ง JS เตือนเจ้าของร้านตอนคิวเต็ม
+// (max_queue = 0 หมายถึงไม่จำกัด ไม่ต้องเตือน)
+$queue_stmt = $conn->prepare("SELECT COUNT(*) as count FROM orders WHERE order_status IN ('pending', 'cooking')");
+$queue_stmt->execute();
+$queue_result = $queue_stmt->get_result();
+$active_queue_count = ($queue_result->num_rows > 0) ? $queue_result->fetch_assoc()['count'] : 0;
+$queue_stmt->close();
+
+$max_stmt = $conn->prepare("SELECT max_queue FROM owner WHERE owner_id = 1");
+$max_stmt->execute();
+$max_result = $max_stmt->get_result();
+$max_queue = ($max_result->num_rows > 0) ? intval($max_result->fetch_assoc()['max_queue']) : 0;
+$max_stmt->close();
+
+echo json_encode([
+    'pending_count' => $pending_count,
+    'payments_count' => $payments_count,
+    'active_queue_count' => $active_queue_count,
+    'max_queue' => $max_queue,
+]);
 ?>

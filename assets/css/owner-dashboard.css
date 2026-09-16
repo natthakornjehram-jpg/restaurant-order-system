@@ -45,12 +45,13 @@ body { background-color: #f0f4f7; }
     border-radius: 15px; font-weight: 700; padding: 10px 20px; border: none;
     transition: 0.3s; min-width: 150px; color: #fff !important;
 }
-/* สีประจำตัวของปุ่มแต่ละอัน (ร้าน=เขียว, ทานที่ร้าน=ส้มสด, กลับบ้าน=น้ำเงินเข้ม) กันสามปุ่มดูเหมือนกันหมด
+/* สีประจำตัวของปุ่มแต่ละอัน (ร้าน=เขียว, ทานที่ร้าน=ส้มสด, กลับบ้าน=เขียวอมฟ้า) กันสามปุ่มดูเหมือนกันหมด
    ตอนเปิดพร้อมกัน ตอนปิดไม่เปลี่ยนเป็นสีแดงเหมือนกันหมดแล้ว แต่ใช้ .is-closed จางสีเดิมลงแทน
-   ยังพอเดาได้ว่าปุ่มไหนคือปุ่มไหน */
+   ยังพอเดาได้ว่าปุ่มไหนคือปุ่มไหน (กลับบ้านเดิมเป็นน้ำเงินเข้ม ดูคล้ายสีฟ้าที่ใช้กับป้ายสถานะ "กำลังทำ"/
+   "รอชำระเงิน" ที่อื่นในหน้าแดชบอร์ด เลยเปลี่ยนโทนให้ต่างออกไปชัดเจนขึ้น) */
 .dashboard-scope .bg-toggle-shop { background-color: #27ae60; }
 .dashboard-scope .bg-toggle-dinein { background-color: #f39c12; }
-.dashboard-scope .bg-toggle-takeaway { background-color: #154360; }
+.dashboard-scope .bg-toggle-takeaway { background-color: #0d9488; }
 .dashboard-scope .btn-toggle.is-closed { opacity: .45; filter: grayscale(35%); }
 
 /* กรอบออเดอร์ข้างล่าง */
