@@ -420,9 +420,9 @@ include '../includes/nav_dinein.php';
                             <div class="d-flex align-items-center justify-content-between mt-3 bg-light p-3 rounded-3">
                                 <span class="fw-bold">จำนวนจาน</span>
                                 <div class="qty-stepper">
-                                    <button class="qty-btn" type="button" onclick="this.nextElementSibling.stepDown()">&minus;</button>
+                                    <button class="qty-btn" type="button" onclick="this.nextElementSibling.stepDown()"><i class="bi bi-dash"></i></button>
                                     <input type="number" name="quantity" class="qty-input" value="1" min="1" max="20" readonly>
-                                    <button class="qty-btn" type="button" onclick="this.previousElementSibling.stepUp()">+</button>
+                                    <button class="qty-btn" type="button" onclick="this.previousElementSibling.stepUp()"><i class="bi bi-plus"></i></button>
                                 </div>
                             </div>
                         </div>

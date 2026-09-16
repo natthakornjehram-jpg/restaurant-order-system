@@ -83,16 +83,18 @@ body {
 .order-type-card.dine-in { background: linear-gradient(160deg, #c98a3e, #a3661a); }
 .order-type-card.takeaway { background: linear-gradient(160deg, #4caf7d, #2e7d55); }
 
-/* ปุ่มเพิ่ม/ลดจำนวนจานในโมดัลเลือกเมนู - ทำเป็นแคปซูลเดียวกัน ปุ่มกลมสีน้ำตาลคาเฟ่ แทนกล่องสี่เหลี่ยมเทาแบบ Bootstrap เดิม */
+/* ปุ่มเพิ่ม/ลดจำนวนจานในโมดัลเลือกเมนู - ปุ่มกลมสีน้ำตาลคาเฟ่ "ลอย" ด้วยเงาของตัวเอง แทนกล่องสี่เหลี่ยมเทา
+   แบบ Bootstrap เดิม พื้นหลังโปร่งใสให้กลมกลืนกับการ์ด bg-light ที่ครอบอยู่ ไม่ต้องมีกล่องขาวลอยซ้อนอีกชั้น
+   ใช้ไอคอน Bootstrap Icons แทนตัวอักษร -/+ เพราะจัดกึ่งกลางแนวตั้งในวงกลมได้เป๊ะกว่า (ตัวอักษรลอยเยื้องลง
+   เพราะ font metrics ของเครื่องหมายลบ/บวกแต่ละฟอนต์ไม่เท่ากัน) */
 .qty-stepper {
-    display: inline-flex; align-items: center; gap: 2px;
-    background: #fff; border-radius: 999px; padding: 4px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    display: inline-flex; align-items: center; gap: 10px;
 }
 .qty-stepper .qty-btn {
     width: 34px; height: 34px; border-radius: 50%; border: none; flex-shrink: 0;
-    background: var(--cafe-brown); color: #fff; font-size: 1.15rem; font-weight: 700; line-height: 1;
+    background: var(--cafe-brown); color: #fff; font-size: 1rem; line-height: 1;
     display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.2);
     transition: transform 0.12s ease, opacity 0.15s ease;
 }
 .qty-stepper .qty-btn:active { transform: scale(0.88); }
