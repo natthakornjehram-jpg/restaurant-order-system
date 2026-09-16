@@ -36,6 +36,28 @@ $unpaid_orders = ($unpaid_res && $row = $unpaid_res->fetch_assoc()) ? $row['unpa
 // --- 3. ดึงรายการออเดอร์ล่าสุด 8 รายการ ---
 $pending_list_sql = "SELECT * FROM orders WHERE DATE(created_at) = CURDATE() ORDER BY created_at DESC LIMIT 8";
 $pending_list_res = $conn->query($pending_list_sql);
+
+// --- 4. เช็คว่าคิวเต็มหรือยัง (เหมือนกับที่เช็คฝั่งลูกค้าใน qr_table/menu_dinein.php) ---
+// ใช้ตัดสินว่าปุ่ม "รับทานที่ร้าน"/"รับสั่งกลับบ้าน" ควรโชว์เป็นสถานะ "คิวเต็ม" (สีเหลือง แยกจาก "งดรับ" สีเทา)
+// หรือไม่ - ให้เจ้าของร้านแยกออกว่าปุ่มปิดเพราะกดปิดเองหรือเพราะคิวเต็มอัตโนมัติ (ค่าจริงในฐานข้อมูลไม่ถูกแก้
+// อัตโนมัติ แค่ปรับหน้าตาปุ่มให้ตรงกับสถานะจริงที่ลูกค้าเจอ)
+$max_queue = intval($store['max_queue'] ?? 0);
+$active_queue_count = 0;
+if ($max_queue > 0) {
+    $q_res = $conn->query("SELECT COUNT(*) AS c FROM orders WHERE order_status IN ('pending', 'cooking')");
+    $active_queue_count = ($q_res && $q_row = $q_res->fetch_assoc()) ? intval($q_row['c']) : 0;
+}
+$queue_is_full = ($max_queue > 0 && $active_queue_count >= $max_queue);
+
+// สถานะจริงของปุ่ม "ทานที่ร้าน"/"กลับบ้าน" ให้ดูตามลำดับ: ร้านปิดทั้งร้าน > กดปิดเอง > คิวเต็ม > เปิดรับปกติ
+// (ร้านปิดทั้งร้านหรือกดปิดเอง ให้ผลเป็น "งดรับ" เหมือนกัน เพราะเป็นการตัดสินใจของเจ้าของร้านทั้งคู่)
+function toggle_visual_state($manual_open, $shop_open, $queue_is_full) {
+    if (!$shop_open || !$manual_open) return 'closed';
+    if ($queue_is_full) return 'queue_full';
+    return 'open';
+}
+$dinein_state = toggle_visual_state(!empty($store['is_dinein_open']), $store['is_shop_open'] == 1, $queue_is_full);
+$takeaway_state = toggle_visual_state(!empty($store['is_takeaway_open']), $store['is_shop_open'] == 1, $queue_is_full);
 ?>
 
 <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/owner-dashboard.css?v=<?= time() ?>">
@@ -55,13 +77,25 @@ $pending_list_res = $conn->query($pending_list_sql);
             <div class="d-flex gap-2 toggle-row-split">
                 <button data-id="dinein" data-type="dinein_status"
                         onclick="toggleStatus('dinein', 'dinein_status', <?= $store['is_dinein_open']; ?>)"
-                        class="btn btn-toggle shadow-sm bg-toggle-dinein <?= ($store['is_dinein_open'] == 1) ? '' : 'is-closed'; ?>">
-                    <?= ($store['is_dinein_open'] == 1) ? '<i class="bi bi-cup-hot me-1"></i> รับทานที่ร้าน' : '<i class="bi bi-cup-hot me-1"></i> งดรับทานที่ร้าน' ?>
+                        class="btn btn-toggle shadow-sm bg-toggle-dinein <?= $dinein_state !== 'open' ? 'is-' . str_replace('_', '-', $dinein_state) : ''; ?>">
+                    <?php if ($dinein_state === 'queue_full'): ?>
+                        <i class="bi bi-hourglass-split me-1"></i> คิวเต็ม (ทานที่ร้าน)
+                    <?php elseif ($dinein_state === 'closed'): ?>
+                        <i class="bi bi-cup-hot me-1"></i> งดรับทานที่ร้าน
+                    <?php else: ?>
+                        <i class="bi bi-cup-hot me-1"></i> รับทานที่ร้าน
+                    <?php endif; ?>
                 </button>
                 <button data-id="takeaway" data-type="takeaway_status"
                         onclick="toggleStatus('takeaway', 'takeaway_status', <?= $store['is_takeaway_open']; ?>)"
-                        class="btn btn-toggle shadow-sm bg-toggle-takeaway <?= ($store['is_takeaway_open'] == 1) ? '' : 'is-closed'; ?>">
-                    <?= ($store['is_takeaway_open'] == 1) ? '<i class="bi bi-bag-check me-1"></i> รับสั่งกลับบ้าน' : '<i class="bi bi-bag-check me-1"></i> งดรับสั่งกลับบ้าน' ?>
+                        class="btn btn-toggle shadow-sm bg-toggle-takeaway <?= $takeaway_state !== 'open' ? 'is-' . str_replace('_', '-', $takeaway_state) : ''; ?>">
+                    <?php if ($takeaway_state === 'queue_full'): ?>
+                        <i class="bi bi-hourglass-split me-1"></i> คิวเต็ม (กลับบ้าน)
+                    <?php elseif ($takeaway_state === 'closed'): ?>
+                        <i class="bi bi-bag-check me-1"></i> งดรับสั่งกลับบ้าน
+                    <?php else: ?>
+                        <i class="bi bi-bag-check me-1"></i> รับสั่งกลับบ้าน
+                    <?php endif; ?>
                 </button>
             </div>
         </div>

@@ -291,6 +291,12 @@ include '../includes/nav_dinein.php';
         <div class="alert alert-danger text-center rounded-4 shadow-sm border-0 py-5">
             <h4 class="fw-bold mb-2"><i class="bi bi-door-closed-fill text-danger"></i> ขณะนี้ร้านปิดให้บริการ</h4>
             <p class="mb-0 text-muted">ขออภัยในความไม่สะดวกครับ</p>
+            <?php if (!empty($store['close_reason'])): ?>
+                <!-- เจ้าของร้านกรอกเหตุผลปิดร้านไว้ที่หน้าตั้งค่า (เช่น "ลาป่วย") - โชว์ให้ลูกค้าเห็นตรงๆ ถ้ามีการกรอกไว้ -->
+                <p class="mt-3 mb-0 fw-bold" style="color: var(--cafe-brown, #795548);">
+                    <i class="bi bi-info-circle-fill me-1"></i><?= htmlspecialchars($store['close_reason']) ?>
+                </p>
+            <?php endif; ?>
         </div>
     <?php else: ?>
 

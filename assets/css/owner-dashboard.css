@@ -53,6 +53,9 @@ body { background-color: #f0f4f7; }
 .dashboard-scope .bg-toggle-dinein { background-color: #f39c12; }
 .dashboard-scope .bg-toggle-takeaway { background-color: #0d9488; }
 .dashboard-scope .btn-toggle.is-closed { opacity: .45; filter: grayscale(35%); }
+/* สถานะ "คิวเต็มอัตโนมัติ" แยกจาก "งดรับ" ที่กดปิดเอง (.is-closed) - ค่าจริงในฐานข้อมูลยังเป็น "เปิด" อยู่
+   แค่คิวถึงลิมิตชั่วคราว จึงใช้สีเหลือง/ส้มเตือนแทนสีเทาจาง ให้เจ้าของร้านแยกสาเหตุออกได้ในทันที */
+.dashboard-scope .btn-toggle.is-queue-full { background-color: #d97706 !important; }
 
 /* กรอบออเดอร์ข้างล่าง */
 .dashboard-scope .order-item-box {

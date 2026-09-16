@@ -281,10 +281,9 @@ function checkNewOrders() {
 
 /**
  * 3.5 เตือนเจ้าของร้านตอนคิวเต็ม (จำนวนออเดอร์ค้าง pending+cooking ถึง max_queue ที่ตั้งไว้ใน owner/settings.php)
- *     มีให้ติ๊ก "ไม่ต้องแจ้งเตือนอีก" ถ้าไม่ติ๊กจะเด้งเตือนซ้ำทุกรอบโพล (2 วิ) จนกว่าจะติ๊กหรือคิวลดลงต่ำกว่าลิมิต
- *     เก็บสถานะที่ติ๊กไว้ด้วย sessionStorage ผูกกับค่า max_queue ปัจจุบัน กันค้างข้ามรอบถ้าเจ้าของร้านปรับค่าใหม่
+ *     แจ้งครั้งเดียวตอนคิว "เพิ่งเต็มพอดี" กดรับทราบแล้วไม่ต้องเห็นซ้ำอีกจนกว่าคิวจะลดลงต่ำกว่าลิมิตแล้วเต็มใหม่อีกรอบ
+ *     เก็บสถานะรับทราบไว้ด้วย sessionStorage ผูกกับค่า max_queue ปัจจุบัน กันค้างข้ามรอบถ้าเจ้าของร้านปรับค่าใหม่
  */
-let queueFullDialogOpen = false;
 function checkQueueFullWarning(activeCount, maxQueue) {
     if (!maxQueue || maxQueue <= 0) return; // ไม่ได้ตั้งลิมิตไว้ ไม่ต้องเตือน
 
@@ -292,27 +291,19 @@ function checkQueueFullWarning(activeCount, maxQueue) {
     const isFull = activeCount >= maxQueue;
 
     if (!isFull) {
-        sessionStorage.removeItem(dismissKey); // คิวลดลงแล้ว เคลียร์ค่าติ๊กไว้ กันไม่เตือนตอนเต็มรอบหน้า
+        sessionStorage.removeItem(dismissKey); // คิวลดลงแล้ว เคลียร์ค่าไว้ กันไม่เตือนตอนเต็มรอบหน้า
         return;
     }
     if (sessionStorage.getItem(dismissKey) === '1') return;
-    if (queueFullDialogOpen) return;
 
-    queueFullDialogOpen = true;
+    // บันทึกว่ารับทราบแล้วทันทีตอนเปิดกล่อง (ไม่ใช่ตอนกดปุ่ม) กันโพลรอบถัดไป (2 วิ) เด้งซ้อนกันก่อนที่จะกดปิด
+    sessionStorage.setItem(dismissKey, '1');
     Swal.fire({
         icon: 'warning',
         title: 'คิวเต็มแล้ว!',
-        html: 'ตอนนี้มีออเดอร์ค้างรอทำอยู่ <b>' + activeCount + '</b> ออเดอร์ (จำกัดไว้ที่ ' + maxQueue + ') <br>ลูกค้าใหม่จะเลือกทานที่ร้าน/สั่งกลับบ้านไม่ได้ และลูกค้าเดิมจะสั่งเพิ่มไม่ได้ จนกว่าคิวจะลดลง',
-        input: 'checkbox',
-        inputPlaceholder: 'ไม่ต้องแจ้งเตือนอีกจนกว่าคิวจะลดลง',
+        html: 'ตอนนี้คิวเต็มแล้ว (มีออเดอร์ค้างรอทำอยู่ ' + activeCount + '/' + maxQueue + ' ออเดอร์) <br>คุณสามารถเพิ่มจำนวนคิวได้ที่หน้าตั้งค่า ถ้าต้องการรับออเดอร์เพิ่ม',
         confirmButtonText: 'รับทราบ',
         allowOutsideClick: false
-    }).then((result) => {
-        queueFullDialogOpen = false;
-        if (result.isConfirmed && result.value) {
-            sessionStorage.setItem(dismissKey, '1');
-        }
-        // ไม่ติ๊ก -> ไม่บันทึกอะไร รอบโพลถัดไป (2 วิ) จะเด้งเตือนซ้ำอีกจนกว่าจะติ๊กหรือคิวลดลง
     });
 }
 
