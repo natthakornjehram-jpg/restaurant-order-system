@@ -82,3 +82,23 @@ body {
 }
 .order-type-card.dine-in { background: linear-gradient(160deg, #c98a3e, #a3661a); }
 .order-type-card.takeaway { background: linear-gradient(160deg, #4caf7d, #2e7d55); }
+
+/* ปุ่มเพิ่ม/ลดจำนวนจานในโมดัลเลือกเมนู - ทำเป็นแคปซูลเดียวกัน ปุ่มกลมสีน้ำตาลคาเฟ่ แทนกล่องสี่เหลี่ยมเทาแบบ Bootstrap เดิม */
+.qty-stepper {
+    display: inline-flex; align-items: center; gap: 2px;
+    background: #fff; border-radius: 999px; padding: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.qty-stepper .qty-btn {
+    width: 34px; height: 34px; border-radius: 50%; border: none; flex-shrink: 0;
+    background: var(--cafe-brown); color: #fff; font-size: 1.15rem; font-weight: 700; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.12s ease, opacity 0.15s ease;
+}
+.qty-stepper .qty-btn:active { transform: scale(0.88); }
+.qty-stepper .qty-btn:disabled { opacity: 0.35; }
+.qty-stepper .qty-input {
+    width: 38px; text-align: center; border: none; background: transparent;
+    font-weight: 700; font-size: 1.05rem; color: var(--cafe-dark); padding: 0;
+}
+.qty-stepper .qty-input:focus { outline: none; }

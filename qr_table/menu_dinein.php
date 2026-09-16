@@ -110,7 +110,7 @@ if (!isset($_SESSION['table_id']) && !isset($_SESSION['order_type']) && $store['
     && (empty($store['is_takeaway_open']) || $queue_is_full)) {
     include '../includes/header_dinein.php';
     ?>
-    <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/menu-dinein.css">
+    <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/menu-dinein.css?v=<?= time() ?>">
     <div class="container py-5 text-center" style="max-width: 460px;">
         <?php if ($queue_is_full): ?>
         <div class="alert alert-warning text-center rounded-4 shadow-sm border-0 py-5">
@@ -134,7 +134,7 @@ if (isset($_SESSION['table_id']) && !isset($_SESSION['order_type']) && $store['i
     && ((empty($store['is_dinein_open']) && empty($store['is_takeaway_open'])) || $queue_is_full)) {
     include '../includes/header_dinein.php';
     ?>
-    <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/menu-dinein.css">
+    <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/menu-dinein.css?v=<?= time() ?>">
     <div class="container py-5 text-center" style="max-width: 460px;">
         <?php if ($queue_is_full): ?>
         <div class="alert alert-warning text-center rounded-4 shadow-sm border-0 py-5">
@@ -158,7 +158,7 @@ if (!isset($_SESSION['order_type'])) {
     $table_no_for_choice = $_SESSION['table_number'] ?? '';
     include '../includes/header_dinein.php';
     ?>
-    <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/menu-dinein.css">
+    <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/menu-dinein.css?v=<?= time() ?>">
     <div class="container py-5 text-center" style="max-width: 460px;">
         <div class="choice-icon-circle mx-auto mb-3">
             <?php if (!empty($store['logo_url']) && $store['logo_url'] !== 'default_logo.png'): ?>
@@ -283,7 +283,7 @@ include '../includes/header_dinein.php';
 include '../includes/nav_dinein.php';
 ?>
 
-<link rel="stylesheet" href="<?= BASE_URL ?>assets/css/menu-dinein.css">
+<link rel="stylesheet" href="<?= BASE_URL ?>assets/css/menu-dinein.css?v=<?= time() ?>">
 
 <div class="container py-4">
     <?php if($store['is_shop_open'] == 0): ?>
@@ -419,10 +419,10 @@ include '../includes/nav_dinein.php';
 
                             <div class="d-flex align-items-center justify-content-between mt-3 bg-light p-3 rounded-3">
                                 <span class="fw-bold">จำนวนจาน</span>
-                                <div class="input-group" style="width: 110px;">
-                                    <button class="btn btn-outline-secondary btn-sm" type="button" onclick="this.nextElementSibling.stepDown()">-</button>
-                                    <input type="number" name="quantity" class="form-control text-center fw-bold bg-transparent border-0" value="1" min="1" max="20" readonly>
-                                    <button class="btn btn-outline-secondary btn-sm" type="button" onclick="this.previousElementSibling.stepUp()">+</button>
+                                <div class="qty-stepper">
+                                    <button class="qty-btn" type="button" onclick="this.nextElementSibling.stepDown()">&minus;</button>
+                                    <input type="number" name="quantity" class="qty-input" value="1" min="1" max="20" readonly>
+                                    <button class="qty-btn" type="button" onclick="this.previousElementSibling.stepUp()">+</button>
                                 </div>
                             </div>
                         </div>
