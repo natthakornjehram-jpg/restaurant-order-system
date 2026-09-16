@@ -10,13 +10,14 @@ require_once '../includes/csrf.php';
 header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
 header("Pragma: no-cache");
 
-// ดึงชื่อร้านมาแสดงบน Title Bar (ดึงจากตาราง owner โดยตรง)
+// ดึงชื่อร้านและโลโก้มาแสดงบน Title Bar/favicon ของแท็บ (ดึงจากตาราง owner โดยตรง)
 $owner_id = $_SESSION['owner_id'] ?? 0;
-$stmt_h = $conn->prepare("SELECT restaurant_name FROM owner WHERE owner_id = ? LIMIT 1");
+$stmt_h = $conn->prepare("SELECT restaurant_name, logo_url FROM owner WHERE owner_id = ? LIMIT 1");
 $stmt_h->bind_param("i", $owner_id);
 $stmt_h->execute();
 $header_res = $stmt_h->get_result()->fetch_assoc();
 $display_name = !empty($header_res['restaurant_name']) ? $header_res['restaurant_name'] : 'ระบบจัดการร้านอาหาร';
+$header_logo_url = $header_res['logo_url'] ?? '';
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -24,7 +25,10 @@ $display_name = !empty($header_res['restaurant_name']) ? $header_res['restaurant
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($display_name) ?> - Owner System</title>
-    
+    <?php if (!empty($header_logo_url) && $header_logo_url !== 'default_logo.png'): ?>
+        <link rel="icon" href="<?= BASE_URL ?>assets/images/logos/<?= htmlspecialchars($header_logo_url) ?>">
+    <?php endif; ?>
+
     <link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;600&family=Sarabun:wght@300;400;600&display=swap" rel="stylesheet">
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
