@@ -54,7 +54,12 @@ $queue_count = $res ? $res->num_rows : 0;
                         <span class="badge <?php echo $is_open_table ? 'bg-danger' : 'bg-dark'; ?> rounded-pill px-3 mb-1" style="font-size: 0.85rem;">
                             <i class="bi bi-shop me-1"></i><?php echo $table_label; ?>
                         </span>
-                        <div class="order-id text-primary fw-bold fs-5">#<?php echo str_pad($order['daily_order_no'] ?: $oid, 3, '0', STR_PAD_LEFT);?></div>
+                        <div class="order-id text-primary fw-bold fs-5">
+                            #<?php echo str_pad($order['daily_order_no'] ?: $oid, 3, '0', STR_PAD_LEFT);?>
+                            <button type="button" class="btn btn-link btn-sm p-0 ms-1 align-baseline" title="แก้ไขเลขคิว" onclick="editQueueNo('<?php echo $oid;?>', <?php echo intval($order['daily_order_no'] ?: $oid);?>)">
+                                <i class="bi bi-pencil-square"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="text-end">
                         <span class="time-badge"><i class="bi bi-clock-history me-1"></i> <?php echo date('H:i', strtotime($order['created_at']));?></span>
@@ -148,6 +153,6 @@ $queue_count = $res ? $res->num_rows : 0;
     </div>
 </div>
 
-<script src="<?= BASE_URL ?>assets/js/owner-manage-orders.js"></script>
+<script src="<?= BASE_URL ?>assets/js/owner-manage-orders.js?v=<?= time() ?>"></script>
 
 <?php include '../includes/footer_owner.php';?>
