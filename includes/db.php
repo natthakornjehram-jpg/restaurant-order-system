@@ -6,6 +6,11 @@
 //    วันที่ในออเดอร์/รายงานยอดขาย (created_at, CURDATE() ฝั่ง PHP ฯลฯ) อาจเพี้ยนไปจากที่ตั้งใจ
 date_default_timezone_set('Asia/Bangkok');
 
+// ซ่อนไม่ให้ header ตอบกลับบอกว่าเว็บนี้ใช้ PHP เวอร์ชันไหน (X-Powered-By: PHP/x.x.x) กันคนสอดรู้
+// เอาไปหาช่องโหว่เฉพาะเวอร์ชันนั้นได้ง่ายขึ้น - ต้องทำที่นี่เพราะ include ไฟล์นี้อยู่แทบทุกหน้า
+// (การซ่อน Server header ของตัวเว็บเซิร์ฟเวอร์เอง เช่น Apache/x.x.x ต้องตั้งที่ .htaccess/httpd.conf แทน)
+header_remove('X-Powered-By');
+
 //เชื่อมต่อฐานข้อมูล MySQL
 $host = "localhost";
 $user = "root";

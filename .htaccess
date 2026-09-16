@@ -2,3 +2,11 @@
 # กันปัญหาเบราว์เซอร์ปฏิเสธไม่โหลดสไตล์ชีต เมื่อโฮสต์ส่ง Content-Type ผิด
 AddType text/css .css
 AddType text/javascript .js
+
+# ซ่อนข้อมูลเวอร์ชัน Apache ที่มากับหน้า error/directory listing อัตโนมัติของเซิร์ฟเวอร์ (เช่น "Apache/2.4.58")
+# กันคนเอาไปหาช่องโหว่เฉพาะเวอร์ชันนั้น (ปิด X-Powered-By ของ PHP ทำแยกไว้ที่ includes/db.php แล้ว
+# ส่วน Server header ของตัวเว็บเซิร์ฟเวอร์เองต้องตั้งที่ httpd.conf/ServerTokens แทน .htaccess แก้ไม่ได้)
+ServerSignature Off
+<IfModule mod_headers.c>
+    Header unset X-Powered-By
+</IfModule>
