@@ -194,6 +194,25 @@ function playNotifySound() {
 }
 
 /**
+ * 2.1 แจ้งเตือนแบบระบบของเบราว์เซอร์ (Web Notification API) - เด้งเป็นกล่องข้อความของเครื่อง/มือถือได้เลย
+ *     แม้เจ้าของร้านจะสลับแท็บ/สลับไปแอปอื่น หรือล็อกหน้าจอไปแล้ว (ตอนนั้น toast/เสียงในหน้าเว็บจะไม่มีทางเห็น/ได้ยิน)
+ *     ต้องขอสิทธิ์จากผู้ใช้ก่อนเสมอ ปุ่มกระดิ่งอยู่ที่แถบบนสุด (มือถือ) และหัวเมนูข้าง (เดสก์ท็อป) ใน nav_owner.php
+ */
+function updateOwnerNotifyBellUI() {
+    const supported = ('Notification' in window);
+    const shouldShow = supported && Notification.permission === 'default';
+    ['notifyBellMobile', 'notifyBellDesktop'].forEach(function (id) {
+        const bell = document.getElementById(id);
+        if (bell) bell.style.display = shouldShow ? '' : 'none';
+    });
+}
+
+function requestOwnerNotifyPermission() {
+    if (!('Notification' in window)) return;
+    Notification.requestPermission().then(updateOwnerNotifyBellUI);
+}
+
+/**
  * 2.5 พูดแจ้งเตือนด้วยเสียง (Web Speech API) ใช้คู่กับ playNotifySound()
  */
 function speakThai(text) {
@@ -233,6 +252,13 @@ function checkNewOrders() {
                 timerProgressBar: true
             });
 
+            // ยิงแจ้งเตือนระบบซ้ำอีกทาง เผื่อเจ้าของร้านสลับแท็บ/สลับแอปไปแล้วไม่เห็น toast ข้างบน/ไม่ได้ยินเสียง
+            if (('Notification' in window) && Notification.permission === 'granted') {
+                new Notification('มีออเดอร์ใหม่เข้า! 🔔', {
+                    body: 'ลูกค้าสั่งอาหารมาใหม่ ตรวจสอบหน้าครัวด่วน'
+                });
+            }
+
             // รีโหลดหน้าเฉพาะตอนอยู่หน้า manage_orders.php
             if(window.location.pathname.includes('manage_orders.php')) {
                 location.reload();
@@ -252,6 +278,7 @@ function checkNewOrders() {
 }
 
 // เช็คทุก 2 วินาที (เกือบเรียลไทม์ โดยไม่ต้องใช้ WebSocket)
+updateOwnerNotifyBellUI();
 if (lastPendingCount === null) checkNewOrders();
 setInterval(checkNewOrders, 2000);
 </script>

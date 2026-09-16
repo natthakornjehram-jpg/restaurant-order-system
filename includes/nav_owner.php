@@ -58,12 +58,18 @@ $owner_nav_items = [
             <?= htmlspecialchars($restaurant_name) ?>
         </a>
     </div>
+
+    <!-- ขอสิทธิ์แจ้งเตือนแบบระบบ (Web Notification) ให้เด้งแจ้ง "ออเดอร์เข้าแล้ว" ได้แม้สลับแท็บ/สลับแอปไปแล้ว
+         ซ่อนไว้ก่อนด้วย JS (updateOwnerNotifyBellUI ใน footer_owner.php) โชว์เฉพาะตอนยังไม่เคยขอสิทธิ์เท่านั้น -->
+    <button type="button" id="notifyBellMobile" class="btn btn-outline-light btn-sm rounded-circle shadow-sm d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; display: none;" title="เปิดการแจ้งเตือนออเดอร์ใหม่" onclick="requestOwnerNotifyPermission()">
+        <i class="bi bi-bell"></i>
+    </button>
   </div>
 </nav>
 
 <div class="owner-shell d-flex">
   <div class="offcanvas-lg offcanvas-start owner-sidebar bg-dark text-white" tabindex="-1" id="ownerSidebar">
-    <div class="offcanvas-header border-bottom border-secondary">
+    <div class="offcanvas-header border-bottom border-secondary d-flex justify-content-between align-items-center">
       <h5 class="offcanvas-title fw-bold text-warning m-0">
         <?php if (!empty($owner_logo_url) && $owner_logo_url !== 'default_logo.png'): ?>
             <img src="<?= BASE_URL ?>assets/images/logos/<?= htmlspecialchars($owner_logo_url) ?>" alt="logo" style="width:36px;height:36px;object-fit:cover;border-radius:50%;" class="me-2">
@@ -72,6 +78,10 @@ $owner_nav_items = [
         <?php endif; ?>
         เมนูจัดการร้าน
       </h5>
+      <!-- ปุ่มขอสิทธิ์แจ้งเตือนอีกจุด สำหรับตอนเปิดจากจอเดสก์ท็อป (แถบบนสุด d-lg-none ไม่โชว์ตรงนั้น) -->
+      <button type="button" id="notifyBellDesktop" class="btn btn-outline-warning btn-sm rounded-circle shadow-sm d-none d-lg-flex align-items-center justify-content-center" style="width: 32px; height: 32px; display: none;" title="เปิดการแจ้งเตือนออเดอร์ใหม่" onclick="requestOwnerNotifyPermission()">
+        <i class="bi bi-bell"></i>
+      </button>
     </div>
 
     <div class="offcanvas-body p-0 d-flex flex-column">
