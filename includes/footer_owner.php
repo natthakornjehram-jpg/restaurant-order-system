@@ -203,7 +203,7 @@ function updateOwnerNotifyBellUI() {
     const shouldShow = supported && Notification.permission === 'default';
     ['notifyBellMobile', 'notifyBellDesktop'].forEach(function (id) {
         const bell = document.getElementById(id);
-        if (bell) bell.style.display = shouldShow ? '' : 'none';
+        if (bell) bell.style.display = shouldShow ? 'flex' : 'none';
     });
 }
 

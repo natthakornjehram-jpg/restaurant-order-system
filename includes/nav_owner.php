@@ -61,7 +61,7 @@ $owner_nav_items = [
 
     <!-- ขอสิทธิ์แจ้งเตือนแบบระบบ (Web Notification) ให้เด้งแจ้ง "ออเดอร์เข้าแล้ว" ได้แม้สลับแท็บ/สลับแอปไปแล้ว
          ซ่อนไว้ก่อนด้วย JS (updateOwnerNotifyBellUI ใน footer_owner.php) โชว์เฉพาะตอนยังไม่เคยขอสิทธิ์เท่านั้น -->
-    <button type="button" id="notifyBellMobile" class="btn btn-outline-light btn-sm rounded-circle shadow-sm d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; display: none;" title="เปิดการแจ้งเตือนออเดอร์ใหม่" onclick="requestOwnerNotifyPermission()">
+    <button type="button" id="notifyBellMobile" class="btn btn-outline-light btn-sm rounded-circle shadow-sm" style="width: 36px; height: 36px; display: none; align-items: center; justify-content: center;" title="เปิดการแจ้งเตือนออเดอร์ใหม่" onclick="requestOwnerNotifyPermission()">
         <i class="bi bi-bell"></i>
     </button>
   </div>
@@ -78,8 +78,10 @@ $owner_nav_items = [
         <?php endif; ?>
         เมนูจัดการร้าน
       </h5>
-      <!-- ปุ่มขอสิทธิ์แจ้งเตือนอีกจุด สำหรับตอนเปิดจากจอเดสก์ท็อป (แถบบนสุด d-lg-none ไม่โชว์ตรงนั้น) -->
-      <button type="button" id="notifyBellDesktop" class="btn btn-outline-warning btn-sm rounded-circle shadow-sm d-none d-lg-flex align-items-center justify-content-center" style="width: 32px; height: 32px; display: none;" title="เปิดการแจ้งเตือนออเดอร์ใหม่" onclick="requestOwnerNotifyPermission()">
+      <!-- ปุ่มขอสิทธิ์แจ้งเตือนอีกจุด สำหรับตอนเปิดจากจอเดสก์ท็อป (แถบบนสุด d-lg-none ไม่โชว์ตรงนั้น)
+           ไม่ใช้ d-none/d-lg-flex ของ Bootstrap เพราะมี !important ชนกับ JS ที่ตั้ง style.display ตรงๆ
+           (แถบนี้ถูกซ่อนลอยนอกจอบนมือถืออยู่แล้วโดย offcanvas เอง ไม่โชว์จนกว่าจะกดแฮมเบอร์เกอร์เปิดเมนู) -->
+      <button type="button" id="notifyBellDesktop" class="btn btn-outline-warning btn-sm rounded-circle shadow-sm" style="width: 32px; height: 32px; display: none; align-items: center; justify-content: center;" title="เปิดการแจ้งเตือนออเดอร์ใหม่" onclick="requestOwnerNotifyPermission()">
         <i class="bi bi-bell"></i>
       </button>
     </div>

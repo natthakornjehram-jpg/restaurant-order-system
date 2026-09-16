@@ -35,7 +35,7 @@ $nav_menu_url = '../qr_table/menu_dinein.php' . ($nav_has_table ? '?table=' . ur
 
             <!-- ขอสิทธิ์แจ้งเตือนแบบระบบ (Web Notification) ให้เด้งแจ้ง "อาหารพร้อมแล้ว" ได้แม้สลับแท็บ/พับจอไป
                  ซ่อนไว้ก่อนด้วย JS (updateNotifyBellUI ใน footer_dinein.php) จะโชว์เฉพาะตอนยังไม่เคยขอสิทธิ์เท่านั้น -->
-            <button type="button" id="notifyBell" class="btn btn-outline-light btn-sm rounded-circle shadow-sm d-flex align-items-center justify-content-center" style="width: 38px; height: 38px; display: none;" title="เปิดการแจ้งเตือนอาหารพร้อม" onclick="requestFoodNotifyPermission()">
+            <button type="button" id="notifyBell" class="btn btn-outline-light btn-sm rounded-circle shadow-sm" style="width: 38px; height: 38px; display: none; align-items: center; justify-content: center;" title="เปิดการแจ้งเตือนอาหารพร้อม" onclick="requestFoodNotifyPermission()">
                 <i class="bi bi-bell"></i>
             </button>
 

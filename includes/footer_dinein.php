@@ -48,7 +48,7 @@
         if (!bell) return;
         // ไม่รองรับ, ขอไปแล้วได้สิทธิ์, หรือถูกปฏิเสธไปแล้ว (เบราว์เซอร์ไม่ให้ขอซ้ำ) - ซ่อนปุ่มทิ้งทั้งหมด
         // โชว์ปุ่มเฉพาะตอนสถานะเป็น "default" คือยังไม่เคยถามเท่านั้น
-        bell.style.display = (('Notification' in window) && Notification.permission === 'default') ? '' : 'none';
+        bell.style.display = (('Notification' in window) && Notification.permission === 'default') ? 'flex' : 'none';
     }
 
     function requestFoodNotifyPermission() {
