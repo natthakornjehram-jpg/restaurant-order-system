@@ -40,6 +40,22 @@
         }
     }
 
+    // แจ้งเตือนแบบระบบของเบราว์เซอร์ (Web Notification API) - เด้งเป็นกล่องข้อความของเครื่อง/มือถือได้เลย
+    // แม้ลูกค้าจะสลับไปแท็บอื่นหรือพับหน้าจอไปแล้ว โดยไม่ต้องสร้างแอพแยก แต่ต้องขอสิทธิ์จากผู้ใช้ก่อนเสมอ
+    // (Safari บน iOS รุ่นเก่าไม่รองรับ ต้องเพิ่มเว็บเป็น Home Screen App ก่อนถึงจะใช้ได้)
+    function updateNotifyBellUI() {
+        const bell = document.getElementById('notifyBell');
+        if (!bell) return;
+        // ไม่รองรับ, ขอไปแล้วได้สิทธิ์, หรือถูกปฏิเสธไปแล้ว (เบราว์เซอร์ไม่ให้ขอซ้ำ) - ซ่อนปุ่มทิ้งทั้งหมด
+        // โชว์ปุ่มเฉพาะตอนสถานะเป็น "default" คือยังไม่เคยถามเท่านั้น
+        bell.style.display = (('Notification' in window) && Notification.permission === 'default') ? '' : 'none';
+    }
+
+    function requestFoodNotifyPermission() {
+        if (!('Notification' in window)) return;
+        Notification.requestPermission().then(updateNotifyBellUI);
+    }
+
     let hasNotified = false;
     let lastStatusHash = null;
     function checkMyFoodStatus() {
@@ -52,6 +68,13 @@
                     let toastEl = document.getElementById('foodReadyToast');
                     let toast = new bootstrap.Toast(toastEl);
                     toast.show();
+
+                    // ยิงแจ้งเตือนระบบซ้ำอีกทาง เผื่อลูกค้าไม่ได้จ้องหน้าจอ/สลับแท็บไปแล้วไม่เห็น toast ข้างบน
+                    if (('Notification' in window) && Notification.permission === 'granted') {
+                        new Notification('อาหารของคุณพร้อมแล้ว! 🍽️', {
+                            body: 'กำลังนำไปเสิร์ฟที่โต๊ะ หรือติดต่อรับที่เคาน์เตอร์ครับ'
+                        });
+                    }
 
                     hasNotified = true;
                 }
@@ -102,6 +125,7 @@
 
     // เริ่มทำงานเมื่อโหลดหน้าเว็บเสร็จ
     document.addEventListener("DOMContentLoaded", function() {
+        updateNotifyBellUI();
         setInterval(checkMyFoodStatus, 5000);
         setInterval(checkBillClosed, 5000);
     });
