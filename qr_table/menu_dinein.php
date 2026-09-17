@@ -513,8 +513,17 @@ include '../includes/nav_dinein.php';
             <?php
             $queue_res = $conn->query("SELECT COUNT(*) as queue_count FROM orders WHERE order_status IN ('pending', 'cooking')");
             $queue_count = $queue_res->fetch_assoc()['queue_count'] ?? 0;
-            if ($queue_count > 0):
+            if ($queue_is_full):
             ?>
+                <!-- คิวเต็มตามลิมิต max_queue - บอกตรงๆ ว่าสั่งเพิ่มไม่ได้แล้ว แทนที่จะปล่อยให้กดปุ่มแล้วเจอ alert เอาตอนหลัง -->
+                <div class="alert alert-danger border border-danger text-dark rounded-4 mb-4 shadow-sm d-flex align-items-center">
+                    <i class="bi bi-hourglass-split text-danger fs-1 me-3"></i>
+                    <div>
+                        <h6 class="fw-bold mb-1">คิวเต็มแล้ว (<?= $active_queue_count ?>/<?= $max_queue ?>)</h6>
+                        <span class="small">ขณะนี้งดรับออเดอร์เพิ่มชั่วคราว กรุณารอสักครู่แล้วลองใหม่อีกครั้งครับ</span>
+                    </div>
+                </div>
+            <?php elseif ($queue_count > 0): ?>
                 <div class="alert <?= ($queue_count >= 5) ? 'alert-danger border-danger' : 'alert-warning border-warning' ?> border text-dark rounded-4 mb-4 shadow-sm d-flex align-items-center">
                     <i class="bi <?= ($queue_count >= 5) ? 'bi-exclamation-octagon-fill text-danger' : 'bi-info-circle-fill text-warning' ?> fs-1 me-3"></i>
                     <div>
@@ -600,9 +609,15 @@ include '../includes/nav_dinein.php';
                         <span class="h3 mb-0 fw-bold text-success">฿<?= number_format($total_price, 0) ?></span>
                     </div>
 
-                    <button type="submit" id="dineinSubmitOrderBtn" class="btn btn-success w-100 rounded-pill py-3 fw-bold shadow-sm fs-5">
-                        <i class="bi bi-send-fill me-2"></i> ยืนยันส่งออเดอร์
-                    </button>
+                    <?php if ($queue_is_full): ?>
+                        <button type="button" class="btn btn-secondary w-100 rounded-pill py-3 fw-bold shadow-sm fs-5" disabled>
+                            <i class="bi bi-hourglass-split me-2"></i> คิวเต็ม งดรับออเดอร์ชั่วคราว
+                        </button>
+                    <?php else: ?>
+                        <button type="submit" id="dineinSubmitOrderBtn" class="btn btn-success w-100 rounded-pill py-3 fw-bold shadow-sm fs-5">
+                            <i class="bi bi-send-fill me-2"></i> ยืนยันส่งออเดอร์
+                        </button>
+                    <?php endif; ?>
                 </div>
             </form>
         <?php endif; ?>
