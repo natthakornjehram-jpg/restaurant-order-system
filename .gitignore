@@ -11,7 +11,7 @@
 .env
 .env.local
 
-# มี Gmail App Password ของจริงอยู่ข้างใน ห้าม commit เด็ดขาด (ดู includes/email_config.php
+# มี Brevo API key ของจริงอยู่ข้างใน ห้าม commit เด็ดขาด (ดู includes/email_config.example.php
 # สำหรับวิธีตั้งค่า - ไฟล์นี้ต้องสร้างเองในเครื่อง/เซิร์ฟเวอร์ที่ deploy จริง ไม่ commit ไปกับโค้ด)
 includes/email_config.php
 
