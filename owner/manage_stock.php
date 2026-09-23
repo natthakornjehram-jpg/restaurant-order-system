@@ -403,7 +403,8 @@ function render_stock_topping_card($top, $all_pools = []) {
     <?php
 }
 
-// การ์ดกลุ่มสต็อกร่วม 1 ใบ
+// การ์ดกลุ่มสต็อกร่วม 1 กลุ่ม - ทำเป็นแถวพับ/กางได้ (accordion) แบบเดียวกับแท็บเมนู/ท็อปปิ้ง แทนการ์ดกริดเดิม
+// เพราะดูง่ายกว่าเมื่อมีหลายกลุ่ม (เห็นชื่อ+จำนวนที่ผูกไว้ทีเดียวเป็นลิสต์ ไม่ต้องไล่สแกนการ์ดใหญ่ทีละใบ)
 function render_stock_pool_card($p, $linked_names) {
     $p_id = $p['pool_id'];
     $qty = (int) $p['stock_qty'];
@@ -412,25 +413,29 @@ function render_stock_pool_card($p, $linked_names) {
     elseif ($qty <= 5) { $badge = "bg-warning text-dark"; $text = "ใกล้หมด"; }
     $names_json = htmlspecialchars(json_encode($p['pool_name'], JSON_UNESCAPED_UNICODE), ENT_QUOTES);
     ?>
-    <div class="col-12 col-md-6 col-lg-4 col-xl-3" id="pool-col-<?= $p_id ?>">
-        <div class="card stock-card p-3 h-100 bg-white">
-            <div class="d-flex justify-content-between align-items-start mb-2">
-                <h5 class="fw-bold mb-0"><i class="bi bi-boxes text-primary me-1"></i> <?= htmlspecialchars($p['pool_name']) ?></h5>
-                <span class="badge rounded-pill <?= $badge ?> px-3 py-1" id="pool_badge_<?= $p_id ?>"><?= $text ?></span>
-            </div>
-            <div class="small text-muted mb-3">
-                <?= !empty($linked_names) ? 'ใช้ร่วมกับ: ' . htmlspecialchars(implode(', ', $linked_names)) : 'ยังไม่มีเมนู/ท็อปปิ้งผูกกับกลุ่มนี้' ?>
-            </div>
-
-            <div class="bg-light rounded-4 p-3 mb-3 text-center">
-                <div class="d-flex align-items-center justify-content-center gap-3 my-1">
-                    <button type="button" class="btn btn-outline-danger btn-qty shadow-sm" onclick="adjustPoolStock(<?= $p_id ?>, -1)">-</button>
-                    <span class="h2 fw-bold m-0" id="pool_stock_display_<?= $p_id ?>" style="min-width: 60px;"><?= $qty ?></span>
-                    <button type="button" class="btn btn-outline-success btn-qty shadow-sm" onclick="adjustPoolStock(<?= $p_id ?>, 1)">+</button>
+    <div class="accordion-item border-0 shadow-sm rounded-4 overflow-hidden mb-3" id="pool-col-<?= $p_id ?>">
+        <h2 class="accordion-header">
+            <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#poolCollapse<?= $p_id ?>">
+                <i class="bi bi-boxes text-primary me-2"></i>
+                <?= htmlspecialchars($p['pool_name']) ?>
+                <span class="badge bg-light text-dark rounded-pill ms-2"><?= count($linked_names) ?> เมนู/ท็อปปิ้ง</span>
+                <span class="badge rounded-pill <?= $badge ?> ms-1" id="pool_badge_<?= $p_id ?>"><?= $text ?></span>
+            </button>
+        </h2>
+        <div id="poolCollapse<?= $p_id ?>" class="accordion-collapse collapse" data-bs-parent="#poolsGridRow">
+            <div class="accordion-body bg-white">
+                <div class="small text-muted mb-3">
+                    <?= !empty($linked_names) ? 'ใช้ร่วมกับ: ' . htmlspecialchars(implode(', ', $linked_names)) : 'ยังไม่มีเมนู/ท็อปปิ้งผูกกับกลุ่มนี้' ?>
                 </div>
-            </div>
 
-            <div class="mt-auto">
+                <div class="bg-light rounded-4 p-3 mb-3 text-center">
+                    <div class="d-flex align-items-center justify-content-center gap-3 my-1">
+                        <button type="button" class="btn btn-outline-danger btn-qty shadow-sm" onclick="adjustPoolStock(<?= $p_id ?>, -1)">-</button>
+                        <span class="h2 fw-bold m-0" id="pool_stock_display_<?= $p_id ?>" style="min-width: 60px;"><?= $qty ?></span>
+                        <button type="button" class="btn btn-outline-success btn-qty shadow-sm" onclick="adjustPoolStock(<?= $p_id ?>, 1)">+</button>
+                    </div>
+                </div>
+
                 <div class="d-flex gap-2 mb-2">
                     <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill flex-grow-1" onclick="adjustPoolStock(<?= $p_id ?>, 10)">+10</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill flex-grow-1" onclick="adjustPoolStock(<?= $p_id ?>, 50)">+50</button>
@@ -675,7 +680,7 @@ include '../includes/nav_owner.php';
                 $link_tops_res = $conn->query("SELECT stock_pool_id, topping_name AS name FROM topping WHERE stock_pool_id IS NOT NULL");
                 if ($link_tops_res) { while ($r = $link_tops_res->fetch_assoc()) { $pool_links[$r['stock_pool_id']][] = $r['name']; } }
                 ?>
-                <div class="row g-4" id="poolsGridRow">
+                <div class="accordion" id="poolsGridRow">
                     <?php foreach ($all_pools as $p) { render_stock_pool_card($p, $pool_links[$p['pool_id']] ?? []); } ?>
                 </div>
             <?php endif; ?>
@@ -1121,26 +1126,23 @@ document.getElementById('poolForm').addEventListener('submit', function (e) {
 
         const existingCol = document.getElementById('pool-col-' + data.pool_id);
         if (existingCol) {
-            // แก้ไขกลุ่มเดิม: แทนที่การ์ดเดิมด้วย HTML ที่เรนเดอร์ใหม่จากเซิร์ฟเวอร์ (ตรงกับความจริง 100% ไม่ต้องคำนวณเอง)
+            // แก้ไขกลุ่มเดิม: แทนที่แถวเดิมด้วย HTML ที่เรนเดอร์ใหม่จากเซิร์ฟเวอร์ (ตรงกับความจริง 100% ไม่ต้องคำนวณเอง)
             existingCol.outerHTML = data.card_html;
             const flashEl = document.getElementById('pool-col-' + data.pool_id);
-            if (flashEl) {
-                const cardEl = flashEl.querySelector('.stock-card');
-                if (cardEl) { cardEl.classList.add('card-update-flash'); setTimeout(() => cardEl.classList.remove('card-update-flash'), 800); }
-            }
+            if (flashEl) { flashEl.classList.add('card-update-flash'); setTimeout(() => flashEl.classList.remove('card-update-flash'), 800); }
         } else {
-            // สร้างกลุ่มใหม่: แทรกการ์ดใหม่เข้าไปในกริด (ถ้าเดิมว่างเปล่าอยู่ ให้สลับจากข้อความ "ยังไม่มีกลุ่ม" มาเป็นกริดจริงก่อน)
+            // สร้างกลุ่มใหม่: แทรกแถวใหม่เข้าไปใน accordion (ถ้าเดิมว่างเปล่าอยู่ ให้สลับจากข้อความ "ยังไม่มีกลุ่ม" มาเป็น accordion จริงก่อน)
             let grid = document.getElementById('poolsGridRow');
             if (!grid) {
                 const emptyState = document.getElementById('poolsEmptyState');
                 if (emptyState) {
-                    emptyState.outerHTML = '<div class="row g-4" id="poolsGridRow"></div>';
+                    emptyState.outerHTML = '<div class="accordion" id="poolsGridRow"></div>';
                     grid = document.getElementById('poolsGridRow');
                 }
             }
             if (grid) {
                 grid.insertAdjacentHTML('afterbegin', data.card_html);
-                const newCard = document.getElementById('pool-col-' + data.pool_id)?.querySelector('.stock-card');
+                const newCard = document.getElementById('pool-col-' + data.pool_id);
                 if (newCard) { newCard.classList.add('card-update-flash'); setTimeout(() => newCard.classList.remove('card-update-flash'), 800); }
             }
         }
