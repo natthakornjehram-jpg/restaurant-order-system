@@ -2,12 +2,37 @@
 session_start();
 require_once '../includes/db.php';
 require_once '../includes/csrf.php';
+require_once '../includes/cart_render.php';
 
 $action = $_GET['action'] ?? ($_POST['action'] ?? '');
 
 // สร้างตะกร้าว่างๆ ถ้ายังไม่เคยมี
 if (!isset($_SESSION['cart'])) {
     $_SESSION['cart'] = [];
+}
+
+// ให้หน้านี้ตอบเป็น JSON แทนการรีโหลดทั้งหน้าได้ ถ้าคำขอมาจาก fetch() ของ JS - ตรรกะแก้ตะกร้าด้านล่างเหมือนเดิมทุกอย่าง
+// (ฝั่ง JS จะไม่ใช้ AJAX เองสำหรับเคสที่ตะกร้าว่าง<->มีของ เพราะโครงสร้างหน้าเปลี่ยนเยอะ ปล่อยให้รีโหลดปกติแบบเดิมในเคสนั้น)
+$is_ajax = isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+
+function cart_action_ajax_response($success, $error = '') {
+    global $conn;
+    $total_qty = 0;
+    $total_price = 0;
+    foreach ($_SESSION['cart'] as $item) {
+        $total_qty += $item['quantity'];
+        $total_price += ($item['price'] * $item['quantity']);
+    }
+    $return_url = cart_action_return_url();
+    header('Content-Type: application/json');
+    echo json_encode([
+        'success' => $success,
+        'error' => $error ?: null,
+        'cart_rows_html' => render_dinein_cart_rows($_SESSION['cart'], $return_url),
+        'total_qty' => $total_qty,
+        'total_price' => $total_price,
+    ]);
+    exit;
 }
 
 // ปลายทางที่อนุญาตให้เด้งกลับหลังแก้ตะกร้า (จำกัดเฉพาะ path เดิม + querystring ต่อท้ายเท่านั้น กัน open redirect)
@@ -84,11 +109,15 @@ if ($action === 'add' && $_SERVER['REQUEST_METHOD'] === 'POST' && csrf_verify($_
         // หย่อนกล่องลงตะกร้า Session
         $_SESSION['cart'][] = $cart_item;
 
+        if ($is_ajax) { cart_action_ajax_response(true); }
+
         // เด้งกลับไปหน้าเมนู เพื่อให้สั่งอย่างอื่นต่อ (มีโต๊ะก็กลับไปหน้าเมนูของโต๊ะนั้น ไม่มีโต๊ะก็กลับไปหน้าเมนูเฉยๆ)
         $table_no = $_SESSION['table_number'] ?? '';
         header("Location: ../qr_table/menu_dinein.php" . ($table_no !== '' ? '?table=' . urlencode($table_no) : ''));
         exit;
     }
+
+    if ($is_ajax) { cart_action_ajax_response(false, 'เมนูนี้ไม่พร้อมขายแล้ว กรุณาเลือกเมนูใหม่'); }
 }
 // 🔴 กรณี: กดปุ่ม "ลบรายการ" ในแท็บ "รายการที่สั่ง" (menu_dinein.php)
 elseif ($action === 'remove' && $_SERVER['REQUEST_METHOD'] === 'POST' && csrf_verify($_POST['csrf_token'] ?? '') && isset($_POST['id'])) {
@@ -99,6 +128,7 @@ elseif ($action === 'remove' && $_SERVER['REQUEST_METHOD'] === 'POST' && csrf_ve
         $_SESSION['cart'] = array_values($_SESSION['cart']); // จัดเรียงลำดับใหม่ให้สวยงาม
     }
 
+    if ($is_ajax) { cart_action_ajax_response(true); }
     header("Location: " . cart_action_return_url());
     exit;
 }
@@ -119,11 +149,13 @@ elseif (($action === 'increase' || $action === 'decrease') && $_SERVER['REQUEST_
         }
     }
 
+    if ($is_ajax) { cart_action_ajax_response(true); }
     header("Location: " . cart_action_return_url());
     exit;
 }
 
-// ถ้างงๆ ให้กลับไปหน้าเมนู
+// ถ้างงๆ (action ไม่รู้จัก, CSRF ไม่ผ่าน ฯลฯ) ให้กลับไปหน้าเมนู
+if ($is_ajax) { cart_action_ajax_response(false, 'คำขอไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง'); }
 header("Location: ../qr_table/menu_dinein.php");
 exit;
 ?>

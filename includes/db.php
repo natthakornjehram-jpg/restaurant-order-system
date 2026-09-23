@@ -12,10 +12,14 @@ date_default_timezone_set('Asia/Bangkok');
 header_remove('X-Powered-By');
 
 //เชื่อมต่อฐานข้อมูล MySQL
-$host = "localhost";
-$user = "root";
-$pass = "";
-$db   = "restaurant_db1";
+// ค่าจริงอยู่ที่ includes/db_config.php (ไม่ commit ขึ้น git เพราะมีรหัสผ่านจริง - ดู includes/db_config.example.php)
+// ถ้ายังไม่สร้างไฟล์นั้น (เช่น เพิ่ง clone มาใหม่บนเครื่อง dev) ใช้ค่า default ของ XAMPP ไปก่อน
+$db_config_path = __DIR__ . '/db_config.php';
+$db_config = file_exists($db_config_path) ? require $db_config_path : [];
+$host = $db_config['host'] ?? 'localhost';
+$user = $db_config['user'] ?? 'root';
+$pass = $db_config['pass'] ?? '';
+$db   = $db_config['db'] ?? 'restaurant_db1';
 
 // 1. เช็คว่ากำลังรันบนเครื่อง dev (localhost) หรือโฮสต์จริง
 //    บนเครื่อง dev: โชว์ error เต็มๆ เพื่อ debug ง่าย

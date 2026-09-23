@@ -58,6 +58,21 @@
 
     let hasNotified = false;
     let lastStatusHash = null;
+
+    // ดึงหน้าบิลปัจจุบันซ้ำแบบเงียบๆ แล้วแทนที่เฉพาะเนื้อหาบิล ไม่รีโหลดทั้งหน้า (กันจอกะพริบ/เลื่อนกลับขึ้นบนสุด
+    // ทุกครั้งที่สถานะออเดอร์เปลี่ยน ซึ่งเกิดบ่อยกว่าฝั่งเจ้าของร้านมาก เพราะเช็คทุก 5 วินาทีตลอดที่ลูกค้าเปิดหน้าค้างไว้)
+    function softRefreshMyBill() {
+        fetch(window.location.href, { cache: 'no-store' })
+            .then(function (res) { return res.text(); })
+            .then(function (html) {
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                const fresh = doc.getElementById('myBillContainer');
+                const current = document.getElementById('myBillContainer');
+                if (fresh && current) current.innerHTML = fresh.innerHTML;
+            })
+            .catch(function (err) { console.error('Soft refresh failed:', err); });
+    }
+
     function checkMyFoodStatus() {
         fetch('../member/api_check_my_order.php')
             .then(response => response.json())
@@ -79,10 +94,10 @@
                     hasNotified = true;
                 }
 
-                // หน้าบิล: รีเฟรชอัตโนมัติเมื่อสถานะออเดอร์ไหนก็ตามเปลี่ยน (ไม่ต้องกดรีเฟรชเอง)
+                // หน้าบิล: อัปเดตอัตโนมัติแบบเงียบๆ เมื่อสถานะออเดอร์ไหนก็ตามเปลี่ยน (ไม่ต้องกดรีเฟรชเอง ไม่ต้องรีโหลดทั้งหน้า)
                 if (lastStatusHash !== null && data.status_hash !== lastStatusHash
                     && window.location.pathname.includes('my_bill.php')) {
-                    location.reload();
+                    softRefreshMyBill();
                 }
                 lastStatusHash = data.status_hash;
             }).catch(err => console.error(err));

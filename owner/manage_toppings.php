@@ -4,16 +4,23 @@ session_start();
 require_once '../includes/db.php';
 require_once 'auth_owner.php';
 require_once '../includes/csrf.php';
+require_once '../includes/topping_render.php';
+
+// ให้หน้านี้ตอบเป็น JSON แทนการรีโหลดทั้งหน้าได้ ถ้าคำขอมาจาก fetch() ของ JS - ตรรกะเพิ่ม/แก้ไข/ลบด้านล่างเหมือนเดิมทุกอย่าง
+$is_ajax = isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
 
 // --- 1. จัดการหมวดหมู่ + ตัวเลือกย่อยทั้งหมดในหมวดนั้น รวมในหน้าจอเดียว (สร้าง/แก้ไข/ลบตัวเลือกย่อยได้พร้อมกัน) ---
 if (isset($_POST['save_category_group'])) {
     if (!csrf_verify($_POST['csrf_token'] ?? '')) {
+        if ($is_ajax) { header('Content-Type: application/json'); echo json_encode(['success' => false, 'error' => 'คำขอไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง']); exit; }
         header("Location: manage_toppings.php"); exit();
     }
     $cat_name = trim($_POST['topping_cat_name'] ?? '');
     $cat_id = isset($_POST['cat_id']) ? intval($_POST['cat_id']) : 0;
+    $is_new_cat = ($cat_id === 0);
 
     if ($cat_name === '') {
+        if ($is_ajax) { header('Content-Type: application/json'); echo json_encode(['success' => false, 'error' => 'กรุณากรอกชื่อหมวดหมู่']); exit; }
         $_SESSION['error_msg'] = "กรุณากรอกชื่อหมวดหมู่";
         header("Location: manage_toppings.php"); exit();
     }
@@ -79,8 +86,35 @@ if (isset($_POST['save_category_group'])) {
         }
     }
 
-    if (!empty($blocked_deletes)) {
-        $_SESSION['error_msg'] = "บันทึกข้อมูลแล้ว แต่ไม่สามารถลบ: " . implode(', ', $blocked_deletes) . " เพราะเคยถูกใช้ในคำสั่งซื้อแล้ว";
+    $warning_msg = !empty($blocked_deletes)
+        ? "บันทึกข้อมูลแล้ว แต่ไม่สามารถลบ: " . implode(', ', $blocked_deletes) . " เพราะเคยถูกใช้ในคำสั่งซื้อแล้ว"
+        : null;
+
+    if ($is_ajax) {
+        $cat_stmt = $conn->prepare("SELECT * FROM topping_categories WHERE topping_cat_id = ?");
+        $cat_stmt->bind_param("i", $cat_id);
+        $cat_stmt->execute();
+        $cat_row = $cat_stmt->get_result()->fetch_assoc();
+
+        $items_stmt = $conn->prepare("SELECT * FROM topping WHERE topping_cat_id = ? ORDER BY price ASC");
+        $items_stmt->bind_param("i", $cat_id);
+        $items_stmt->execute();
+        $cat_toppings = $items_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => true,
+            'is_new' => $is_new_cat,
+            'cat_id' => $cat_id,
+            'cat_name' => $cat_row ? $cat_row['topping_cat_name'] : $cat_name,
+            'block_html' => $cat_row ? render_owner_topping_category_block($cat_row, $cat_toppings) : '',
+            'warning' => $warning_msg,
+        ]);
+        exit;
+    }
+
+    if ($warning_msg) {
+        $_SESSION['error_msg'] = $warning_msg;
     } else {
         $_SESSION['success_msg'] = "บันทึกหมวดหมู่เรียบร้อยแล้ว";
     }
@@ -90,6 +124,7 @@ if (isset($_POST['save_category_group'])) {
 // --- 2. จัดการข้อมูลตัวเลือกเสริม (เพิ่ม/แก้ไข) ---
 if (isset($_POST['save_topping'])) {
     if (!csrf_verify($_POST['csrf_token'] ?? '')) {
+        if ($is_ajax) { header('Content-Type: application/json'); echo json_encode(['success' => false, 'error' => 'คำขอไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง']); exit; }
         header("Location: manage_toppings.php"); exit();
     }
     $name = trim($_POST['topping_name']);
@@ -102,21 +137,51 @@ if (isset($_POST['save_topping'])) {
 
     // ตรวจสอบข้อมูลฝั่งเซิร์ฟเวอร์ (กันกรณี validation ฝั่ง JS ถูกข้าม)
     if ($name === '' || $cat_id <= 0 || $price < 0) {
+        if ($is_ajax) { header('Content-Type: application/json'); echo json_encode(['success' => false, 'error' => 'กรุณากรอกข้อมูลให้ครบถ้วนและถูกต้องก่อนบันทึก']); exit; }
         $_SESSION['error_msg'] = "กรุณากรอกข้อมูลให้ครบถ้วนและถูกต้องก่อนบันทึก";
         header("Location: manage_toppings.php"); exit();
+    }
+
+    // จำหมวดหมู่เดิมไว้ก่อนอัปเดต (เผื่อแก้ไขแล้วย้ายหมวดหมู่ ฝั่ง JS จะได้รู้ว่าต้องย้ายแถวข้ามตารางด้วย ไม่ใช่แค่แทนที่ในที่เดิม)
+    $old_cat_id = null;
+    if ($t_id > 0) {
+        $old_stmt = $conn->prepare("SELECT topping_cat_id FROM topping WHERE topping_id = ?");
+        $old_stmt->bind_param("i", $t_id);
+        $old_stmt->execute();
+        $old_row = $old_stmt->get_result()->fetch_assoc();
+        $old_cat_id = $old_row ? (int) $old_row['topping_cat_id'] : null;
     }
 
     if ($t_id > 0) {
         // แก้ไข
         $stmt = $conn->prepare("UPDATE topping SET topping_name = ?, topping_cat_id = ?, price = ?, use_stock = ?, stock_qty = ?, is_active = ? WHERE topping_id = ?");
         $stmt->bind_param("sidiiii", $name, $cat_id, $price, $use_stock, $stock_qty, $is_active, $t_id);
+        $stmt->execute();
     } else {
         // เพิ่มใหม่
         $stmt = $conn->prepare("INSERT INTO topping (topping_name, topping_cat_id, price, use_stock, stock_qty, is_active) VALUES (?, ?, ?, ?, ?, ?)");
         $stmt->bind_param("sidiii", $name, $cat_id, $price, $use_stock, $stock_qty, $is_active);
+        $stmt->execute();
+        $t_id = $conn->insert_id;
     }
-    $stmt->execute();
-    $_SESSION['success_msg'] = ($t_id > 0) ? "แก้ไขตัวเลือกเสริมเรียบร้อยแล้ว" : "เพิ่มตัวเลือกเสริมเรียบร้อยแล้ว";
+
+    if ($is_ajax) {
+        $row_stmt = $conn->prepare("SELECT * FROM topping WHERE topping_id = ?");
+        $row_stmt->bind_param("i", $t_id);
+        $row_stmt->execute();
+        $t_row = $row_stmt->get_result()->fetch_assoc();
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => true,
+            'is_new' => $old_cat_id === null,
+            'topping_id' => $t_id,
+            'cat_id' => $cat_id,
+            'old_cat_id' => $old_cat_id,
+            'row_html' => $t_row ? render_owner_topping_row($t_row) : '',
+        ]);
+        exit;
+    }
+    $_SESSION['success_msg'] = ($old_cat_id !== null) ? "แก้ไขตัวเลือกเสริมเรียบร้อยแล้ว" : "เพิ่มตัวเลือกเสริมเรียบร้อยแล้ว";
     header("Location: manage_toppings.php"); exit();
 }
 
@@ -162,6 +227,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'reorder_category') {
 
     // สลับตำแหน่งกันในอาร์เรย์ แล้วเขียน sort_order ใหม่ทั้งหมดให้เรียงต่อเนื่องเสมอ
     // (กันปัญหาค่าเดิมซ้ำ/ไม่ต่อเนื่องจากการย้ายครั้งก่อนๆ)
+    $swap_id = $ordered_ids[$swap_pos];
     [$ordered_ids[$pos], $ordered_ids[$swap_pos]] = [$ordered_ids[$swap_pos], $ordered_ids[$pos]];
 
     $upd = $conn->prepare("UPDATE topping_categories SET sort_order = ? WHERE topping_cat_id = ?");
@@ -170,7 +236,8 @@ if (isset($_POST['action']) && $_POST['action'] === 'reorder_category') {
         $upd->execute();
     }
 
-    echo json_encode(['success' => true]);
+    // ส่ง id ของหมวดที่สลับตำแหน่งด้วยกันกลับไป ให้ฝั่งหน้าเว็บสลับ DOM สองบล็อกนี้เองได้เลยโดยไม่ต้องรีโหลด
+    echo json_encode(['success' => true, 'cat_id' => $cat_id, 'swap_id' => $swap_id]);
     exit();
 }
 
@@ -178,6 +245,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'reorder_category') {
 // เดิมเป็นลิงก์ GET (?delete_id=) ไม่มี CSRF token เลย เปลี่ยนเป็น POST + ตรวจ CSRF token
 if (isset($_POST['delete_id'])) {
     if (!csrf_verify($_POST['csrf_token'] ?? '')) {
+        if ($is_ajax) { header('Content-Type: application/json'); echo json_encode(['success' => false, 'error' => 'คำขอไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง']); exit; }
         $_SESSION['error_msg'] = "คำขอไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง";
         header("Location: manage_toppings.php"); exit();
     }
@@ -190,6 +258,7 @@ if (isset($_POST['delete_id'])) {
     $used_in_orders = (int) $check->get_result()->fetch_assoc()['cnt'];
 
     if ($used_in_orders > 0) {
+        if ($is_ajax) { header('Content-Type: application/json'); echo json_encode(['success' => false, 'error' => 'ไม่สามารถลบได้ เนื่องจากตัวเลือกเสริมนี้เคยถูกใช้ในคำสั่งซื้อแล้ว']); exit; }
         $_SESSION['error_msg'] = "ไม่สามารถลบได้ เนื่องจากตัวเลือกเสริมนี้เคยถูกใช้ในคำสั่งซื้อแล้ว";
     } else {
         // ลบความสัมพันธ์กับเมนูออกก่อน (ไม่กระทบประวัติออเดอร์เก่า)
@@ -200,6 +269,7 @@ if (isset($_POST['delete_id'])) {
         $del_stmt = $conn->prepare("DELETE FROM topping WHERE topping_id = ?");
         $del_stmt->bind_param("i", $id);
         $del_stmt->execute();
+        if ($is_ajax) { header('Content-Type: application/json'); echo json_encode(['success' => true]); exit; }
         $_SESSION['success_msg'] = "ลบตัวเลือกเสริมเรียบร้อยแล้ว";
     }
     header("Location: manage_toppings.php"); exit();
@@ -229,91 +299,17 @@ include '../includes/nav_owner.php';
     $cats_query = $conn->query("SELECT * FROM topping_categories ORDER BY sort_order ASC, topping_cat_name ASC");
     $all_cats_list = [];
     while ($c = $cats_query->fetch_assoc()) { $all_cats_list[] = $c; }
-    $cat_count = count($all_cats_list);
 
-    foreach ($all_cats_list as $cat_index => $cat):
+    foreach ($all_cats_list as $cat):
         $current_cat_id = $cat['topping_cat_id'];
 
         $stmt_items = $conn->prepare("SELECT * FROM topping WHERE topping_cat_id = ? ORDER BY price ASC");
         $stmt_items->bind_param("i", $current_cat_id);
         $stmt_items->execute();
-        $items_res = $stmt_items->get_result();
-        $cat_toppings = [];
-        while ($row = $items_res->fetch_assoc()) { $cat_toppings[] = $row; }
+        $cat_toppings = $stmt_items->get_result()->fetch_all(MYSQLI_ASSOC);
 
-        // ข้อมูลย่อ (id, ชื่อ, ราคา) ส่งให้ JS ใช้เปิดหน้าจอ "แก้ไขหมวดนี้" พร้อมแถวตัวเลือกย่อยเดิมทันที ไม่ต้องยิง AJAX แยก
-        $cat_toppings_json = json_encode(array_map(function ($t) {
-            return ['id' => $t['topping_id'], 'name' => $t['topping_name'], 'price' => $t['price']];
-        }, $cat_toppings), JSON_UNESCAPED_UNICODE | JSON_HEX_APOS);
-        $cat_name_json = json_encode($cat['topping_cat_name'], JSON_UNESCAPED_UNICODE | JSON_HEX_APOS);
-    ?>
-    <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
-        <div class="card-header bg-light border-0 py-3 ps-4 d-flex justify-content-between align-items-center">
-            <h5 class="fw-bold m-0 text-dark"><?= htmlspecialchars($cat['topping_cat_name']) ?></h5>
-            <div class="d-flex align-items-center gap-1">
-                <button type="button" class="btn btn-sm btn-outline-secondary rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; padding: 0;"
-                        onclick="moveCategory(<?= $current_cat_id ?>, 'up')" <?= $cat_index === 0 ? 'disabled' : '' ?> title="ย้ายขึ้น">
-                    <i class="bi bi-arrow-up"></i>
-                </button>
-                <button type="button" class="btn btn-sm btn-outline-secondary rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; padding: 0;"
-                        onclick="moveCategory(<?= $current_cat_id ?>, 'down')" <?= $cat_index === $cat_count - 1 ? 'disabled' : '' ?> title="ย้ายลง">
-                    <i class="bi bi-arrow-down"></i>
-                </button>
-                <button class="btn btn-sm btn-outline-secondary rounded-pill ms-1"
-                        onclick='openCatModal(<?= $current_cat_id ?>, <?= $cat_name_json ?>, <?= $cat_toppings_json ?>)'>
-                    <i class="bi bi-pencil-square"></i> แก้ไขหมวดนี้
-                </button>
-            </div>
-        </div>
-        <table class="table align-middle mb-0">
-            <thead class="table-light">
-                <tr>
-                    <th class="ps-4 py-2 small" style="width: 34%;">ชื่อตัวเลือกเสริม</th>
-                    <th class="py-2 small" style="width: 20%;">ราคาที่บวกเพิ่ม</th>
-                    <th class="text-center py-2 small" style="width: 16%;">เปิดขาย</th>
-                    <th class="text-center py-2 small" style="width: 30%;">จัดการ</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php
-                foreach ($cat_toppings as $row):
-                    $is_in_stock = $row['is_active'] == 1;
-                    // json_encode + htmlspecialchars (ไม่ใช่ htmlspecialchars อย่างเดียว) เพราะค่านี้ถูกใส่ใน onclick="..."
-                    // เป็นสตริง JS ด้วย - htmlspecialchars(ENT_QUOTES) เข้ารหัส ' เป็น &#039; ซึ่งเบราว์เซอร์จะถอดรหัส
-                    // HTML entity กลับเป็น ' ก่อนส่งให้ JS parser เสมอ ทำให้หลุดออกจากสตริง JS ได้อยู่ดีถ้าชื่อมี '
-                    $t_name_js = htmlspecialchars(json_encode($row['topping_name'], JSON_UNESCAPED_UNICODE), ENT_QUOTES);
-                ?>
-                <tr id="row-<?= $row['topping_id'] ?>" class="<?= !$is_in_stock ? 'out-of-stock' : '' ?>">
-                    <td class="ps-4 fw-bold topping-name">
-                        <?= htmlspecialchars($row['topping_name']) ?>
-                        <?php if (!empty($row['use_stock'])): ?>
-                            <i class="bi bi-box-seam text-secondary ms-1" style="font-size: 0.8rem;" title="ติดตามคลังสินค้าอยู่ (ดูจำนวนคงเหลือได้ที่หน้าจัดการคลังสินค้า)"></i>
-                        <?php endif; ?>
-                    </td>
-                    <td class="text-success fw-bold">+<?= number_format($row['price'], 2) ?> บาท</td>
-                    <td class="text-center">
-                        <div class="form-check form-switch d-inline-block m-0">
-                            <input class="form-check-input" type="checkbox" role="switch"
-                                   id="active_<?= $row['topping_id'] ?>"
-                                   onchange="toggleToppingActive(<?= $row['topping_id'] ?>, this.checked)"
-                                   <?= $is_in_stock ? 'checked' : '' ?>>
-                        </div>
-                    </td>
-                    <td class="text-center">
-                        <button class="btn btn-sm btn-outline-primary rounded-pill px-3 me-1"
-                                onclick="openToppingModal(<?= $row['topping_id'] ?>, <?= $t_name_js ?>, <?= $row['price'] ?>, <?= $current_cat_id ?>, <?= !empty($row['use_stock']) ? 1 : 0 ?>, <?= (int)$row['stock_qty'] ?>, <?= (int)$row['is_active'] ?>)">
-                            <i class="bi bi-pencil-square"></i> แก้ไข
-                        </button>
-                        <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="confirmDeleteTopping(<?= $row['topping_id'] ?>, <?= $t_name_js ?>)">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-    <?php endforeach; ?>
+        echo render_owner_topping_category_block($cat, $cat_toppings);
+    endforeach; ?>
 </div>
 
 <div class="modal fade" id="catModal" tabindex="-1">
@@ -325,6 +321,7 @@ include '../includes/nav_owner.php';
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body px-4">
+                <div class="cat-group-error"></div>
                 <input type="hidden" name="cat_id" id="cat_id">
                 <div class="mb-3">
                     <label class="small fw-bold mb-2">ชื่อหมวดหมู่</label>
@@ -357,6 +354,7 @@ include '../includes/nav_owner.php';
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body px-4">
+                <div class="topping-form-error"></div>
                 <input type="hidden" name="topping_id" id="t_id">
 
                 <div class="mb-3">
@@ -410,11 +408,6 @@ include '../includes/nav_owner.php';
         </form>
     </div>
 </div>
-
-<form method="POST" action="manage_toppings.php" id="deleteToppingForm" class="d-none">
-    <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
-    <input type="hidden" name="delete_id" id="delete_topping_id">
-</form>
 
 <script src="<?= BASE_URL ?>assets/js/owner-manage-toppings.js?v=<?= time() ?>"></script>
 

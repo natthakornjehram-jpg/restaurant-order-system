@@ -3,6 +3,7 @@
 session_start();
 require_once '../includes/db.php';
 require_once '../includes/csrf.php';
+require_once '../includes/cart_render.php';
 
 /** @var array $store ข้อมูลร้าน ถูกดึงไว้แล้วใน includes/db.php (แจ้ง IDE ให้รู้จักตัวแปรนี้ กันขึ้นเตือนเฉยๆ ไม่กระทบการทำงาน) */
 $store ??= [];
@@ -14,7 +15,8 @@ $store ??= [];
 $max_queue = intval($store['max_queue'] ?? 0);
 $active_queue_count = 0;
 if ($max_queue > 0) {
-    $q_res = $conn->query("SELECT COUNT(*) AS c FROM orders WHERE order_status IN ('pending', 'cooking')");
+    // ออเดอร์กลับบ้านที่ยังไม่ผ่านการตรวจสลิป (unpaid) ยังไม่นับเป็นคิวครัวจริง (ดูเหตุผลที่ owner/manage_orders.php)
+    $q_res = $conn->query("SELECT COUNT(*) AS c FROM orders WHERE order_status IN ('pending', 'cooking') AND (order_type = 'dine_in' OR payment_status = 'paid')");
     $active_queue_count = ($q_res && $q_row = $q_res->fetch_assoc()) ? intval($q_row['c']) : 0;
 }
 $queue_is_full = ($max_queue > 0 && $active_queue_count >= $max_queue);
@@ -369,7 +371,7 @@ include '../includes/nav_dinein.php';
 
             <div class="modal fade text-start" id="itemModal<?= $m_id ?>" tabindex="-1">
                 <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-                    <form class="modal-content border-0 rounded-4 shadow" action="../member/cart_action.php?action=add" method="POST">
+                    <form class="modal-content border-0 rounded-4 shadow cart-add-form" action="../member/cart_action.php?action=add" method="POST">
                         <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
                         <input type="hidden" name="item_id" value="<?= $m_id ?>">
                         <input type="hidden" name="return_url" value="../qr_table/menu_dinein.php<?= dinein_url($current_cat_id > 0 ? 'cat_id='.$current_cat_id : '') ?>">
@@ -380,6 +382,7 @@ include '../includes/nav_dinein.php';
                         </div>
 
                         <div class="modal-body py-3">
+                            <div class="cart-add-error"></div>
                             <img src="<?= htmlspecialchars($img_path) ?>" class="w-100 rounded-4 mb-3" style="height:180px; object-fit:cover;" onerror="this.src='../assets/images/items/default_food.jpg'">
 
                             <?php
@@ -467,51 +470,11 @@ include '../includes/nav_dinein.php';
                 </div>
             <?php endif; ?>
             <div class="card cart-card p-3 mb-4">
-                <?php foreach ($_SESSION['cart'] as $key => $item):
-                    $img_path = !empty($item['image']) ? "../assets/images/items/" . $item['image'] : "../assets/images/items/default_food.jpg";
-                ?>
-                    <div class="item-row d-flex align-items-center">
-                        <img src="<?= htmlspecialchars($img_path) ?>" class="rounded-3 me-3" style="width: 70px; height: 70px; object-fit: cover;" onerror="this.src='../assets/images/items/default_food.jpg'">
-                        <div class="flex-grow-1 pe-2">
-                            <h6 class="fw-bold mb-1"><?= htmlspecialchars($item['name']) ?></h6>
-                            <div class="small text-muted mb-1"><?= !empty($item['topping_names']) ? htmlspecialchars($item['topping_names']) : 'ดั้งเดิม'; ?></div>
-                            <?php if(!empty($item['note'])): ?>
-                                <div class="small text-danger"><i class="bi bi-chat-text"></i> <?= htmlspecialchars($item['note']) ?></div>
-                            <?php endif; ?>
-                            <form method="POST" action="../member/cart_action.php" class="d-inline">
-                                <input type="hidden" name="action" value="remove">
-                                <input type="hidden" name="id" value="<?= $key ?>">
-                                <input type="hidden" name="return_url" value="<?= htmlspecialchars($cart_return_url) ?>">
-                                <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
-                                <button type="submit" class="btn btn-link text-danger small text-decoration-none fw-bold p-0 border-0 align-baseline"><i class="bi bi-trash"></i> ลบ</button>
-                            </form>
-                        </div>
-                        <div class="text-end" style="min-width: 110px;">
-                            <div class="fw-bold text-dark mb-2">฿<?= number_format($item['price'] * $item['quantity'], 0) ?></div>
-                            <div class="d-flex align-items-center justify-content-end gap-2">
-                                <form method="POST" action="../member/cart_action.php" class="d-inline">
-                                    <input type="hidden" name="action" value="decrease">
-                                    <input type="hidden" name="id" value="<?= $key ?>">
-                                    <input type="hidden" name="return_url" value="<?= htmlspecialchars($cart_return_url) ?>">
-                                    <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
-                                    <button type="submit" class="btn btn-sm btn-outline-secondary rounded-circle qty-step-btn">−</button>
-                                </form>
-                                <span class="fw-bold"><?= $item['quantity'] ?></span>
-                                <form method="POST" action="../member/cart_action.php" class="d-inline">
-                                    <input type="hidden" name="action" value="increase">
-                                    <input type="hidden" name="id" value="<?= $key ?>">
-                                    <input type="hidden" name="return_url" value="<?= htmlspecialchars($cart_return_url) ?>">
-                                    <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
-                                    <button type="submit" class="btn btn-sm btn-outline-secondary rounded-circle qty-step-btn">+</button>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
+                <div id="cartItemsList"><?php echo render_dinein_cart_rows($_SESSION['cart'], $cart_return_url); ?></div>
             </div>
 
             <?php
-            $queue_res = $conn->query("SELECT COUNT(*) as queue_count FROM orders WHERE order_status IN ('pending', 'cooking')");
+            $queue_res = $conn->query("SELECT COUNT(*) as queue_count FROM orders WHERE order_status IN ('pending', 'cooking') AND (order_type = 'dine_in' OR payment_status = 'paid')");
             $queue_count = $queue_res->fetch_assoc()['queue_count'] ?? 0;
             if ($queue_is_full):
             ?>
@@ -540,7 +503,7 @@ include '../includes/nav_dinein.php';
             <form action="../member/submit_order.php" method="POST" enctype="multipart/form-data" id="dineinOrderForm">
                 <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
                 <input type="hidden" name="order_type" value="<?= htmlspecialchars($_SESSION['order_type']) ?>">
-                <input type="hidden" name="total_amount" value="<?= $total_price ?>">
+                <input type="hidden" name="total_amount" id="cartTotalAmountInput" value="<?= $total_price ?>">
 
                 <?php if ($_SESSION['order_type'] === 'takeaway'): ?>
                 <div class="card cart-card p-3 mb-4 customer-info-card">
@@ -566,25 +529,10 @@ include '../includes/nav_dinein.php';
                 <?php if ($_SESSION['order_type'] === 'takeaway'): ?>
                 <div class="card cart-card p-3 mb-4 customer-info-card">
                     <label class="small fw-bold text-muted d-block mb-2"><i class="bi bi-wallet2 me-1"></i> วิธีชำระเงิน</label>
-                    <div class="d-flex flex-column gap-2">
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="payment_method" id="dineinPayQr" value="qr_counter" checked onchange="dineinToggleTransferProof()">
-                            <label class="form-check-label fw-bold" for="dineinPayQr"><i class="bi bi-qr-code me-1"></i>สแกน QR หน้าเคาน์เตอร์ (จ่ายตอนมารับ)</label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="payment_method" id="dineinPayCash" value="cash" onchange="dineinToggleTransferProof()">
-                            <label class="form-check-label fw-bold" for="dineinPayCash"><i class="bi bi-cash-coin me-1"></i>เงินสดหน้าเคาน์เตอร์ (จ่ายตอนมารับ)</label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="payment_method" id="dineinPayTransfer" value="transfer" onchange="dineinToggleTransferProof()">
-                            <label class="form-check-label fw-bold" for="dineinPayTransfer"><i class="bi bi-bank me-1"></i>โอนเงินเอง แนบสลิปตอนนี้เลย</label>
-                        </div>
-                    </div>
-
-                    <!-- โชว์ QR พร้อมเพย์/เลขบัญชีของร้าน + ช่องแนบสลิป เฉพาะตอนเลือก "โอนเงินเอง" เท่านั้น
-                         ต้องแนบสลิปมาพร้อมตอนสั่งเลย (ไม่ใช่โชว์ตอนมารับเหมือนเดิม) กันลูกค้าสั่งทิ้งไว้ไม่มารับ/ไม่จ่ายจริง
-                         ออเดอร์ยังเข้าครัวทันทีหลังแนบสลิป ไม่ต้องรอร้านกดยืนยันก่อน แต่ร้านตรวจสลิปย้อนหลังได้ที่หน้าจัดการชำระเงิน -->
-                    <div id="dineinTransferProofBox" class="mt-3 pt-3 border-top" style="display: none;">
+                    <!-- สั่งกลับบ้านต้องโอนเงินและแนบสลิปมาก่อนเท่านั้น (ตัด "จ่ายตอนมารับ" ออกทั้งเงินสดและสแกน QR
+                         หน้าเคาน์เตอร์) กันปัญหาลูกค้าสั่งทิ้งไว้ไม่มารับ/ไม่จ่ายจริง จึงไม่มีตัวเลือกให้กดแล้ว มีแค่โอนเงินอย่างเดียว -->
+                    <input type="hidden" name="payment_method" value="transfer">
+                    <div class="mt-1">
                         <?php if (!empty($store['promptpay_qr'])): ?>
                             <div class="text-center mb-3">
                                 <img src="../assets/images/logos/<?= htmlspecialchars($store['promptpay_qr']) ?>" alt="QR พร้อมเพย์" class="rounded-3 shadow-sm" style="max-width: 220px; width: 100%;">
@@ -594,19 +542,23 @@ include '../includes/nav_dinein.php';
                             <div class="small text-muted mb-3" style="white-space: pre-line;"><?= htmlspecialchars($store['bank_info']) ?></div>
                         <?php endif; ?>
                         <?php if (empty($store['promptpay_qr']) && empty($store['bank_info'])): ?>
-                            <div class="small text-danger mb-3">ร้านยังไม่ได้ตั้งค่าช่องทางรับเงิน กรุณาเลือกวิธีชำระเงินแบบอื่นแทนครับ</div>
+                            <div class="small text-danger mb-3">ร้านยังไม่ได้ตั้งค่าช่องทางรับเงิน กรุณาติดต่อร้านโดยตรงก่อนสั่งครับ</div>
                         <?php endif; ?>
                         <label class="small fw-bold text-muted">แนบสลิปการโอนเงิน *</label>
+                        <!-- ตั้งใจไม่ใส่ required ตรงนี้ เพราะ browser จะบล็อก submit event ด้วย tooltip เล็กๆ ของตัวเอง
+                             ก่อนที่ JS เช็คเองด้านล่างจะได้ทำงาน (เห็นยาก โดยเฉพาะบนมือถือ) เช็คฝั่ง JS เองแทนเพื่อโชว์
+                             กล่องแจ้งเตือนที่ชัดเจนกว่า - ฝั่งเซิร์ฟเวอร์ (submit_order.php) ก็ยังเช็คซ้ำอยู่แล้วเช่นกัน -->
                         <input type="file" name="payment_slip" id="dineinPaymentSlip" class="form-control rounded-3" accept="image/*">
-                        <div class="form-text">รองรับไฟล์ภาพ (JPG, PNG, WEBP)</div>
+                        <div class="form-text">รองรับไฟล์ภาพ (JPG, PNG, WEBP) — ต้องแนบสลิปก่อนถึงจะส่งออเดอร์ได้</div>
                     </div>
                 </div>
                 <?php endif; ?>
 
                 <div class="card cart-card p-4 border-top border-4 border-success text-center">
+                    <div id="dineinOrderErrorBox"></div>
                     <div class="d-flex justify-content-between align-items-center mb-4">
                         <span class="h6 mb-0 fw-bold">ยอดสุทธิรวม</span>
-                        <span class="h3 mb-0 fw-bold text-success">฿<?= number_format($total_price, 0) ?></span>
+                        <span class="h3 mb-0 fw-bold text-success" id="cartTotalPriceDisplay">฿<?= number_format($total_price, 0) ?></span>
                     </div>
 
                     <?php if ($queue_is_full): ?>
@@ -679,28 +631,178 @@ function dineinFillLastCustomer() {
     if (phoneInput) phoneInput.value = <?= json_encode($_SESSION['dinein_last_phone'] ?? '') ?>;
 }
 
-// โชว์/ซ่อนกล่องแนบสลิป (QR พร้อมเพย์ + ช่องอัปโหลด) เฉพาะตอนเลือกวิธีจ่าย "โอนเงินเอง" เท่านั้น
-// และตั้ง required ให้ช่องอัปโหลดเฉพาะตอนที่กล่องนี้โชว์อยู่ (กันกรอกวิธีอื่นแล้วโดนบังคับแนบไฟล์ไปด้วย)
-function dineinToggleTransferProof() {
-    var box = document.getElementById('dineinTransferProofBox');
-    var slipInput = document.getElementById('dineinPaymentSlip');
-    var transferRadio = document.getElementById('dineinPayTransfer');
-    if (!box || !transferRadio) return;
-    var isTransfer = transferRadio.checked;
-    box.style.display = isTransfer ? 'block' : 'none';
-    if (slipInput) slipInput.required = isTransfer;
-}
-
 document.addEventListener('DOMContentLoaded', function () {
     var form = document.getElementById('dineinOrderForm');
     if (!form) return;
+    var errorBox = document.getElementById('dineinOrderErrorBox');
+
     // ใช้ submit event ธรรมดา (ไม่เรียก form.submit() ตรงๆ) เพื่อให้ required/validation ของเบราว์เซอร์ทำงานปกติ
-    form.addEventListener('submit', function () {
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
         var btn = document.getElementById('dineinSubmitOrderBtn');
+        var originalBtnHtml = btn ? btn.innerHTML : '';
+        if (errorBox) errorBox.innerHTML = '';
+
+        // เตือนลูกค้าให้แนบสลิปก่อนกดส่งจริง (แทนที่จะปล่อยให้เจอแค่ tooltip เล็กๆ ของ required เฉยๆ
+        // ซึ่งบางเบราว์เซอร์/มือถือมองไม่ค่อยเห็น) - ช่องนี้จะมีอยู่ในหน้าก็ต่อเมื่อเป็นออเดอร์กลับบ้านเท่านั้น
+        var slipInput = document.getElementById('dineinPaymentSlip');
+        if (slipInput && slipInput.files.length === 0) {
+            if (errorBox) {
+                errorBox.innerHTML = '<div class="alert alert-warning rounded-3 text-start mb-4"><i class="bi bi-exclamation-triangle-fill me-1"></i>กรุณาแนบสลิปการโอนเงินก่อนกดส่งออเดอร์ครับ</div>';
+                errorBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            return;
+        }
+
         if (btn) {
             btn.innerHTML = 'กำลังส่งออเดอร์...';
             btn.disabled = true;
         }
+
+        fetch(form.getAttribute('action'), {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: new FormData(form)
+        })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+            if (data.success) {
+                window.location.href = data.redirect;
+                return; // คงปุ่ม "กำลังส่งออเดอร์..." ไว้จนกว่าหน้าจะเปลี่ยนจริง กันกดซ้ำระหว่างรอ
+            }
+
+            if (btn) { btn.innerHTML = originalBtnHtml; btn.disabled = false; }
+
+            if (data.redirect) {
+                // ข้อผิดพลาดที่สถานะหน้าเปลี่ยนไปจริง (ร้านปิด/คิวเต็ม/ตะกร้าไม่ตรงกับความจริงแล้ว ฯลฯ)
+                // ต้องโหลดหน้าเมนูใหม่เสมอ ไม่ปล่อยให้ค้างอยู่หน้าเดิมที่ข้อมูลไม่ตรงความจริงแล้ว
+                alert(data.error || 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
+                window.location.href = data.redirect;
+                return;
+            }
+
+            // ข้อผิดพลาดที่แก้ไขแล้วลองใหม่ได้เลย (เช่น ลืมแนบสลิป, วัตถุดิบไม่พอ) - อยู่หน้าเดิม โชว์ error ตรงนี้
+            if (errorBox) {
+                errorBox.innerHTML = '<div class="alert alert-danger rounded-3 text-start mb-4">' + (data.error || 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง') + '</div>';
+                errorBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        })
+        .catch(function () {
+            if (btn) { btn.innerHTML = originalBtnHtml; btn.disabled = false; }
+            if (errorBox) {
+                errorBox.innerHTML = '<div class="alert alert-danger rounded-3 text-start mb-4">เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่อีกครั้ง</div>';
+            }
+        });
+    });
+});
+
+// ===== แก้ตะกร้า (เพิ่ม/ลบ/ปรับจำนวน) แบบ AJAX ไม่รีโหลดทั้งหน้า =====
+// ตัวเลขจำนวนของทั้งตะกร้าเก็บไว้ที่ฝั่ง JS ด้วย ใช้เช็คว่าแอคชันนี้จะทำให้ตะกร้า "ว่าง<->มีของ" หรือเปล่า
+// (ถ้าใช่ ปล่อยให้ฟอร์ม submit จริงแบบเดิม รีโหลดหน้าไปเลย เพราะโครงสร้าง UI ของสองสถานะนี้ต่างกันเยอะ
+// เช่น การ์ดข้อมูลลูกค้า/แนบสลิป/แถบแจ้งเตือนคิว ที่มีแค่ตอนตะกร้ามีของ - ทำสดในเคสนี้เสี่ยงเกินไป
+// ส่วนเคสทั่วไป (ตะกร้ามีของอยู่แล้ว แค่เพิ่ม/ลบ/ปรับจำนวน) ทำสดได้ปลอดภัย ไม่กระทบโครงสร้างส่วนอื่น)
+var dineinCartTotalQty = <?= (int) $total_qty ?>;
+
+function refreshDineinCartUI(data) {
+    dineinCartTotalQty = data.total_qty;
+
+    var list = document.getElementById('cartItemsList');
+    if (list) list.innerHTML = data.cart_rows_html;
+
+    var badgeText = document.getElementById('cartTabBadgeText');
+    if (badgeText) badgeText.textContent = data.total_qty > 0 ? ' (' + data.total_qty + ')' : '';
+
+    var totalInput = document.getElementById('cartTotalAmountInput');
+    if (totalInput) totalInput.value = data.total_price;
+
+    var totalDisplay = document.getElementById('cartTotalPriceDisplay');
+    if (totalDisplay) totalDisplay.textContent = '฿' + data.total_price.toLocaleString('th-TH');
+}
+
+// ปุ่มลบ/ลด/เพิ่ม ในแท็บ "รายการที่สั่ง" (event delegation เพราะแถวจะถูกแทนที่ใหม่ทุกครั้งที่ตะกร้าเปลี่ยน)
+document.addEventListener('submit', function (e) {
+    var form = e.target.closest('.cart-mini-form');
+    if (!form) return;
+
+    var actionType = form.querySelector('input[name="action"]').value;
+    var row = form.closest('.item-row');
+    var rowsCount = document.querySelectorAll('#cartItemsList .item-row').length;
+    var rowQty = parseInt(row.querySelector('.cart-row-qty').textContent, 10) || 0;
+
+    // จะทำให้ตะกร้ากลายเป็นว่างเปล่าหรือเปล่า (แถวสุดท้ายที่เหลืออยู่ถูกลบ/ลดจนหมด)
+    var willBecomeEmpty = rowsCount === 1 && (actionType === 'remove' || (actionType === 'decrease' && rowQty <= 1));
+    if (willBecomeEmpty) return; // ปล่อยให้ submit จริง รีโหลดหน้าไปแสดงสถานะ "ตะกร้าว่าง" ตามปกติ
+
+    e.preventDefault();
+    // สำคัญ: ต้องใช้ getAttribute('action') ไม่ใช่ form.action ตรงๆ เพราะฟอร์มนี้มี <input name="action">
+    // อยู่ข้างใน ซึ่งชื่อชนกับ property "action" ของฟอร์มเอง (ทำให้ form.action คืนอีลีเมนต์ input แทนที่จะเป็น
+    // string URL อย่างที่ควรจะเป็น) - เจอบั๊กนี้จากการทดสอบจริง (fetch ยิง URL ผิดจนได้ 404)
+    var formUrl = form.getAttribute('action');
+    var submitBtn = form.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+
+    fetch(formUrl, {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: new FormData(form)
+    })
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+        if (data.success) { refreshDineinCartUI(data); }
+        submitBtn.disabled = false;
+    })
+    .catch(function () {
+        submitBtn.disabled = false;
+        window.location.href = formUrl; // เชื่อมต่อไม่ได้ - ให้รีโหลดจริงแทนเผื่อ fetch พังแต่หน้าเว็บยังใช้ได้
+    });
+});
+
+// ฟอร์ม "เพิ่มลงตะกร้า" ในโมดัลแต่ละเมนู
+document.addEventListener('submit', function (e) {
+    var form = e.target.closest('.cart-add-form');
+    if (!form) return;
+
+    if (dineinCartTotalQty === 0) return; // ตะกร้ายังว่างอยู่ - ปล่อยให้ submit จริง รีโหลดไปแสดงตะกร้าที่เพิ่งเริ่มมีของ
+
+    e.preventDefault();
+    var submitBtn = form.querySelector('button[type="submit"]');
+    var originalBtnHtml = submitBtn.innerHTML;
+    var errorBox = form.querySelector('.cart-add-error');
+    errorBox.innerHTML = '';
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>กำลังเพิ่ม...';
+
+    fetch(form.getAttribute('action'), {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: new FormData(form)
+    })
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtnHtml;
+
+        if (!data.success) {
+            errorBox.innerHTML = '<div class="alert alert-danger rounded-3 py-2 small mb-3">' + (data.error || 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง') + '</div>';
+            return;
+        }
+
+        refreshDineinCartUI(data);
+
+        // ปิดโมดัล + เคลียร์ฟอร์มกลับเป็นค่าเริ่มต้น เผื่อเปิดเพิ่มเมนูเดิมอีกรอบ
+        var modalEl = form.closest('.modal');
+        var modalInstance = modalEl && bootstrap.Modal.getInstance(modalEl);
+        if (modalInstance) modalInstance.hide();
+        form.querySelectorAll('input[type="checkbox"]').forEach(function (cb) { cb.checked = false; });
+        var noteField = form.querySelector('textarea[name="note"]');
+        if (noteField) noteField.value = '';
+        var qtyField = form.querySelector('input[name="quantity"]');
+        if (qtyField) qtyField.value = 1;
+    })
+    .catch(function () {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtnHtml;
+        errorBox.innerHTML = '<div class="alert alert-danger rounded-3 py-2 small mb-3">เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่อีกครั้ง</div>';
     });
 });
 </script>

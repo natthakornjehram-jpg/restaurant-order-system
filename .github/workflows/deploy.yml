@@ -1,0 +1,33 @@
+name: Deploy to InfinityFree
+
+# ทุกครั้งที่ push เข้า main จะอัปโหลดไฟล์ขึ้นโฮสต์ผ่าน FTP ให้อัตโนมัติ
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # กดรันเองได้จากแท็บ Actions บน GitHub ด้วย เผื่ออยากรีดีพลอยโดยไม่ต้อง push ใหม่
+
+jobs:
+  ftp-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout โค้ด
+        uses: actions/checkout@v4
+
+      - name: อัปโหลดขึ้น InfinityFree ผ่าน FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          # โฟลเดอร์เว็บจริงบน InfinityFree ปกติคือ htdocs/ (เช็คชื่อโฟลเดอร์จริงจาก File Manager ในคอนโทรลพาเนลอีกที)
+          server-dir: /htdocs/
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github/**
+            docs/**
+            **/node_modules/**
+            includes/db_config.php
+            includes/email_config.php
+            includes/slipok_config.php

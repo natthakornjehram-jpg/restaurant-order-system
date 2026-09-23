@@ -1,29 +1,53 @@
-<?php 
+<?php
 session_start();
 include '../includes/db.php';
 require_once 'auth_owner.php';
 require_once '../includes/csrf.php';
+require_once '../includes/table_render.php';
+
+// ให้หน้านี้ตอบเป็น JSON แทนการรีโหลดทั้งหน้าได้ ถ้าคำขอมาจาก fetch() ของ JS - ตรรกะเพิ่ม/แก้ไข/ลบโต๊ะด้านล่างเหมือนเดิมทุกอย่าง
+$is_ajax = isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
 
 // --- 1. จัดการเพิ่มโต๊ะใหม่ ---
 if (isset($_POST['add_table'])) {
     if (!csrf_verify($_POST['csrf_token'] ?? '')) {
+        if ($is_ajax) { header('Content-Type: application/json'); echo json_encode(['success' => false, 'error' => 'คำขอไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง']); exit; }
         header("Location: manage_tables.php");
         exit();
     }
     $table_no = trim($_POST['table_number']);
-    if (!empty($table_no)) {
-        $check = $conn->prepare("SELECT table_id FROM restauranttable WHERE table_number = ?");
-        $check->bind_param("s", $table_no);
-        $check->execute();
-        if ($check->get_result()->num_rows == 0) {
-            // สุ่มโทเค็นลับต่อโต๊ะไว้ฝังใน QR code ตั้งแต่ตอนสร้างโต๊ะเลย (ดูรายละเอียดที่ includes/db.php)
-            $qr_token = bin2hex(random_bytes(8));
-            $stmt = $conn->prepare("INSERT INTO restauranttable (table_number, status, qr_token) VALUES (?, 'available', ?)");
-            $stmt->bind_param("ss", $table_no, $qr_token);
-            $stmt->execute();
-            $_SESSION['success_msg'] = "เพิ่มโต๊ะเรียบร้อยแล้ว";
-        }
+    if (empty($table_no)) {
+        if ($is_ajax) { header('Content-Type: application/json'); echo json_encode(['success' => false, 'error' => 'กรุณากรอกเลขโต๊ะ']); exit; }
+        header("Location: manage_tables.php");
+        exit();
     }
+    $check = $conn->prepare("SELECT table_id FROM restauranttable WHERE table_number = ?");
+    $check->bind_param("s", $table_no);
+    $check->execute();
+    if ($check->get_result()->num_rows > 0) {
+        if ($is_ajax) { header('Content-Type: application/json'); echo json_encode(['success' => false, 'error' => 'มีโต๊ะชื่อนี้อยู่แล้ว']); exit; }
+        header("Location: manage_tables.php");
+        exit();
+    }
+
+    // สุ่มโทเค็นลับต่อโต๊ะไว้ฝังใน QR code ตั้งแต่ตอนสร้างโต๊ะเลย (ดูรายละเอียดที่ includes/db.php)
+    $qr_token = bin2hex(random_bytes(8));
+    $stmt = $conn->prepare("INSERT INTO restauranttable (table_number, status, qr_token) VALUES (?, 'available', ?)");
+    $stmt->bind_param("ss", $table_no, $qr_token);
+    $stmt->execute();
+    $new_table_id = $conn->insert_id;
+
+    if ($is_ajax) {
+        $new_table_row = ['table_id' => $new_table_id, 'table_number' => $table_no, 'status' => 'available', 'qr_token' => $qr_token];
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => true,
+            'card_html' => render_owner_table_card($new_table_row),
+            'modal_html' => render_owner_table_edit_modal($new_table_row),
+        ]);
+        exit;
+    }
+    $_SESSION['success_msg'] = "เพิ่มโต๊ะเรียบร้อยแล้ว";
     header("Location: manage_tables.php");
     exit();
 }
@@ -31,17 +55,36 @@ if (isset($_POST['add_table'])) {
 // --- 2. จัดการแก้ไขชื่อโต๊ะ ---
 if (isset($_POST['edit_table'])) {
     if (!csrf_verify($_POST['csrf_token'] ?? '')) {
+        if ($is_ajax) { header('Content-Type: application/json'); echo json_encode(['success' => false, 'error' => 'คำขอไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง']); exit; }
         header("Location: manage_tables.php");
         exit();
     }
     $t_id = intval($_POST['table_id']);
     $new_no = trim($_POST['new_table_number']);
-    if ($t_id > 0 && !empty($new_no)) {
-        $stmt = $conn->prepare("UPDATE restauranttable SET table_number = ? WHERE table_id = ?");
-        $stmt->bind_param("si", $new_no, $t_id);
-        $stmt->execute();
-        $_SESSION['success_msg'] = "แก้ไขชื่อโต๊ะเรียบร้อยแล้ว";
+    if ($t_id <= 0 || empty($new_no)) {
+        if ($is_ajax) { header('Content-Type: application/json'); echo json_encode(['success' => false, 'error' => 'กรุณากรอกเลขโต๊ะ']); exit; }
+        header("Location: manage_tables.php");
+        exit();
     }
+    $stmt = $conn->prepare("UPDATE restauranttable SET table_number = ? WHERE table_id = ?");
+    $stmt->bind_param("si", $new_no, $t_id);
+    $stmt->execute();
+
+    if ($is_ajax) {
+        $row_stmt = $conn->prepare("SELECT * FROM restauranttable WHERE table_id = ?");
+        $row_stmt->bind_param("i", $t_id);
+        $row_stmt->execute();
+        $t_row = $row_stmt->get_result()->fetch_assoc();
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => true,
+            'table_id' => $t_id,
+            'card_html' => $t_row ? render_owner_table_card($t_row) : '',
+            'modal_html' => $t_row ? render_owner_table_edit_modal($t_row) : '',
+        ]);
+        exit;
+    }
+    $_SESSION['success_msg'] = "แก้ไขชื่อโต๊ะเรียบร้อยแล้ว";
     header("Location: manage_tables.php");
     exit();
 }
@@ -51,6 +94,7 @@ if (isset($_POST['edit_table'])) {
 // เหมือนการเพิ่ม/แก้ไขโต๊ะด้านบน กันหน้าอื่นหลอกให้ owner ที่ล็อกอินอยู่ลบโต๊ะโดยไม่ตั้งใจ
 if (isset($_POST['delete_table'])) {
     if (!csrf_verify($_POST['csrf_token'] ?? '')) {
+        if ($is_ajax) { header('Content-Type: application/json'); echo json_encode(['success' => false, 'error' => 'คำขอไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง']); exit; }
         header("Location: manage_tables.php");
         exit();
     }
@@ -59,7 +103,10 @@ if (isset($_POST['delete_table'])) {
         $stmt = $conn->prepare("DELETE FROM restauranttable WHERE table_id = ?");
         $stmt->bind_param("i", $id);
         $stmt->execute();
+        if ($is_ajax) { header('Content-Type: application/json'); echo json_encode(['success' => true]); exit; }
         $_SESSION['success_msg'] = "ลบโต๊ะเรียบร้อยแล้ว";
+    } elseif ($is_ajax) {
+        header('Content-Type: application/json'); echo json_encode(['success' => false, 'error' => 'ไม่พบโต๊ะนี้']); exit;
     }
     header("Location: manage_tables.php");
     exit();
@@ -83,81 +130,26 @@ include '../includes/nav_owner.php';
     </div>
 
     <div class="row g-4" id="table-grid">
-        <?php 
+        <?php
         $tables = $conn->query("SELECT * FROM restauranttable ORDER BY table_number ASC");
         if($tables && $tables->num_rows > 0):
             while($t = $tables->fetch_assoc()):
-                $is_busy = ($t['status'] !== 'available');
-        ?>
-        <div class="col-6 col-md-4 col-lg-2" id="card-table-<?php echo $t['table_id']; ?>">
-            <div class="card h-100 border-0 shadow-sm rounded-4 text-center p-3 <?php echo $is_busy ? 'bg-danger text-white' : 'bg-white text-dark'; ?> status-card">
-                <div class="card-body p-0">
-                    <div class="small opacity-75 mb-1">TABLE</div>
-                    <h2 class="fw-bold mb-2"><?php echo htmlspecialchars($t['table_number']); ?></h2>
-                    
-                    <div class="mb-3 status-badge">
-                        <?php if($is_busy): ?>
-                            <span class="badge rounded-pill bg-white text-danger px-3">ไม่ว่าง</span>
-                        <?php else: ?>
-                            <span class="badge rounded-pill bg-success px-3">ว่าง</span>
-                        <?php endif; ?>
-                    </div>
-
-                    <div class="d-grid gap-2 btn-area">
-                        <?php if($is_busy): ?>
-                            <button type="button" onclick="ajaxCheckout(<?php echo $t['table_id']; ?>)" class="btn btn-sm btn-light text-danger fw-bold rounded-pill shadow-sm">
-                                <i class="bi bi-cash-stack"></i> เช็คบิล
-                            </button>
-                        <?php else: ?>
-                            <button class="btn btn-sm btn-outline-primary rounded-pill shadow-sm" data-bs-toggle="modal" data-bs-target="#editTable<?php echo $t['table_id']; ?>">
-                                <i class="bi bi-pencil-square"></i> แก้ไขชื่อ
-                            </button>
-                            <button type="button" onclick="showQR(<?= htmlspecialchars(json_encode($t['table_number']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($t['qr_token'] ?? ''), ENT_QUOTES) ?>)" class="btn btn-sm btn-outline-dark rounded-pill shadow-sm">
-                                <i class="bi bi-qr-code"></i> พิมพ์ QR
-                            </button>
-                        <?php endif; ?>
-
-                        <form method="POST" action="manage_tables.php" class="d-inline" onsubmit="return ownerConfirmSubmit(event, 'ยืนยันลบโต๊ะนี้?');">
-                            <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
-                            <input type="hidden" name="delete_table" value="<?php echo $t['table_id']; ?>">
-                            <button type="submit" class="btn btn-link btn-sm text-<?php echo $is_busy ? 'white' : 'danger'; ?> text-decoration-none x-small">ลบโต๊ะ</button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="modal fade text-dark" id="editTable<?php echo $t['table_id']; ?>" tabindex="-1">
-            <div class="modal-dialog modal-sm modal-dialog-centered">
-                <form class="modal-content border-0 rounded-4 shadow" method="POST">
-                    <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
-                    <div class="modal-header border-0">
-                        <h5 class="fw-bold">แก้ไขชื่อโต๊ะ</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body py-0">
-                        <input type="hidden" name="table_id" value="<?php echo $t['table_id']; ?>">
-                        <label class="small fw-bold mb-2">เลขโต๊ะใหม่</label>
-                        <input type="text" name="new_table_number" class="form-control rounded-3" value="<?php echo htmlspecialchars($t['table_number']); ?>" required>
-                    </div>
-                    <div class="modal-footer border-0">
-                        <button type="submit" name="edit_table" class="btn btn-warning w-100 rounded-pill py-2 fw-bold">อัปเดตชื่อโต๊ะ</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-        <?php endwhile; else: ?>
-            <div class="col-12 text-center py-5 text-muted">ยังไม่มีข้อมูลโต๊ะในระบบ</div>
+                echo render_owner_table_card($t);
+                echo render_owner_table_edit_modal($t);
+            endwhile;
+        else: ?>
+            <div class="col-12 text-center py-5 text-muted" id="tableEmptyState">ยังไม่มีข้อมูลโต๊ะในระบบ</div>
         <?php endif; ?>
     </div>
 </div>
 
 <div class="modal fade" id="addTableModal" tabindex="-1">
     <div class="modal-dialog modal-sm modal-dialog-centered">
-        <form class="modal-content border-0 rounded-4 shadow text-dark" method="POST">
+        <form class="modal-content border-0 rounded-4 shadow text-dark table-mini-form" data-table-action="add" action="manage_tables.php" method="POST">
             <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
             <div class="modal-header border-0"><h5 class="fw-bold">เพิ่มโต๊ะใหม่</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body py-0">
+                <div class="add-table-error"></div>
                 <label class="small fw-bold mb-2">เลขโต๊ะ / ชื่อโต๊ะ</label>
                 <input type="text" name="table_number" class="form-control form-control-lg rounded-3" placeholder="เช่น A1" required>
             </div>

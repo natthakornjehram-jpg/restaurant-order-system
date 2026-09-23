@@ -24,14 +24,35 @@ function sendPaymentData(orderId, method, announcement) {
     })
     .then(res => res.json())
     .then(data => {
-        if (data.success) {
-            if (announcement && typeof speakThai === 'function') {
-                speakThai(announcement);
-            }
-            sessionStorage.setItem('ownerFlashMsg', announcement || 'บันทึกการชำระเงินเรียบร้อย!');
-            location.reload();
-        } else {
+        if (!data.success) {
             ownerNotify('ผิดพลาด: ' + (data.error || data.message), 'error');
+            return;
+        }
+        if (announcement && typeof speakThai === 'function') {
+            speakThai(announcement);
+        }
+        ownerNotify(announcement || 'บันทึกการชำระเงินเรียบร้อย!');
+
+        // ปิดแล้ว = ออกจากทั้งสองแท็บ (ไม่ใช่ unpaid อีกต่อไป) เอาการ์ดออกแบบนุ่มๆ ไม่ต้องรีโหลดทั้งหน้า
+        const col = document.getElementById('payment-col-' + orderId);
+        if (col) {
+            col.classList.add('card-col-removing');
+            setTimeout(() => col.remove(), 300);
+        }
+        const modal = document.getElementById('payModal' + orderId);
+        if (modal) {
+            const inst = bootstrap.Modal.getInstance(modal);
+            if (inst) inst.hide();
+            modal.remove();
+        }
+
+        // แท็บไหนมีการ์ดนี้อยู่ ก็ลดตัวเลขนับของแท็บนั้น (เช็คจาก id ของแท็บที่ยังหาการ์ดเจอตอนกดปุ่ม)
+        const badgeId = col && col.closest('#pills-served') ? 'servedCountBadge' : 'onlineCountBadge';
+        const badge = document.getElementById(badgeId);
+        if (badge) {
+            const next = Math.max(0, (parseInt(badge.textContent, 10) || 0) - 1);
+            if (next === 0) badge.style.display = 'none';
+            badge.textContent = next;
         }
     })
     .catch(err => {

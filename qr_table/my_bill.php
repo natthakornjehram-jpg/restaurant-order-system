@@ -71,8 +71,8 @@ include '../includes/nav_dinein.php';
     }
 </style>
 
-<div class="container py-4 mb-5">
-    
+<div class="container py-4 mb-5" id="myBillContainer">
+
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h4 class="fw-bold m-0 text-dark">
             <?php if (($_SESSION['order_type'] ?? '') === 'takeaway'): ?>

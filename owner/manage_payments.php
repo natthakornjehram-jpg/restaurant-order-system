@@ -11,10 +11,11 @@ include '../includes/nav_owner.php';
 
 // 1. ออนไลน์ (สั่งกลับบ้าน จ่ายเงินสดตอนมารับ รอร้านยืนยันปิดออเดอร์)
 // เพิ่ม p.slip_image เข้ามาด้วย เพื่อโชว์สลิปที่ลูกค้าแนบมาตอนสั่งจริง (กรณีเลือกโอนเงินเอง) ให้ร้านตรวจสอบได้
+// order_status != 'canceled' กันออเดอร์กลับบ้านที่เจ้าของร้านยกเลิกไปแล้ว (ตอนยัง pending) โผล่มาค้างรอปิดออเดอร์อยู่ตรงนี้
 $sql_online = "SELECT o.*, p.status AS pay_status, p.method AS pay_method, p.transaction_ref, p.slip_image
         FROM orders o
         JOIN payment p ON o.order_id = p.order_id
-        WHERE o.payment_status = 'unpaid' AND o.order_type != 'dine_in' AND p.status = 'pending'
+        WHERE o.payment_status = 'unpaid' AND o.order_type != 'dine_in' AND p.status = 'pending' AND o.order_status != 'canceled'
         ORDER BY o.created_at ASC";
 $res_online = $conn->query($sql_online);
 
@@ -45,13 +46,13 @@ $res_served = $conn->query($sql_served);
         <li class="nav-item" role="presentation">
             <button class="nav-link active rounded-3 px-4 py-3 fw-bold shadow-sm" id="pills-served-tab" data-bs-toggle="pill" data-bs-target="#pills-served" type="button" role="tab">
                 <i class="bi bi-shop me-1"></i> ทานที่ร้าน (รอเช็คบิล)
-                <?php if($res_served && $res_served->num_rows > 0) echo "<span class='badge bg-success rounded-circle ms-2'>{$res_served->num_rows}</span>"; ?>
+                <span id="servedCountBadge" class="badge bg-success rounded-circle ms-2" style="<?= ($res_served && $res_served->num_rows > 0) ? '' : 'display:none;' ?>"><?= $res_served ? $res_served->num_rows : 0 ?></span>
             </button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link rounded-3 px-4 py-3 fw-bold shadow-sm" id="pills-online-tab" data-bs-toggle="pill" data-bs-target="#pills-online" type="button" role="tab">
                 <i class="bi bi-bag me-1"></i> สั่งกลับบ้าน (รอปิดออเดอร์)
-                <?php if($res_online && $res_online->num_rows > 0) echo "<span class='badge bg-danger rounded-circle ms-2'>{$res_online->num_rows}</span>"; ?>
+                <span id="onlineCountBadge" class="badge bg-danger rounded-circle ms-2" style="<?= ($res_online && $res_online->num_rows > 0) ? '' : 'display:none;' ?>"><?= $res_online ? $res_online->num_rows : 0 ?></span>
             </button>
         </li>
     </ul>
@@ -62,7 +63,7 @@ $res_served = $conn->query($sql_served);
         <div class="tab-pane fade show active" id="pills-served" role="tabpanel">
             <div class="row g-4">
                 <?php if($res_served && $res_served->num_rows > 0): while($row = $res_served->fetch_assoc()): ?>
-                <div class="col-md-6 col-lg-4 col-xl-3">
+                <div class="col-md-6 col-lg-4 col-xl-3" id="payment-col-<?php echo $row['order_id'];?>">
                     <div class="soft-card h-100 border-top border-4 border-success shadow-sm">
                         <div class="card-body p-4 text-start d-flex flex-column justify-content-between">
                             <div>
@@ -159,7 +160,7 @@ $res_served = $conn->query($sql_served);
         <div class="tab-pane fade" id="pills-online" role="tabpanel">
             <div class="row g-4">
                 <?php if($res_online && $res_online->num_rows > 0): while($row = $res_online->fetch_assoc()): ?>
-                <div class="col-md-6 col-lg-4 col-xl-3">
+                <div class="col-md-6 col-lg-4 col-xl-3" id="payment-col-<?php echo $row['order_id'];?>">
                     <div class="soft-card h-100 border-top border-4 border-primary">
                         <div class="card-body p-4 text-center d-flex flex-column justify-content-between">
                             <div>

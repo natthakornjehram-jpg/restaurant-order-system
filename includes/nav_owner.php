@@ -76,7 +76,7 @@ $owner_nav_items = [
         <?php else: ?>
             <i class="bi bi-shop me-2"></i>
         <?php endif; ?>
-        เมนูจัดการร้าน
+        จัดการร้าน
       </h5>
       <!-- ปุ่มขอสิทธิ์แจ้งเตือนอีกจุด สำหรับตอนเปิดจากจอเดสก์ท็อป (แถบบนสุด d-lg-none ไม่โชว์ตรงนั้น)
            ไม่ใช้ d-none/d-lg-flex ของ Bootstrap เพราะมี !important ชนกับ JS ที่ตั้ง style.display ตรงๆ
@@ -98,7 +98,9 @@ $owner_nav_items = [
           <a class="owner-nav-link nav-link text-white py-2 px-3 d-flex align-items-center <?= ($current_page == $item['page']) ? 'active' : ''; ?>" href="../owner/<?= $item['page'] ?>">
             <span class="owner-nav-icon"><i class="bi <?= $item['icon'] ?>"></i></span>
             <span><?= $item['label'] ?></span>
-            <?php if (!empty($item['warn'])): ?>
+            <?php if ($item['page'] === 'settings.php'): ?>
+                <i id="navQrWarnIcon" class="bi bi-exclamation-circle-fill text-warning ms-2" title="<?= htmlspecialchars($item['warn_title'] ?? 'ต้องตรวจสอบการตั้งค่า') ?>" style="<?= empty($item['warn']) ? 'display:none;' : '' ?>"></i>
+            <?php elseif (!empty($item['warn'])): ?>
                 <i class="bi bi-exclamation-circle-fill text-warning ms-2" title="<?= htmlspecialchars($item['warn_title'] ?? 'ต้องตรวจสอบการตั้งค่า') ?>"></i>
             <?php endif; ?>
           </a>

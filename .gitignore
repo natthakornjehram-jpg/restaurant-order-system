@@ -27,3 +27,8 @@ includes/slipok_config.php
 Thumbs.db
 .vscode/
 .idea/
+.claude/
+
+# ไฟล์ทดสอบชั่วคราวที่ bypass การล็อกอิน (ตั้ง session owner ให้ตรงๆ) ห้าม commit เด็ดขาด เพราะเป็นช่องโหว่
+# ความปลอดภัยถ้าหลุดขึ้นโฮสต์จริงโดยไม่ตั้งใจ ลบทิ้งได้เลยถ้าไม่ได้ใช้ทดสอบแล้ว
+owner/_test_login_tmp.php

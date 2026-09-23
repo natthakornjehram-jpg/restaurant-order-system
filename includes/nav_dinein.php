@@ -43,9 +43,11 @@ $nav_menu_url = '../qr_table/menu_dinein.php' . ($nav_has_table ? '?table=' . ur
                 <span class="status-dot"></span> <?= $nav_is_shop_open ? 'เปิดรับออเดอร์' : 'ปิดรับออเดอร์' ?>
             </span>
 
-            <?php if ($nav_has_table && $nav_order_type === 'dine_in'): ?>
+            <?php if ($nav_has_table && $nav_order_type === 'dine_in' && $current_page !== 'my_bill.php' && $current_page !== 'join_table.php'): ?>
             <!-- บิลรวมของโต๊ะ (my_bill.php) มีความหมายเฉพาะ "ทานที่ร้าน" เท่านั้น เพราะเป็นบิลรวมของทุกคนที่โต๊ะนี้
-                 "สั่งกลับบ้าน" เป็นออเดอร์ส่วนตัว ดูสถานะผ่าน order_detail.php ของตัวเองแทน (ไม่มีไอคอนนี้) -->
+                 "สั่งกลับบ้าน" เป็นออเดอร์ส่วนตัว ดูสถานะผ่าน order_detail.php ของตัวเองแทน (ไม่มีไอคอนนี้)
+                 ซ่อนไอคอนนี้ตอนอยู่หน้า my_bill.php เองอยู่แล้ว ไม่งั้นจะมีปุ่มลิงก์วนกลับมาหน้าเดิมซ้ำ ทำให้ลูกค้าสับสน
+                 ซ่อนตอนอยู่หน้า join_table.php ด้วย เพราะลูกค้ายังไม่ได้ยืนยันรหัสร่วมโต๊ะ กดไปก็โดนเด้งกลับมาหน้านี้เหมือนเดิมอยู่ดี -->
             <a href="../qr_table/my_bill.php" class="btn btn-outline-light btn-sm rounded-circle shadow-sm d-flex align-items-center justify-content-center" title="ติดตามสถานะ" style="width: 38px; height: 38px;">
                 <i class="bi bi-receipt"></i>
             </a>
@@ -69,7 +71,7 @@ $nav_menu_url = '../qr_table/menu_dinein.php' . ($nav_has_table ? '?table=' . ur
                 <i class="bi bi-egg-fried"></i> เมนูอาหาร
             </button>
             <button type="button" class="dinein-tab <?= $nav_active_tab === 'cart' ? 'active' : '' ?>" onclick="dineinSwitchTab('cart')">
-                <i class="bi bi-cart3"></i> รายการที่สั่ง<?= $nav_cart_qty > 0 ? ' (' . $nav_cart_qty . ')' : '' ?>
+                <i class="bi bi-cart3"></i> รายการที่สั่ง<span id="cartTabBadgeText"><?= $nav_cart_qty > 0 ? ' (' . $nav_cart_qty . ')' : '' ?></span>
             </button>
         </div>
     </div>

@@ -40,6 +40,8 @@ if (empty($db_join_code) || $is_verified_join || ($_SESSION['order_type'] ?? '')
 }
 
 $pin_error = "";
+// ให้หน้านี้ตอบเป็น JSON แทนการรีโหลดทั้งหน้าได้ ถ้าคำขอมาจาก fetch() ของ JS - ตรรกะตรวจสอบ/จำกัดจำนวนครั้งด้านล่างเหมือนเดิมทุกอย่าง
+$is_ajax = isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
 
 // จำกัดจำนวนครั้งที่กรอกรหัสผิด: ไม่เกิน 10 ครั้งต่อโต๊ะภายใน 15 นาที กันสคริปต์เดารหัส 4 หลัก (9000 ความเป็นไปได้)
 // นับจากตาราง join_pin_attempts ที่ผูกกับ table_id ไม่ใช่ session กันบายพาสด้วยการล้างคุกกี้/เปิดแท็บใหม่
@@ -62,6 +64,11 @@ if (isset($_POST['submit_join_pin'])) {
             $log_stmt->execute();
 
             $_SESSION['user_join_code'] = $db_join_code;
+            if ($is_ajax) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => true, 'redirect' => $menu_url]);
+                exit;
+            }
             header("Location: $menu_url");
             exit;
         }
@@ -70,6 +77,12 @@ if (isset($_POST['submit_join_pin'])) {
         $log_stmt->execute();
         $pin_fail_count++;
         $pin_error = "รหัสร่วมโต๊ะไม่ถูกต้อง กรุณาสอบถามรหัสจากเพื่อนร่วมโต๊ะครับ";
+    }
+
+    if ($is_ajax) {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'error' => $pin_error, 'locked' => $pin_fail_count >= 10]);
+        exit;
     }
 }
 
@@ -85,16 +98,18 @@ include '../includes/nav_dinein.php';
         <h4 class="fw-bold text-dark">โต๊ะนี้กำลังเปิดบริการอยู่</h4>
         <p class="text-muted small mb-3">กรุณากรอก <b>รหัสร่วมโต๊ะ 4 หลัก</b> เพื่อร่วมสั่งอาหารกับเพื่อนในโต๊ะเดียวกันครับ (ไม่ว่าจะทานที่ร้านหรือสั่งกลับบ้าน)<br>(ดูรหัสได้จากหน้าจอมือถือของเพื่อนร่วมโต๊ะที่สแกนเป็นคนแรก)</p>
 
+        <div id="joinPinErrorBox">
         <?php if ($pin_error): ?>
             <div class="alert alert-danger rounded-3 py-2 small mb-3"><?= htmlspecialchars($pin_error) ?></div>
         <?php endif; ?>
+        </div>
 
         <form method="POST" class="d-grid gap-3" id="joinPinForm">
             <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
             <input type="text" name="join_pin" id="joinPinInput" inputmode="numeric" pattern="[0-9]*" maxlength="4"
                    class="form-control form-control-lg text-center fw-bold rounded-3" placeholder="กรอกรหัส 4 หลัก" required autofocus
                    style="letter-spacing: 10px; font-size: 1.8rem;" <?= $pin_fail_count >= 10 ? 'disabled' : '' ?>>
-            <button type="submit" name="submit_join_pin" class="btn btn-warning py-3 rounded-pill fw-bold shadow" style="background-color: var(--cafe-brown); color: #fff; border: none;" <?= $pin_fail_count >= 10 ? 'disabled' : '' ?>>
+            <button type="submit" name="submit_join_pin" id="joinPinSubmitBtn" class="btn btn-warning py-3 rounded-pill fw-bold shadow" style="background-color: var(--cafe-brown); color: #fff; border: none;" <?= $pin_fail_count >= 10 ? 'disabled' : '' ?>>
                 <i class="bi bi-key-fill me-1"></i> ยืนยันเข้าร่วมโต๊ะ
             </button>
         </form>
@@ -104,11 +119,53 @@ include '../includes/nav_dinein.php';
 <script>
     // เอาไว้เฉพาะตัวเลข 0-9 และส่งฟอร์มอัตโนมัติทันทีที่ครบ 4 หลัก ให้ลื่นไหลไม่ต้องกดปุ่มเอง
     const joinPinInput = document.getElementById('joinPinInput');
+    const joinPinForm = document.getElementById('joinPinForm');
+    const joinPinSubmitBtn = document.getElementById('joinPinSubmitBtn');
+    const joinPinErrorBox = document.getElementById('joinPinErrorBox');
+
     joinPinInput.addEventListener('input', function () {
         this.value = this.value.replace(/\D/g, '').slice(0, 4);
         if (this.value.length === 4) {
-            document.getElementById('joinPinForm').submit();
+            joinPinForm.dispatchEvent(new Event('submit', { cancelable: true }));
         }
+    });
+
+    // ส่งฟอร์มแบบ AJAX แทนการรีโหลดทั้งหน้า - ตรรกะตรวจสอบ/จำกัดจำนวนครั้งฝั่งเซิร์ฟเวอร์เหมือนเดิมทุกอย่าง
+    joinPinForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        joinPinErrorBox.innerHTML = '';
+
+        // ต้องสร้าง FormData "ก่อน" ปิด (disabled) ช่องกรอกเสมอ เพราะฟิลด์ที่ disabled จะไม่ถูกรวมเข้า FormData
+        // เลยตาม spec ของ HTML (เจอบั๊กนี้จากการทดสอบจริง - ปิดช่องก่อนแล้วค่อยสร้าง FormData ทำให้ join_pin หายไปเงียบๆ)
+        const fd = new FormData(joinPinForm);
+        // new FormData(form) ไม่ใส่ name/value ของปุ่ม submit ที่กดให้อัตโนมัติ (submit_join_pin เป็นชื่อปุ่ม ไม่ใช่ input ซ่อน)
+        fd.append('submit_join_pin', '1');
+
+        joinPinInput.disabled = true;
+        joinPinSubmitBtn.disabled = true;
+
+        fetch(joinPinForm.getAttribute('action') || 'join_table.php', {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: fd
+        })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+            if (data.success) {
+                window.location.href = data.redirect;
+                return; // คงปุ่มปิดไว้จนกว่าหน้าจะเปลี่ยนจริง กันกดซ้ำระหว่างรอ
+            }
+            joinPinErrorBox.innerHTML = '<div class="alert alert-danger rounded-3 py-2 small mb-3">' + (data.error || 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง') + '</div>';
+            joinPinInput.value = '';
+            joinPinInput.disabled = !!data.locked;
+            joinPinSubmitBtn.disabled = !!data.locked;
+            if (!data.locked) joinPinInput.focus();
+        })
+        .catch(function () {
+            joinPinErrorBox.innerHTML = '<div class="alert alert-danger rounded-3 py-2 small mb-3">เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่อีกครั้ง</div>';
+            joinPinInput.disabled = false;
+            joinPinSubmitBtn.disabled = false;
+        });
     });
 </script>
 

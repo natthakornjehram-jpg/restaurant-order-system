@@ -13,6 +13,8 @@ if ($owner_exists) {
 
 $success_message = "";
 $error_message = "";
+// ให้หน้านี้ตอบเป็น JSON แทนการรีโหลดทั้งหน้าได้ ถ้าคำขอมาจาก fetch() ของ JS - ตรรกะตรวจสอบด้านล่างเหมือนเดิมทุกอย่าง
+$is_ajax = isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ?? '')) {
     $error_message = "คำขอไม่ถูกต้อง (CSRF token ไม่ถูกต้อง) กรุณาลองใหม่อีกครั้ง";
@@ -48,6 +50,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
                 $_SESSION['role'] = 'owner';
                 $_SESSION['owner_id'] = $new_owner_id;
 
+                if ($is_ajax) {
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => true, 'redirect' => 'dashboard.php']);
+                    exit;
+                }
                 header("Location: dashboard.php");
                 exit;
             } else {
@@ -55,6 +62,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
             }
         }
     }
+}
+
+// มาถึงตรงนี้ได้แปลว่าไม่สำเร็จ (สำเร็จแล้ว exit ไปแล้วด้านบน) - ตอบ error กลับเป็น JSON ถ้าเป็น AJAX
+if ($is_ajax && $_SERVER['REQUEST_METHOD'] == 'POST') {
+    header('Content-Type: application/json');
+    echo json_encode(['success' => false, 'error' => $error_message]);
+    exit;
 }
 ?>
 
@@ -78,11 +92,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
             <h2>เปิดร้านอาหารกับเรา ☕</h2>
             <p class="text-center text-muted mb-4 small">สมัครแล้วเข้าสู่ระบบจัดการร้านได้ทันที</p>
 
+            <div id="regAlertBox">
             <?php if($error_message): ?>
                 <div class="alert alert-danger text-center rounded-4 border-0 mb-4 shadow-sm"><?= htmlspecialchars($error_message) ?></div>
             <?php endif; ?>
+            </div>
 
-            <form method="POST">
+            <form method="POST" id="registerForm">
                 <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
                 <div class="row">
                     <div class="col-md-6 mb-3">
@@ -116,7 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
                     <label>ที่อยู่ร้าน / คำอธิบายสั้นๆ</label>
                     <textarea name="address" class="form-control" rows="2" placeholder="ที่ตั้งร้านของคุณ..." required></textarea>
                 </div>
-                <button type="submit" class="btn-brown shadow">ลงทะเบียนเข้าสู่ระบบ</button>
+                <button type="submit" id="registerSubmitBtn" class="btn-brown shadow">ลงทะเบียนเข้าสู่ระบบ</button>
 
                 <div class="text-center mt-3">
                     <small class="text-muted">มีบัญชีอยู่แล้ว? <a href="../login.php" class="text-decoration-none fw-bold" style="color:#795548;">เข้าสู่ระบบ</a></small>
@@ -139,6 +155,41 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
             void icon.offsetWidth; // บังคับ reflow ให้เล่นแอนิเมชันซ้ำได้ทุกครั้งแม้กดรัวๆ
             icon.classList.add('icon-pop');
         }
+
+        // ส่งฟอร์มสมัครแบบ AJAX แทนการรีโหลดทั้งหน้า - ตรรกะตรวจสอบฝั่งเซิร์ฟเวอร์เหมือนเดิมทุกอย่าง
+        const registerForm = document.getElementById('registerForm');
+        const registerSubmitBtn = document.getElementById('registerSubmitBtn');
+        const regAlertBox = document.getElementById('regAlertBox');
+
+        registerForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            const originalBtnText = registerSubmitBtn.innerHTML;
+            registerSubmitBtn.disabled = true;
+            registerSubmitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>กำลังลงทะเบียน...';
+
+            fetch('register_owner.php', {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                body: new FormData(registerForm)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    registerSubmitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>สำเร็จ กำลังพาไปหน้าแดชบอร์ด...';
+                    window.location.href = data.redirect;
+                    return;
+                }
+                regAlertBox.innerHTML = '<div class="alert alert-danger text-center rounded-4 border-0 mb-4 shadow-sm">' +
+                    (data.error || 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง') + '</div>';
+                registerSubmitBtn.disabled = false;
+                registerSubmitBtn.innerHTML = originalBtnText;
+            })
+            .catch(() => {
+                registerSubmitBtn.disabled = false;
+                registerSubmitBtn.innerHTML = originalBtnText;
+                regAlertBox.innerHTML = '<div class="alert alert-danger text-center rounded-4 border-0 mb-4 shadow-sm">เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่อีกครั้ง</div>';
+            });
+        });
     </script>
 </body>
 </html>

@@ -4,20 +4,56 @@ session_start();
 require_once '../includes/db.php';
 require_once '../includes/csrf.php';
 require_once '../includes/upload_helper.php';
+require_once '../includes/verify_slip.php';
 
-if (!csrf_verify($_POST['csrf_token'] ?? '')) {
+// ให้หน้านี้ตอบเป็น JSON แทนการรีโหลด/alert() แบบเดิมได้ ถ้าคำขอมาจาก fetch() ของ JS - ตรรกะตรวจสอบ/ตัดสต็อก/
+// สร้างออเดอร์ทั้งหมดด้านล่างเหมือนเดิมทุกอย่าง ไม่แตะเลย (ไฟล์นี้เกี่ยวกับเงิน/สต็อกโดยตรง ความเสี่ยงสูงถ้าแก้ผิด)
+$is_ajax = isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+
+// 0. ปลายทางกลับไปหน้าเมนูตอนเกิดข้อผิดพลาด (มีโต๊ะก็กลับไปหน้าเมนูของโต๊ะนั้น ไม่มีโต๊ะก็กลับไปหน้าเมนูเฉยๆ)
+$menu_fallback_url = '../qr_table/menu_dinein.php' . (!empty($_SESSION['table_number']) ? '?table=' . urlencode($_SESSION['table_number']) : '');
+
+// ข้อผิดพลาดที่ "สถานะหน้าเปลี่ยนไปจริง" (ร้านปิด/คิวเต็ม/CSRF หมดอายุ ฯลฯ) ต้องพาไปโหลดหน้าเมนูใหม่เสมอ
+// (ต่อให้เป็น AJAX ก็ไม่ปล่อยให้ค้างอยู่หน้าเดิมที่ข้อมูลไม่ตรงกับความจริงแล้ว) ต่างจาก error ที่แก้ไขแล้วลองใหม่ตรงนี้ได้เลย (ดูฟังก์ชันด้านล่าง)
+function submit_order_fail_redirect($message, $redirect_url, $is_ajax) {
+    if ($is_ajax) {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'error' => $message, 'redirect' => $redirect_url]);
+        exit;
+    }
     echo "<script>
-        alert('คำขอไม่ถูกต้อง (CSRF token ไม่ถูกต้อง) กรุณาลองใหม่อีกครั้ง');
+        alert(" . json_encode($message, JSON_UNESCAPED_UNICODE) . ");
+        window.location.href = " . json_encode($redirect_url, JSON_UNESCAPED_SLASHES) . ";
+    </script>";
+    exit;
+}
+
+// ข้อผิดพลาดที่แก้ไขแล้วลองใหม่ได้เลยตรงนี้ (แนบสลิปไม่ครบ/วัตถุดิบไม่พอ ฯลฯ) ไม่ต้องพาไปโหลดหน้าใหม่
+// เพราะตะกร้าและสถานะอื่นๆ ของหน้ายังตรงกับความจริงอยู่ (ตะกร้าจะถูกล้างก็ต่อเมื่อสั่งสำเร็จเท่านั้น)
+function submit_order_fail_inline($message, $is_ajax) {
+    if ($is_ajax) {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'error' => $message]);
+        exit;
+    }
+    echo "<script>
+        alert(" . json_encode($message, JSON_UNESCAPED_UNICODE) . ");
         window.history.back();
     </script>";
     exit;
 }
 
-// 0. ปลายทางกลับไปหน้าเมนูตอนเกิดข้อผิดพลาด (มีโต๊ะก็กลับไปหน้าเมนูของโต๊ะนั้น ไม่มีโต๊ะก็กลับไปหน้าเมนูเฉยๆ)
-$menu_fallback_url = '../qr_table/menu_dinein.php' . (!empty($_SESSION['table_number']) ? '?table=' . urlencode($_SESSION['table_number']) : '');
+if (!csrf_verify($_POST['csrf_token'] ?? '')) {
+    submit_order_fail_redirect('คำขอไม่ถูกต้อง (CSRF token ไม่ถูกต้อง) กรุณาลองใหม่อีกครั้ง', $menu_fallback_url, $is_ajax);
+}
 
 // 1. เช็กว่ามีตะกร้าจริงไหม (กันเคส POST ตรงมาที่ไฟล์นี้โดยไม่ผ่านหน้าตะกร้า)
 if (empty($_SESSION['cart'])) {
+    if ($is_ajax) {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'error' => 'ตะกร้าว่างเปล่า', 'redirect' => $menu_fallback_url]);
+        exit;
+    }
     header("Location: $menu_fallback_url");
     exit;
 }
@@ -25,11 +61,7 @@ if (empty($_SESSION['cart'])) {
 // 1.5 เช็คสถานะร้านฝั่งเซิร์ฟเวอร์อีกครั้ง (หน้าตะกร้าปิดปุ่มสั่งไว้แค่ฝั่ง client เท่านั้น
 //     ยิง POST ตรงมาที่ไฟล์นี้ตอนร้านปิดได้ถ้าไม่เช็คซ้ำตรงนี้)
 if (empty($store['is_shop_open'])) {
-    echo "<script>
-        alert('ขณะนี้ร้านปิดให้บริการ ไม่สามารถสั่งอาหารได้ในขณะนี้');
-        window.location.href = " . json_encode($menu_fallback_url, JSON_UNESCAPED_SLASHES) . ";
-    </script>";
-    exit;
+    submit_order_fail_redirect('ขณะนี้ร้านปิดให้บริการ ไม่สามารถสั่งอาหารได้ในขณะนี้', $menu_fallback_url, $is_ajax);
 }
 
 // 💡 2. ดึงข้อมูลลูกค้าออนไลน์/กลับบ้าน (รับมาจาก confirm_order.php)
@@ -43,11 +75,7 @@ $order_type = ($_POST['order_type'] ?? '') === 'dine_in' && $table_id ? 'dine_in
 // 1.6 เช็คสถานะเปิด/ปิดรับออเดอร์ตามประเภทฝั่งเซิร์ฟเวอร์อีกครั้ง (หน้าเลือกประเภท/ตะกร้าปิดปุ่มไว้แค่ฝั่ง client
 //     เช่นเดียวกับข้อ 1.5 ยิง POST ตรงมาที่ไฟล์นี้ตอนร้านเพิ่งปิดรับประเภทนั้นได้ถ้าไม่เช็คซ้ำตรงนี้)
 if (($order_type === 'dine_in' && empty($store['is_dinein_open'])) || ($order_type === 'takeaway' && empty($store['is_takeaway_open']))) {
-    echo "<script>
-        alert('ขณะนี้ร้านงดรับออเดอร์ประเภทนี้ชั่วคราว กรุณาเลือกใหม่อีกครั้ง');
-        window.location.href = " . json_encode($menu_fallback_url, JSON_UNESCAPED_SLASHES) . ";
-    </script>";
-    exit;
+    submit_order_fail_redirect('ขณะนี้ร้านงดรับออเดอร์ประเภทนี้ชั่วคราว กรุณาเลือกใหม่อีกครั้ง', $menu_fallback_url, $is_ajax);
 }
 
 // 1.65 คิวเต็ม: บล็อกการ "ส่งออเดอร์ใหม่" ทุกครั้งตอนคิวเต็ม ไม่ว่าจะเป็นออเดอร์แรกของรอบนี้หรือสั่งเพิ่มก็ตาม
@@ -58,14 +86,11 @@ if (($order_type === 'dine_in' && empty($store['is_dinein_open'])) || ($order_ty
 //      เท่านั้น ไม่ได้ไปยุ่งกับออเดอร์เดิมที่ครัวกำลังทำอยู่)
 $max_queue = intval($store['max_queue'] ?? 0);
 if ($max_queue > 0) {
-    $q_res = $conn->query("SELECT COUNT(*) AS c FROM orders WHERE order_status IN ('pending', 'cooking')");
+    // ออเดอร์กลับบ้านที่ยังไม่ผ่านการตรวจสลิป (unpaid) ยังไม่นับเป็นคิวครัวจริง (ดูเหตุผลที่ owner/manage_orders.php)
+    $q_res = $conn->query("SELECT COUNT(*) AS c FROM orders WHERE order_status IN ('pending', 'cooking') AND (order_type = 'dine_in' OR payment_status = 'paid')");
     $active_queue_count = ($q_res && $q_row = $q_res->fetch_assoc()) ? intval($q_row['c']) : 0;
     if ($active_queue_count >= $max_queue) {
-        echo "<script>
-            alert('ขณะนี้คิวเต็มแล้ว ไม่สามารถสั่งอาหารได้ในขณะนี้ กรุณารอสักครู่แล้วลองใหม่อีกครั้งครับ');
-            window.location.href = " . json_encode($menu_fallback_url, JSON_UNESCAPED_SLASHES) . ";
-        </script>";
-        exit;
+        submit_order_fail_redirect('ขณะนี้คิวเต็มแล้ว ไม่สามารถสั่งอาหารได้ในขณะนี้ กรุณารอสักครู่แล้วลองใหม่อีกครั้งครับ', $menu_fallback_url, $is_ajax);
     }
 }
 
@@ -73,22 +98,20 @@ if ($max_queue > 0) {
 $online_name = $_POST['customer_name_online'] ?? ($_POST['takeaway_name'] ?? '');
 $online_phone = $_POST['customer_phone_online'] ?? '';
 $note = $_POST['note'] ?? '';
-$payment_method = in_array($_POST['payment_method'] ?? '', ['cash', 'transfer', 'qr_counter'], true) ? $_POST['payment_method'] : 'cash';
+// สั่งกลับบ้านบังคับโอนเงินอย่างเดียวเสมอ (ตัด "จ่ายตอนมารับ" ออกทั้งเงินสดและสแกน QR หน้าเคาน์เตอร์แล้ว)
+// ไม่เชื่อค่า payment_method ที่ส่งมาจากฟอร์มตรงๆ เพราะลูกค้าแก้ค่าใน request ได้
+$payment_method = 'transfer';
 
 // 2.6 "โอนเงินเอง" ต้องแนบสลิปมาพร้อมตอนสั่งเลย (ไม่ใช่โชว์ตอนมารับเหมือนเดิม) กันลูกค้าสั่งทิ้งไว้ไม่มารับ/ไม่จ่ายจริง
 // อัปโหลดก่อนเปิดทรานแซกชัน เพราะการเขียนไฟล์ไม่ได้อยู่ในทรานแซกชันของฐานข้อมูลด้วย ถ้าอัปโหลดไม่ผ่านต้องเช็คให้เสร็จตั้งแต่ตรงนี้
 $slip_filename = null;
-if ($payment_method === 'transfer' && $order_type !== 'dine_in') {
+if ($order_type !== 'dine_in') {
     $slip_filename = !empty($_FILES['payment_slip']['name'])
         ? handle_image_upload($_FILES['payment_slip'], '../assets/images/slips/', 'slip')
         : false;
 
     if ($slip_filename === false) {
-        echo "<script>
-            alert('กรุณาแนบไฟล์รูปสลิปการโอนเงิน (JPG, PNG, WEBP) ก่อนส่งออเดอร์ครับ');
-            window.history.back();
-        </script>";
-        exit;
+        submit_order_fail_inline('กรุณาแนบไฟล์รูปสลิปการโอนเงิน (JPG, PNG, WEBP) ก่อนส่งออเดอร์ครับ', $is_ajax);
     }
 }
 
@@ -141,15 +164,28 @@ foreach ($_SESSION['cart'] as $item) {
 }
 
 if (empty($validated_cart)) {
-    echo "<script>
-        alert('เมนูในตะกร้าไม่พร้อมขายแล้ว กรุณาเลือกเมนูใหม่อีกครั้ง');
-        window.location.href = " . json_encode($menu_fallback_url, JSON_UNESCAPED_SLASHES) . ";
-    </script>";
-    exit;
+    submit_order_fail_redirect('เมนูในตะกร้าไม่พร้อมขายแล้ว กรุณาเลือกเมนูใหม่อีกครั้ง', $menu_fallback_url, $is_ajax);
+}
+
+// 2.7 ตรวจสอบสลิปอัตโนมัติผ่าน SlipOK (เฉพาะออเดอร์กลับบ้านที่แนบสลิปมา) - เช็คยอดเงิน/บัญชีผู้รับ/สลิปซ้ำ
+// ต้องเช็คหลังคำนวณ $total_amount จริงแล้วเท่านั้น (ห้ามเชื่อยอดจากฟอร์ม) ถ้าไม่ผ่านให้ลบไฟล์สลิปที่อัปโหลดทิ้ง
+// แล้วบล็อกการสั่งทันที ไม่ปล่อยให้ออเดอร์ที่สลิปมีปัญหาหลุดเข้าระบบไปรอเจ้าของร้านตรวจเองแบบเดิม
+$slip_trans_ref = null;
+$slip_auto_verified = false;
+if ($order_type !== 'dine_in' && $slip_filename) {
+    $verify_result = verify_slip_with_slipok('../assets/images/slips/' . $slip_filename, $total_amount);
+    if (!$verify_result['success']) {
+        @unlink('../assets/images/slips/' . $slip_filename);
+        submit_order_fail_inline($verify_result['message'], $is_ajax);
+    }
+    // skipped = true หมายถึงเจ้าของร้านยังไม่ได้ตั้งค่า SlipOK เลย (ไม่ได้แปลว่าตรวจแล้วผ่าน) ต้องรอเจ้าของร้าน
+    // ตรวจสลิปเองในหน้าจัดการชำระเงินเหมือนเดิม ต่างจากกรณีตรวจผ่านจริงที่ถือว่าจ่ายเงินแล้วทันที
+    $slip_auto_verified = !$verify_result['skipped'];
+    $slip_trans_ref = $verify_result['trans_ref'];
 }
 
 $order_status = 'pending';
-$payment_status = 'unpaid';
+$payment_status = $slip_auto_verified ? 'paid' : 'unpaid';
 
 // การสร้างออเดอร์ + ตัดสต็อก + สร้างรายการชำระเงิน ต้องสำเร็จไปด้วยกันทั้งหมด
 // ถ้าขั้นตอนไหนพลาด ต้อง rollback ทั้งหมด กันออเดอร์ค้าง/สต็อกไม่ตรงกัน
@@ -203,13 +239,18 @@ try {
     // จ่ายเงินสด/สแกน QR หน้าเคาน์เตอร์ตอนมารับ - บันทึกไว้เป็นหลักฐานว่าตกลงจ่ายแบบไหน รอร้านยืนยันรับเงินตอนลูกค้ามารับของ
     // ส่วน "โอนเงินเอง" แนบสลิปมาแล้วตั้งแต่ก่อนเปิดทรานแซกชัน (ดูขั้นตอนที่ 2.6) บันทึกชื่อไฟล์สลิปลง slip_image ไปด้วย
     if ($order_type !== 'dine_in') {
-        $stmt_pay = $conn->prepare("INSERT INTO payment (order_id, amount, method, slip_image) VALUES (?, ?, ?, ?)");
+        // สลิปผ่านการตรวจสอบอัตโนมัติแล้ว (SlipOK) บันทึกสถานะ completed + เลขอ้างอิงธุรกรรมไปเลย
+        // ไม่ต้องรอเจ้าของร้านมากดยืนยันซ้ำในหน้าจัดการชำระเงิน (ดูข้อ 2.7 ด้านบน)
+        $pay_status = $slip_auto_verified ? 'completed' : 'pending';
+        $stmt_pay = $conn->prepare("INSERT INTO payment (order_id, amount, method, slip_image, status, transaction_ref) VALUES (?, ?, ?, ?, ?, ?)");
         $stmt_pay->bind_param(
-            "idss",
+            "idssss",
             $order_id,
             $total_amount,
             $payment_method,
-            $slip_filename);
+            $slip_filename,
+            $pay_status,
+            $slip_trans_ref);
 
         $stmt_pay->execute();
     }
@@ -274,11 +315,7 @@ try {
     $msg = ($exception->getMessage() === 'stock_insufficient')
         ? 'ขออภัยค่ะ มีเมนูบางรายการในตะกร้าที่วัตถุดิบไม่พอแล้ว กรุณาปรับจำนวนหรือเลือกเมนูอื่นแทน'
         : 'เกิดข้อผิดพลาด ไม่สามารถบันทึกคำสั่งซื้อได้ กรุณาลองใหม่อีกครั้ง';
-    echo "<script>
-        alert(" . json_encode($msg, JSON_UNESCAPED_UNICODE) . ");
-        window.history.back();
-    </script>";
-    exit;
+    submit_order_fail_inline($msg, $is_ajax);
 }
 
 // 6. เคลียร์ตะกร้าทิ้งเมื่อสั่งสำเร็จ
@@ -297,7 +334,13 @@ if ($table_id && $order_type === 'dine_in') {
         $_SESSION['dinein_last_phone'] = $online_phone;
     }
 
-    header("Location: ../qr_table/menu_dinein.php?table=" . urlencode($_SESSION['table_number'] ?? '') . "&order_success=1&queue_no=" . $daily_order_no);
+    $success_redirect = "../qr_table/menu_dinein.php?table=" . urlencode($_SESSION['table_number'] ?? '') . "&order_success=1&queue_no=" . $daily_order_no;
+    if ($is_ajax) {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => true, 'redirect' => $success_redirect]);
+        exit;
+    }
+    header("Location: $success_redirect");
     exit;
 }
 
@@ -307,6 +350,12 @@ $_SESSION['guest_order_ids'][] = $order_id;
 if ($online_name !== '') {
     $_SESSION['dinein_last_name'] = $online_name;
     $_SESSION['dinein_last_phone'] = $online_phone;
+}
+
+if ($is_ajax) {
+    header('Content-Type: application/json');
+    echo json_encode(['success' => true, 'redirect' => 'order_detail.php?id=' . $order_id]);
+    exit;
 }
 echo "<script>
     alert('ส่งคำสั่งซื้อเรียบร้อยแล้ว!');

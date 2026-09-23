@@ -234,6 +234,24 @@ function speakThai(text) {
 let lastPendingCount = null;
 let lastPaymentsCount = null;
 
+// ดึงหน้าปัจจุบันซ้ำแบบเงียบๆ (fetch ธรรมดา ไม่ใช่ AJAX endpoint แยก) แล้วดึงเฉพาะส่วนที่ต้องการมาแทนที่ของเดิม
+// ใน DOM ตรงๆ แทนการรีโหลดทั้งหน้า (location.reload()) ที่ทำให้จอกะพริบ/เลื่อนกลับขึ้นบนสุด/ปิด modal ที่เปิดค้างอยู่
+// ข้ามการรีเฟรชไปเลยถ้ามี modal เปิดค้างอยู่ (เช่น กำลังแก้ไขออเดอร์/ดูรายละเอียดสลิป) กันข้อมูลที่กำลังกรอกอยู่หาย
+function ownerSoftRefresh(selectors) {
+    if (document.querySelector('.modal.show')) return; // มี modal เปิดอยู่ รอรอบถัดไปแทน ไม่รบกวนตอนนี้
+    fetch(window.location.href, { cache: 'no-store' })
+        .then(function (res) { return res.text(); })
+        .then(function (html) {
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            selectors.forEach(function (sel) {
+                const fresh = doc.querySelector(sel);
+                const current = document.querySelector(sel);
+                if (fresh && current) current.innerHTML = fresh.innerHTML;
+            });
+        })
+        .catch(function (err) { console.error('Soft refresh failed:', err); });
+}
+
 function checkNewOrders() {
     fetch('api_check_update.php')
     .then(r => r.json())
@@ -259,16 +277,16 @@ function checkNewOrders() {
                 });
             }
 
-            // รีโหลดหน้าเฉพาะตอนอยู่หน้า manage_orders.php
+            // อัปเดตรายการออเดอร์+ตัวเลขคิวแบบเงียบๆ เฉพาะตอนอยู่หน้า manage_orders.php (ไม่รีโหลดทั้งหน้าอีกต่อไป)
             if(window.location.pathname.includes('manage_orders.php')) {
-                location.reload();
+                ownerSoftRefresh(['#ordersListContainer', '#queueCountBadge']);
             }
         }
 
-        // หน้าจัดการชำระเงิน: รีโหลดอัตโนมัติเมื่อมีรายการเปลี่ยนแปลง (สลิปใหม่เข้ามา / โต๊ะปิดบิลจากเครื่องอื่น)
+        // หน้าจัดการชำระเงิน: อัปเดตรายการแบบเงียบๆ เมื่อมีรายการเปลี่ยนแปลง (สลิปใหม่เข้ามา / โต๊ะปิดบิลจากเครื่องอื่น)
         if (lastPaymentsCount !== null && data.payments_count !== lastPaymentsCount
             && window.location.pathname.includes('manage_payments.php')) {
-            location.reload();
+            ownerSoftRefresh(['#pills-served', '#pills-online', '#servedCountBadge', '#onlineCountBadge']);
         }
 
         checkQueueFullWarning(data.active_queue_count, data.max_queue);

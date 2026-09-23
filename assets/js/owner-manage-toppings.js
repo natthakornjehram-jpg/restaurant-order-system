@@ -1,4 +1,19 @@
-// ย้ายลำดับการแสดงหมวดหมู่ขึ้น/ลง (สลับกับหมวดที่อยู่ติดกัน) แล้วรีโหลดหน้าให้เห็นลำดับใหม่
+// อัปเดตปุ่มขึ้น/ลงของบล็อกหมวดหมู่หนึ่งใบ ให้ตรงกับตำแหน่งจริงหลังสลับ (บนสุด = ปิดปุ่มขึ้น, ล่างสุด = ปิดปุ่มลง)
+// ต้องข้าม sibling ที่ไม่ใช่ .cat-block ไปด้วย (เช่น div หัวข้อ+ปุ่ม "+หมวดหมู่"/"+เพิ่มตัวเลือกเสริม" ที่อยู่ก่อนบล็อกแรก
+// ในคอนเทนเนอร์เดียวกัน) ไม่งั้นบล็อกแรกจะเข้าใจผิดว่ามี previousElementSibling แล้วไม่ปิดปุ่มขึ้นให้
+function refreshCatMoveButtons(block) {
+    if (!block) return;
+    const upBtn = block.querySelector('.cat-move-up');
+    const downBtn = block.querySelector('.cat-move-down');
+    let prev = block.previousElementSibling;
+    while (prev && !prev.classList.contains('cat-block')) prev = prev.previousElementSibling;
+    let next = block.nextElementSibling;
+    while (next && !next.classList.contains('cat-block')) next = next.nextElementSibling;
+    if (upBtn) upBtn.disabled = !prev;
+    if (downBtn) downBtn.disabled = !next;
+}
+
+// ย้ายลำดับการแสดงหมวดหมู่ขึ้น/ลง (สลับกับหมวดที่อยู่ติดกัน) - สลับตำแหน่งการ์ดสองใบใน DOM ตรงๆ ไม่ต้องรีโหลดหน้า
 function moveCategory(id, direction) {
     const formData = new FormData();
     formData.append('action', 'reorder_category');
@@ -13,11 +28,21 @@ function moveCategory(id, direction) {
     })
     .then(res => res.json())
     .then(data => {
-        if (data.success) {
-            window.location.reload();
+        if (!data.success) { ownerNotify(data.error || 'ย้ายลำดับไม่สำเร็จ', 'error'); return; }
+
+        const block = document.getElementById('cat-block-' + data.cat_id);
+        const swapBlock = document.getElementById('cat-block-' + data.swap_id);
+        if (!block || !swapBlock) return;
+
+        if (direction === 'up') {
+            block.parentNode.insertBefore(block, swapBlock);
         } else {
-            ownerNotify(data.error || 'ย้ายลำดับไม่สำเร็จ', 'error');
+            block.parentNode.insertBefore(swapBlock, block);
         }
+        refreshCatMoveButtons(block);
+        refreshCatMoveButtons(swapBlock);
+        block.classList.add('card-update-flash');
+        setTimeout(() => block.classList.remove('card-update-flash'), 800);
     })
     .catch(() => ownerNotify('เกิดข้อผิดพลาด ไม่สามารถย้ายลำดับได้', 'error'));
 }
@@ -144,15 +169,32 @@ function toggleStockQtyField() {
     document.getElementById('t_stock_qty_wrap').style.display = useStock ? 'block' : 'none';
 }
 
-// popup ยืนยันก่อนลบเสมอ (ส่งเป็น POST ผ่านฟอร์มที่ซ่อนไว้ พร้อม CSRF token แทนการยิง GET ตรงๆ)
+// popup ยืนยันก่อนลบเสมอ ส่งเป็น AJAX แทนการรีโหลดทั้งหน้า (เดิม submit ฟอร์มที่ซ่อนไว้แบบธรรมดา)
 // ใช้ ownerConfirm() (SweetAlert2) แทน confirm() ของเบราว์เซอร์ เพราะ confirm() ถูกบล็อกแบบเงียบๆ
 // ในเบราว์เซอร์/เว็บวิวบางตัว ทำให้กดลบแล้วไม่มีอะไรเกิดขึ้นเลยโดยไม่รู้สาเหตุ
 function confirmDeleteTopping(id, name) {
     ownerConfirm('ต้องการลบ "' + name + '" ใช่หรือไม่? การลบไม่สามารถกู้คืนได้').then(function (ok) {
-        if (ok) {
-            document.getElementById('delete_topping_id').value = id;
-            document.getElementById('deleteToppingForm').submit();
-        }
+        if (!ok) return;
+        const fd = new FormData();
+        fd.append('csrf_token', CSRF_TOKEN);
+        fd.append('delete_id', id);
+        fetch('manage_toppings.php', {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: fd
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (!data.success) { ownerNotify(data.error || 'ลบไม่สำเร็จ', 'error'); return; }
+            const row = document.getElementById('row-' + id);
+            if (row) {
+                row.style.transition = 'opacity 0.3s ease';
+                row.style.opacity = '0';
+                setTimeout(() => row.remove(), 300);
+            }
+            ownerNotify('ลบตัวเลือกเสริมเรียบร้อยแล้ว');
+        })
+        .catch(() => ownerNotify('เกิดข้อผิดพลาด ไม่สามารถลบได้', 'error'));
     });
 }
 
@@ -185,12 +227,100 @@ function toggleToppingActive(id, isChecked) {
     });
 }
 
-// ตรวจสอบความถูกต้องของฟอร์มก่อนบันทึก
+// ตอนโหลดหน้าครั้งแรก ปุ่มขึ้น/ลงของทุกบล็อกเรนเดอร์มาแบบ "เปิดใช้งานเสมอ" (ดู includes/topping_render.php)
+// ต้องรีเฟรชให้ตรงตำแหน่งจริงทันทีที่โหลดหน้า (บนสุด/ล่างสุดต้องปิดปุ่มที่เกี่ยวข้อง)
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.cat-block').forEach(refreshCatMoveButtons);
+});
+
+// จัดการฟอร์ม "หมวดหมู่ + ตัวเลือกย่อยทั้งหมดในหมวด" แบบ AJAX ไม่รีโหลดทั้งหน้า (เพิ่มหมวดใหม่/แก้ไขหมวดเดิม
+// พร้อมเพิ่ม/แก้ไข/ลบตัวเลือกย่อยหลายแถวพร้อมกันได้ในครั้งเดียว - ตรรกะฝั่งเซิร์ฟเวอร์เหมือนเดิมทุกอย่าง)
+document.addEventListener('DOMContentLoaded', function () {
+    const catForm = document.getElementById('catGroupForm');
+    if (!catForm) return;
+
+    catForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        const errorBox = catForm.querySelector('.cat-group-error');
+        if (errorBox) errorBox.innerHTML = '';
+        const submitBtn = catForm.querySelector('button[type="submit"]');
+        const originalBtnHtml = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+
+        // new FormData(form) ไม่ใส่ name/value ของปุ่ม submit ที่กดให้อัตโนมัติ (save_category_group เป็นชื่อปุ่ม ไม่ใช่ input ซ่อน)
+        const fd = new FormData(catForm);
+        fd.append('save_category_group', '1');
+
+        fetch('manage_toppings.php', {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: fd
+        })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnHtml;
+
+            if (!data.success) {
+                if (errorBox) { errorBox.innerHTML = '<div class="alert alert-danger rounded-3 py-2 small mb-3">' + (data.error || 'เกิดข้อผิดพลาด') + '</div>'; }
+                return;
+            }
+
+            const modalInstance = bootstrap.Modal.getInstance(document.getElementById('catModal'));
+            if (modalInstance) modalInstance.hide();
+
+            // รอ modal ปิดก่อนค่อยแทรก/แทนที่ DOM กัน bootstrap อ้างอิง element เดิมที่กำลังปิดอยู่
+            setTimeout(function () {
+                const container = document.querySelector('.container.py-3.py-md-4');
+                if (data.is_new) {
+                    // เพิ่มหมวดใหม่ต่อท้ายสุด แล้วรีเฟรชปุ่มขึ้น/ลงของบล็อกที่เคยเป็นบล็อกสุดท้ายด้วย (ตอนนี้ไม่ใช่บล็อกสุดท้ายแล้ว)
+                    const previousLastBlock = document.querySelector('.cat-block:last-of-type');
+                    container.insertAdjacentHTML('beforeend', data.block_html);
+                    if (previousLastBlock) refreshCatMoveButtons(previousLastBlock);
+                } else {
+                    const oldBlock = document.getElementById('cat-block-' + data.cat_id);
+                    if (oldBlock) oldBlock.outerHTML = data.block_html;
+                }
+                const newBlock = document.getElementById('cat-block-' + data.cat_id);
+                if (newBlock) {
+                    refreshCatMoveButtons(newBlock);
+                    newBlock.classList.add('card-update-flash');
+                    setTimeout(() => newBlock.classList.remove('card-update-flash'), 800);
+                }
+
+                // ซิงก์ dropdown "กลุ่มตัวเลือกเสริม" ในโมดัลเพิ่ม/แก้ไขตัวเลือกเสริมเดี่ยวด้วย ไม่งั้นเพิ่ม/แก้ไขหมวดหมู่ใหม่
+                // ไปแล้วเปิดโมดัลนั้นต่อจะไม่เห็นหมวดที่เพิ่งเพิ่ม/เปลี่ยนชื่อไป (หน้าไม่ได้รีโหลดให้ dropdown อ่านค่าใหม่เอง)
+                const catSelect = document.getElementById('t_cat_id');
+                if (catSelect) {
+                    const existingOption = catSelect.querySelector('option[value="' + data.cat_id + '"]');
+                    if (existingOption) {
+                        existingOption.textContent = data.cat_name;
+                    } else {
+                        const opt = document.createElement('option');
+                        opt.value = data.cat_id;
+                        opt.textContent = data.cat_name;
+                        catSelect.appendChild(opt);
+                    }
+                }
+            }, 300);
+
+            ownerNotify(data.warning || 'บันทึกหมวดหมู่เรียบร้อยแล้ว', data.warning ? 'error' : 'success');
+        })
+        .catch(function () {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnHtml;
+            if (errorBox) { errorBox.innerHTML = '<div class="alert alert-danger rounded-3 py-2 small mb-3">เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่อีกครั้ง</div>'; }
+        });
+    });
+});
+
+// ตรวจสอบความถูกต้องของฟอร์มก่อนบันทึก แล้วส่งแบบ AJAX ไม่รีโหลดทั้งหน้า
 document.addEventListener('DOMContentLoaded', function () {
     const form = document.getElementById('toppingForm');
     if (!form) return;
 
     form.addEventListener('submit', function (e) {
+        e.preventDefault();
         let valid = true;
 
         const nameInput = document.getElementById('t_name');
@@ -231,8 +361,60 @@ document.addEventListener('DOMContentLoaded', function () {
             stockInput.classList.remove('is-invalid');
         }
 
-        if (!valid) {
-            e.preventDefault();
-        }
+        if (!valid) return;
+
+        const errorBox = form.querySelector('.topping-form-error');
+        if (errorBox) errorBox.innerHTML = '';
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalBtnHtml = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+
+        // new FormData(form) ไม่ใส่ name/value ของปุ่ม submit ที่กดให้อัตโนมัติ (save_topping เป็นชื่อปุ่ม ไม่ใช่ input ซ่อน)
+        const fd = new FormData(form);
+        fd.append('save_topping', '1');
+
+        fetch('manage_toppings.php', {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: fd
+        })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnHtml;
+
+            if (!data.success) {
+                if (errorBox) { errorBox.innerHTML = '<div class="alert alert-danger rounded-3 py-2 small mb-3">' + (data.error || 'เกิดข้อผิดพลาด') + '</div>'; }
+                return;
+            }
+
+            const modalInstance = bootstrap.Modal.getInstance(document.getElementById('toppingModal'));
+            if (modalInstance) modalInstance.hide();
+
+            setTimeout(function () {
+                const existingRow = document.getElementById('row-' + data.topping_id);
+                const movedCategory = !data.is_new && data.old_cat_id !== null && Number(data.old_cat_id) !== Number(data.cat_id);
+
+                if (data.is_new || movedCategory) {
+                    if (existingRow) existingRow.remove();
+                    const tbody = document.getElementById('topping-tbody-' + data.cat_id);
+                    if (tbody) tbody.insertAdjacentHTML('beforeend', data.row_html);
+                } else if (existingRow) {
+                    existingRow.outerHTML = data.row_html;
+                }
+                const newRow = document.getElementById('row-' + data.topping_id);
+                if (newRow) {
+                    newRow.classList.add('card-update-flash');
+                    setTimeout(() => newRow.classList.remove('card-update-flash'), 800);
+                }
+            }, 300);
+
+            ownerNotify(data.is_new ? 'เพิ่มตัวเลือกเสริมเรียบร้อยแล้ว' : 'แก้ไขตัวเลือกเสริมเรียบร้อยแล้ว');
+        })
+        .catch(function () {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnHtml;
+            if (errorBox) { errorBox.innerHTML = '<div class="alert alert-danger rounded-3 py-2 small mb-3">เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่อีกครั้ง</div>'; }
+        });
     });
 });

@@ -7,9 +7,12 @@ require_once '../includes/csrf.php';
 
 $success_msg = "";
 $error_msg = "";
+// ให้หน้านี้ตอบเป็น JSON แทนการรีโหลดทั้งหน้าได้ ถ้าคำขอมาจาก fetch() ของ JS - ตรรกะบันทึก/อัปโหลดไฟล์ด้านล่างเหมือนเดิมทุกอย่าง
+$is_ajax = isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ?? '')) {
     $error_msg = "คำขอไม่ถูกต้อง (CSRF token ไม่ถูกต้อง) กรุณาลองใหม่อีกครั้ง";
+    if ($is_ajax) { header('Content-Type: application/json'); echo json_encode(['success' => false, 'error' => $error_msg]); exit; }
 } elseif ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $res_name = trim($_POST['restaurant_name']);
     $res_phone = trim($_POST['phone']);
@@ -74,6 +77,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
         $success_msg = "อัปเดตข้อมูลร้านค้าและช่องทางชำระเงินเรียบร้อยแล้ว!";
     } else {
         $error_msg = "เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง";
+    }
+
+    if ($is_ajax) {
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => (bool) $success_msg,
+            'error' => $error_msg ?: null,
+            'logo_url' => '../assets/images/logos/' . $logo_name,
+            'promptpay_qr' => $qr_name ? '../assets/images/logos/' . $qr_name : null,
+        ]);
+        exit;
     }
 }
 
@@ -263,11 +277,42 @@ function removeQr() {
     document.getElementById('qr_remove_btn').style.display = 'none';
 }
 
-// ปุ่มบันทึก: โชว์วงกลมหมุนระหว่างกำลังส่งข้อมูล กันกดซ้ำ (พอบันทึกเสร็จหน้าจะโหลดใหม่แล้วเด้งกล่องข้อความติ๊กถูก/! ยืนยันด้านล่าง)
-document.getElementById('settings_form').addEventListener('submit', function () {
+// ปุ่มบันทึก: ส่งแบบ AJAX ไม่รีโหลดทั้งหน้า (เดิม submit ธรรมดาแล้วรอหน้าโหลดใหม่มาเด้งข้อความยืนยัน)
+// โชว์วงกลมหมุนระหว่างกำลังส่งข้อมูล กันกดซ้ำ เหมือนเดิม แค่ไม่ต้องรอรีโหลดทั้งหน้าอีกต่อไป
+document.getElementById('settings_form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var form = this;
     var btn = document.getElementById('settings_save_btn');
+    var originalBtnHtml = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>กำลังบันทึก...';
+
+    fetch(form.getAttribute('action') || 'settings.php', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: new FormData(form)
+    })
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+        btn.disabled = false;
+        btn.innerHTML = originalBtnHtml;
+
+        if (data.success) {
+            // อัปเดตรูปโลโก้/QR ให้ตรงกับไฟล์จริงที่เพิ่งบันทึกไป (ชื่อไฟล์ใหม่ไม่ซ้ำเดิมเสมอ ไม่ต้อง cache-bust)
+            var logoImg = document.getElementById('preview_logo');
+            if (logoImg && data.logo_url) logoImg.src = data.logo_url;
+
+            var navIcon = document.getElementById('navQrWarnIcon');
+            if (navIcon) navIcon.style.display = data.promptpay_qr ? 'none' : '';
+        }
+
+        ownerNotify(data.success ? 'อัปเดตข้อมูลร้านค้าและช่องทางชำระเงินเรียบร้อยแล้ว!' : (data.error || 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง'), data.success ? 'success' : 'error');
+    })
+    .catch(function () {
+        btn.disabled = false;
+        btn.innerHTML = originalBtnHtml;
+        ownerNotify('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่อีกครั้ง', 'error');
+    });
 });
 </script>
 

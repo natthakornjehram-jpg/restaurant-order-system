@@ -23,17 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    if ($action === 'update_stock') {
-        $item_id = intval($_POST['item_id']);
-        $stock_qty = max(0, intval($_POST['stock_qty']));
-        $use_stock = isset($_POST['use_stock']) ? 1 : 0;
-
-        $stmt = $conn->prepare("UPDATE item SET stock_qty = ?, use_stock = ? WHERE item_id = ?");
-        $stmt->bind_param("iii", $stock_qty, $use_stock, $item_id);
-        if ($stmt->execute()) {
-            $msg = "อัปเดตคลังสินค้าเรียบร้อยแล้ว";
-        }
-    } elseif ($action === 'quick_adjust') {
+    if ($action === 'quick_adjust') {
         $item_id = intval($_POST['item_id']);
         $change = intval($_POST['change']);
         
@@ -125,7 +115,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($stmt->execute()) {
-            echo json_encode(['success' => true]);
+            $new_pool_id = $pool_id > 0 ? $pool_id : $conn->insert_id;
+
+            // หาชื่อเมนู/ท็อปปิ้งที่ผูกกับกลุ่มนี้ไว้อยู่แล้ว (กรณีแก้ไขกลุ่มเดิม) เพื่อ render การ์ดให้ตรงความจริง
+            $linked = [];
+            $li = $conn->prepare("SELECT name FROM item WHERE stock_pool_id = ?");
+            $li->bind_param("i", $new_pool_id);
+            $li->execute();
+            $lr = $li->get_result();
+            while ($r = $lr->fetch_assoc()) { $linked[] = $r['name']; }
+            $lt = $conn->prepare("SELECT topping_name AS name FROM topping WHERE stock_pool_id = ?");
+            $lt->bind_param("i", $new_pool_id);
+            $lt->execute();
+            $lr2 = $lt->get_result();
+            while ($r = $lr2->fetch_assoc()) { $linked[] = $r['name']; }
+
+            // render การ์ดนี้ใบเดียวด้วยฟังก์ชันเดียวกับตอนโหลดหน้าปกติ ส่ง HTML กลับไปแทรก/แทนที่ฝั่งหน้าเว็บได้เลย
+            // ไม่ต้องรีโหลดทั้งหน้า และไม่ต้องเขียนโครงสร้างการ์ดซ้ำสองที่ (PHP กับ JS)
+            ob_start();
+            render_stock_pool_card(['pool_id' => $new_pool_id, 'pool_name' => $pool_name, 'stock_qty' => $pool_qty], $linked);
+            $card_html = ob_get_clean();
+
+            echo json_encode(['success' => true, 'pool_id' => $new_pool_id, 'is_new' => $pool_id === 0, 'card_html' => $card_html]);
         } else {
             echo json_encode(['success' => false, 'error' => 'เกิดข้อผิดพลาดในการบันทึกข้อมูล']);
         }
@@ -181,7 +192,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $stmt = $conn->prepare("UPDATE item SET stock_pool_id = ? WHERE item_id = ?");
         $stmt->bind_param("ii", $pool_val, $item_id);
-        echo json_encode(['success' => $stmt->execute()]);
+        $ok = $stmt->execute();
+
+        // ส่งข้อมูลล่าสุดกลับไปด้วย ให้ฝั่ง JS อัปเดตหน้าการ์ดในตัวได้เลยโดยไม่ต้องรีโหลดหน้าทั้งหน้า
+        $resp = ['success' => $ok, 'is_pooled' => $pool_val !== null];
+        if ($ok && $pool_val !== null) {
+            $p_stmt = $conn->prepare("SELECT pool_name, stock_qty FROM stock_pool WHERE pool_id = ?");
+            $p_stmt->bind_param("i", $pool_val);
+            $p_stmt->execute();
+            $p_row = $p_stmt->get_result()->fetch_assoc();
+            $resp['pool_name'] = $p_row['pool_name'] ?? '';
+            $resp['qty'] = (int) ($p_row['stock_qty'] ?? 0);
+        } elseif ($ok) {
+            $q_stmt = $conn->prepare("SELECT stock_qty FROM item WHERE item_id = ?");
+            $q_stmt->bind_param("i", $item_id);
+            $q_stmt->execute();
+            $resp['qty'] = (int) ($q_stmt->get_result()->fetch_assoc()['stock_qty'] ?? 0);
+        }
+        echo json_encode($resp);
         exit;
     } elseif ($action === 'link_topping_pool') {
         header('Content-Type: application/json');
@@ -191,7 +219,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $stmt = $conn->prepare("UPDATE topping SET stock_pool_id = ? WHERE topping_id = ?");
         $stmt->bind_param("ii", $pool_val, $topping_id);
-        echo json_encode(['success' => $stmt->execute()]);
+        $ok = $stmt->execute();
+
+        $resp = ['success' => $ok, 'is_pooled' => $pool_val !== null];
+        if ($ok && $pool_val !== null) {
+            $p_stmt = $conn->prepare("SELECT pool_name, stock_qty FROM stock_pool WHERE pool_id = ?");
+            $p_stmt->bind_param("i", $pool_val);
+            $p_stmt->execute();
+            $p_row = $p_stmt->get_result()->fetch_assoc();
+            $resp['pool_name'] = $p_row['pool_name'] ?? '';
+            $resp['qty'] = (int) ($p_row['stock_qty'] ?? 0);
+        } elseif ($ok) {
+            $q_stmt = $conn->prepare("SELECT stock_qty FROM topping WHERE topping_id = ?");
+            $q_stmt->bind_param("i", $topping_id);
+            $q_stmt->execute();
+            $resp['qty'] = (int) ($q_stmt->get_result()->fetch_assoc()['stock_qty'] ?? 0);
+        }
+        echo json_encode($resp);
         exit;
     }
 }
@@ -274,29 +318,28 @@ function render_stock_item_card($m, $all_pools = []) {
             <div class="bg-light rounded-4 p-3 mb-3 text-center">
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <span class="small text-muted fw-bold">คงเหลือในคลังสินค้า</span>
-                    <span class="badge rounded-pill <?= $stock_badge ?> px-3 py-1"><?= $stock_text ?></span>
+                    <span class="badge rounded-pill <?= $stock_badge ?> px-3 py-1" id="item_badge_<?= $m_id ?>"><?= $stock_text ?></span>
                 </div>
 
-                <?php if ($is_pooled): ?>
-                    <div class="small text-primary fw-bold mb-1"><i class="bi bi-link-45deg"></i> ใช้ร่วมกับกลุ่ม "<?= htmlspecialchars($m['pool_name']) ?>"</div>
-                    <div class="h2 fw-bold m-0"><?= $stock ?></div>
+                <div id="item_pooled_box_<?= $m_id ?>" style="<?= $is_pooled ? '' : 'display:none;' ?>">
+                    <div class="small text-primary fw-bold mb-1"><i class="bi bi-link-45deg"></i> ใช้ร่วมกับกลุ่ม "<span id="item_pool_name_<?= $m_id ?>"><?= htmlspecialchars($m['pool_name'] ?? '') ?></span>"</div>
+                    <div class="h2 fw-bold m-0" id="item_pool_qty_<?= $m_id ?>"><?= $is_pooled ? $stock : 0 ?></div>
                     <div class="form-text mb-0">ปรับจำนวนได้ที่แท็บ "กลุ่มสต็อกร่วม"</div>
-                <?php else: ?>
+                </div>
+                <div id="item_own_box_<?= $m_id ?>" style="<?= $is_pooled ? 'display:none;' : '' ?>">
                     <div class="d-flex align-items-center justify-content-center gap-3 my-2">
                         <button type="button" class="btn btn-outline-danger btn-qty shadow-sm" onclick="adjustStock(<?= $m_id ?>, -1)">-</button>
-                        <span class="h2 fw-bold m-0" id="stock_display_<?= $m_id ?>" style="min-width: 60px;"><?= $stock ?></span>
+                        <span class="h2 fw-bold m-0" id="stock_display_<?= $m_id ?>" style="min-width: 60px;"><?= $is_pooled ? 0 : $stock ?></span>
                         <button type="button" class="btn btn-outline-success btn-qty shadow-sm" onclick="adjustStock(<?= $m_id ?>, 1)">+</button>
                     </div>
-                <?php endif; ?>
+                </div>
             </div>
 
             <div class="mt-auto">
-                <?php if (!$is_pooled): ?>
-                <div class="d-flex gap-2 mb-2">
+                <div class="d-flex gap-2 mb-2" id="item_stepper_extra_<?= $m_id ?>" style="<?= $is_pooled ? 'display:none;' : '' ?>">
                     <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill flex-grow-1" onclick="adjustStock(<?= $m_id ?>, 10)">+10</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill flex-grow-1" onclick="adjustStock(<?= $m_id ?>, 50)">+50</button>
                 </div>
-                <?php endif; ?>
                 <?php render_pool_link_select($m['stock_pool_id'] ?? null, $all_pools, "linkItemPool($m_id, this.value)"); ?>
             </div>
         </div>
@@ -324,33 +367,32 @@ function render_stock_topping_card($top, $all_pools = []) {
     <div class="col-12 col-md-6 col-lg-4 col-xl-3">
         <div class="card stock-card p-3 h-100 bg-white">
             <div class="d-flex justify-content-end mb-2">
-                <span class="badge rounded-pill <?= $top_badge ?> px-3 py-1" id="top_badge_<?= $t_id ?>"><?= $top_text ?></span>
+                <span class="badge rounded-pill <?= $top_badge ?> px-3 py-1" id="top_badge_<?= $t_id ?>" data-active="<?= (int) $is_active ?>"><?= $top_text ?></span>
             </div>
             <h5 class="fw-bold mb-1"><?= htmlspecialchars($top['topping_name']) ?></h5>
             <div class="fw-bold text-success mb-2">+ ฿<?= number_format($top['price'], 0) ?></div>
 
             <div class="bg-light rounded-4 p-3 mb-3 text-center">
                 <div class="small text-muted fw-bold mb-1">คลังสินค้าคงเหลือ (ชุด/จาน)</div>
-                <?php if ($is_pooled): ?>
-                    <div class="small text-primary fw-bold mb-1"><i class="bi bi-link-45deg"></i> ใช้ร่วมกับกลุ่ม "<?= htmlspecialchars($top['pool_name']) ?>"</div>
-                    <div class="h2 fw-bold m-0"><?= $t_stock ?></div>
+                <div id="top_pooled_box_<?= $t_id ?>" style="<?= $is_pooled ? '' : 'display:none;' ?>">
+                    <div class="small text-primary fw-bold mb-1"><i class="bi bi-link-45deg"></i> ใช้ร่วมกับกลุ่ม "<span id="top_pool_name_<?= $t_id ?>"><?= htmlspecialchars($top['pool_name'] ?? '') ?></span>"</div>
+                    <div class="h2 fw-bold m-0" id="top_pool_qty_<?= $t_id ?>"><?= $is_pooled ? $t_stock : 0 ?></div>
                     <div class="form-text mb-0">ปรับจำนวนได้ที่แท็บ "กลุ่มสต็อกร่วม"</div>
-                <?php else: ?>
+                </div>
+                <div id="top_own_box_<?= $t_id ?>" style="<?= $is_pooled ? 'display:none;' : '' ?>">
                     <div class="d-flex align-items-center justify-content-center gap-3 my-1">
                         <button type="button" class="btn btn-outline-danger btn-qty shadow-sm" onclick="adjustToppingStock(<?= $t_id ?>, -1)">-</button>
-                        <span class="h2 fw-bold m-0" id="top_stock_display_<?= $t_id ?>" style="min-width: 60px;"><?= $t_stock ?></span>
+                        <span class="h2 fw-bold m-0" id="top_stock_display_<?= $t_id ?>" style="min-width: 60px;"><?= $is_pooled ? 0 : $t_stock ?></span>
                         <button type="button" class="btn btn-outline-success btn-qty shadow-sm" onclick="adjustToppingStock(<?= $t_id ?>, 1)">+</button>
                     </div>
-                <?php endif; ?>
+                </div>
             </div>
 
             <div class="mt-auto">
-                <?php if (!$is_pooled): ?>
-                <div class="d-flex gap-2 mb-2">
+                <div class="d-flex gap-2 mb-2" id="top_stepper_extra_<?= $t_id ?>" style="<?= $is_pooled ? 'display:none;' : '' ?>">
                     <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill flex-grow-1" onclick="adjustToppingStock(<?= $t_id ?>, 10)">+10</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill flex-grow-1" onclick="adjustToppingStock(<?= $t_id ?>, 50)">+50</button>
                 </div>
-                <?php endif; ?>
                 <button type="button" id="top_btn_<?= $t_id ?>" onclick="toggleToppingStock(<?= $t_id ?>, <?= $is_active ?>)" class="btn w-100 rounded-pill py-2 fw-bold shadow-sm <?= ($is_active == 1) ? 'btn-outline-danger' : 'btn-success' ?>">
                     <?= ($is_active == 1) ? '<i class="bi bi-pause-circle me-1"></i> กดปิดขาย (ปิดชั่วคราว)' : '<i class="bi bi-play-circle me-1"></i> กดเปิดขาย (เปิดใช้งาน)' ?>
                 </button>
@@ -370,11 +412,11 @@ function render_stock_pool_card($p, $linked_names) {
     elseif ($qty <= 5) { $badge = "bg-warning text-dark"; $text = "ใกล้หมด"; }
     $names_json = htmlspecialchars(json_encode($p['pool_name'], JSON_UNESCAPED_UNICODE), ENT_QUOTES);
     ?>
-    <div class="col-12 col-md-6 col-lg-4 col-xl-3">
+    <div class="col-12 col-md-6 col-lg-4 col-xl-3" id="pool-col-<?= $p_id ?>">
         <div class="card stock-card p-3 h-100 bg-white">
             <div class="d-flex justify-content-between align-items-start mb-2">
                 <h5 class="fw-bold mb-0"><i class="bi bi-boxes text-primary me-1"></i> <?= htmlspecialchars($p['pool_name']) ?></h5>
-                <span class="badge rounded-pill <?= $badge ?> px-3 py-1"><?= $text ?></span>
+                <span class="badge rounded-pill <?= $badge ?> px-3 py-1" id="pool_badge_<?= $p_id ?>"><?= $text ?></span>
             </div>
             <div class="small text-muted mb-3">
                 <?= !empty($linked_names) ? 'ใช้ร่วมกับ: ' . htmlspecialchars(implode(', ', $linked_names)) : 'ยังไม่มีเมนู/ท็อปปิ้งผูกกับกลุ่มนี้' ?>
@@ -413,6 +455,15 @@ include '../includes/nav_owner.php';
     .btn-qty { width: 45px; height: 45px; border-radius: 50%; font-size: 1.3rem; font-weight: bold; display: flex; align-items: center; justify-content: center; }
     .star-btn { width: 34px; height: 34px; border-radius: 50%; border: 1px solid #e5e7eb; background-color: #f9fafb; color: #d1d5db; font-size: 1.1rem; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; align-self: flex-start; }
     .star-btn.star-active { background-color: #fff7e0; border-color: #f5b301; color: #f5b301; }
+
+    /* อนิเมชันตอนอัปเดตค่าแบบเรียลไทม์ (สต็อก/ป้ายสถานะ/กลุ่มร่วม) ไม่ต้องรีหน้า ให้เห็นชัดว่าค่าเพิ่งเปลี่ยน */
+    @keyframes stockFlash {
+        0%   { background-color: rgba(255, 193, 7, 0.55); }
+        100% { background-color: transparent; }
+    }
+    .stock-flash { animation: stockFlash 0.7s ease-out; border-radius: 8px; }
+    .h2.fw-bold { transition: transform 0.15s ease; }
+    .stock-pop { transform: scale(1.18); }
 </style>
 
 <div class="main-content container-fluid pb-5 px-4 pt-3 text-dark">
@@ -611,7 +662,7 @@ include '../includes/nav_owner.php';
                 </button>
             </div>
             <?php if (empty($all_pools)): ?>
-                <div class="text-center py-5">
+                <div class="text-center py-5" id="poolsEmptyState">
                     <i class="bi bi-boxes display-1 text-muted opacity-25"></i>
                     <p class="mt-3 text-muted">ยังไม่มีกลุ่มสต็อกร่วมในระบบ</p>
                 </div>
@@ -624,7 +675,7 @@ include '../includes/nav_owner.php';
                 $link_tops_res = $conn->query("SELECT stock_pool_id, topping_name AS name FROM topping WHERE stock_pool_id IS NOT NULL");
                 if ($link_tops_res) { while ($r = $link_tops_res->fetch_assoc()) { $pool_links[$r['stock_pool_id']][] = $r['name']; } }
                 ?>
-                <div class="row g-4">
+                <div class="row g-4" id="poolsGridRow">
                     <?php foreach ($all_pools as $p) { render_stock_pool_card($p, $pool_links[$p['pool_id']] ?? []); } ?>
                 </div>
             <?php endif; ?>
@@ -642,9 +693,24 @@ include '../includes/nav_owner.php';
             </div>
             <div class="modal-body px-4">
                 <input type="hidden" name="pool_id" id="pool_id" value="0">
+                <div class="mb-3" id="poolCategoryPickerWrap">
+                    <label class="small fw-bold mb-2">เลือกจากหมวดหมู่วัตถุดิบ <span class="text-muted fw-normal">(ไม่ต้องพิมพ์เอง ถ้ามีในลิสต์)</span></label>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <select id="poolCategorySelect" class="form-select rounded-3">
+                                <option value="">หมวดหมู่...</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <select id="poolSubCategorySelect" class="form-select rounded-3" disabled>
+                                <option value="">ชนิด...</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
                 <div class="mb-3">
                     <label class="small fw-bold mb-2">ชื่อกลุ่ม</label>
-                    <input type="text" name="pool_name" id="pool_name" class="form-control rounded-3" placeholder="เช่น ไก่, หมู, กุ้ง" required>
+                    <input type="text" name="pool_name" id="pool_name" class="form-control rounded-3" placeholder="เช่น ไก่, หมู, กุ้ง (หรือเลือกจากหมวดหมู่ด้านบน)" required>
                     <div class="invalid-feedback">กรุณากรอกชื่อกลุ่มสต็อก</div>
                 </div>
                 <div class="mb-3">
@@ -712,11 +778,41 @@ include '../includes/nav_owner.php';
 </div>
 
 <script>
+// กระพริบไฮไลต์สั้นๆ บนอีลีเมนต์ที่เพิ่งอัปเดตค่า ให้เห็นชัดว่าเปลี่ยนแบบเรียลไทม์ (ไม่ใช่แค่โผล่มาเฉยๆ)
+function flashUpdate(el) {
+    if (!el) return;
+    el.classList.remove('stock-flash', 'stock-pop');
+    void el.offsetWidth; // reflow เพื่อ retrigger อนิเมชันได้แม้เพิ่งเล่นไปหมาดๆ
+    el.classList.add('stock-flash', 'stock-pop');
+    setTimeout(() => el.classList.remove('stock-flash', 'stock-pop'), 700);
+}
+
+// อัปเดตป้ายสถานะ (หมด/ใกล้หมด/มีของพอใช้) ของเมนูให้ตรงกับจำนวนล่าสุดทันที โดยไม่ต้องโหลดหน้าใหม่
+// (เดิมอัปเดตแค่ตัวเลขอย่างเดียว ป้ายสียังค้างค่าตอนโหลดหน้าครั้งแรกอยู่ ทำให้ดูไม่ real-time)
+function updateItemBadge(itemId, qty) {
+    const badge = document.getElementById('item_badge_' + itemId);
+    if (!badge) return;
+    badge.classList.remove('bg-success', 'bg-danger', 'bg-warning', 'text-dark');
+    if (qty <= 0) {
+        badge.classList.add('bg-danger');
+        badge.textContent = 'ของหมด!';
+    } else if (qty <= 5) {
+        badge.classList.add('bg-warning', 'text-dark');
+        badge.textContent = 'ใกล้หมด';
+    } else {
+        badge.classList.add('bg-success');
+        badge.textContent = 'มีของพอใช้';
+    }
+    flashUpdate(badge);
+}
+
 function adjustStock(itemId, change) {
     const display = document.getElementById('stock_display_' + itemId);
     let current = parseInt(display.innerText) || 0;
     let nextVal = Math.max(0, current + change);
     display.innerText = nextVal;
+    flashUpdate(display);
+    updateItemBadge(itemId, nextVal);
 
     const formData = new FormData();
     formData.append('action', 'quick_adjust');
@@ -733,9 +829,33 @@ function adjustStock(itemId, change) {
     .then(data => {
         if(data.success) {
             display.innerText = data.new_qty;
+            updateItemBadge(itemId, data.new_qty);
+        } else {
+            display.innerText = current;
+            updateItemBadge(itemId, current);
         }
     })
-    .catch(err => console.error(err));
+    .catch(err => { console.error(err); display.innerText = current; updateItemBadge(itemId, current); });
+}
+
+// เหมือน updateItemBadge แต่ต้องเช็ค data-active ก่อนด้วย เพราะป้ายของท็อปปิ้งมี 2 เงื่อนไขซ้อนกัน
+// (ปิดขายด้วยสวิตช์ อยู่เหนือกว่าเงื่อนไขจำนวนคงเหลือเสมอ - ต่อให้เพิ่งเติมของจนพอใช้แล้ว แต่ยังปิดขายอยู่ก็ต้องโชว์ "ปิดขาย" ไม่ใช่ "มีของพอใช้")
+function updateToppingBadge(toppingId, qty) {
+    const badge = document.getElementById('top_badge_' + toppingId);
+    if (!badge) return;
+    if (badge.dataset.active === '0') return; // ปิดขายอยู่ ไม่ต้องยุ่งกับป้าย ปล่อยให้ toggleToppingStock จัดการเอง
+    badge.classList.remove('bg-success', 'bg-danger', 'bg-warning', 'text-dark');
+    if (qty <= 0) {
+        badge.classList.add('bg-danger');
+        badge.textContent = 'ของหมด!';
+    } else if (qty <= 5) {
+        badge.classList.add('bg-warning', 'text-dark');
+        badge.textContent = 'ใกล้หมด';
+    } else {
+        badge.classList.add('bg-success');
+        badge.textContent = 'เปิดขาย';
+    }
+    flashUpdate(badge);
 }
 
 function adjustToppingStock(toppingId, change) {
@@ -743,6 +863,8 @@ function adjustToppingStock(toppingId, change) {
     let current = parseInt(display.innerText) || 0;
     let nextVal = Math.max(0, current + change);
     display.innerText = nextVal;
+    flashUpdate(display);
+    updateToppingBadge(toppingId, nextVal);
 
     const formData = new FormData();
     formData.append('action', 'quick_adjust_topping');
@@ -759,9 +881,13 @@ function adjustToppingStock(toppingId, change) {
     .then(data => {
         if(data.success) {
             display.innerText = data.new_qty;
+            updateToppingBadge(toppingId, data.new_qty);
+        } else {
+            display.innerText = current;
+            updateToppingBadge(toppingId, current);
         }
     })
-    .catch(err => console.error(err));
+    .catch(err => { console.error(err); display.innerText = current; updateToppingBadge(toppingId, current); });
 }
 
 function toggleFeatured(itemId, newFeatured) {
@@ -805,8 +931,33 @@ function toggleToppingStock(toppingId, currentStatus) {
     })
     .then(res => res.json())
     .then(data => {
-        if(data.success) {
-            window.location.reload();
+        if (!data.success) { ownerNotify('เกิดข้อผิดพลาด ไม่สามารถเปลี่ยนสถานะได้', 'error'); return; }
+
+        const newStatus = data.new_status;
+        const btn = document.getElementById('top_btn_' + toppingId);
+        if (btn) {
+            btn.setAttribute('onclick', 'toggleToppingStock(' + toppingId + ', ' + newStatus + ')');
+            btn.classList.toggle('btn-outline-danger', newStatus == 1);
+            btn.classList.toggle('btn-success', newStatus != 1);
+            btn.innerHTML = (newStatus == 1)
+                ? '<i class="bi bi-pause-circle me-1"></i> กดปิดขาย (ปิดชั่วคราว)'
+                : '<i class="bi bi-play-circle me-1"></i> กดเปิดขาย (เปิดใช้งาน)';
+        }
+
+        const badge = document.getElementById('top_badge_' + toppingId);
+        if (badge) {
+            badge.dataset.active = newStatus;
+            if (newStatus == 1) {
+                const pooledBox = document.getElementById('top_pooled_box_' + toppingId);
+                const isPooled = pooledBox && pooledBox.style.display !== 'none';
+                const qtyEl = document.getElementById(isPooled ? 'top_pool_qty_' + toppingId : 'top_stock_display_' + toppingId);
+                updateToppingBadge(toppingId, parseInt(qtyEl ? qtyEl.textContent : 0, 10) || 0);
+            } else {
+                badge.classList.remove('bg-success', 'bg-danger', 'bg-warning', 'text-dark');
+                badge.classList.add('bg-danger');
+                badge.textContent = 'ปิดขาย (สวิตช์ปิด)';
+                flashUpdate(badge);
+            }
         }
     })
     .catch(err => console.error(err));
@@ -825,10 +976,32 @@ document.addEventListener('DOMContentLoaded', function () {
 /**
  * กลุ่มสต็อกร่วม (Stock Pool) - +/- ปรับจำนวน, สร้าง/แก้ไข, ลบ, และผูก/ยกเลิกผูกเมนู-ท็อปปิ้งเข้ากลุ่ม
  */
+// อัปเดตป้ายสถานะ (หมด/ใกล้หมด/มีของพอใช้) ให้ตรงกับจำนวนล่าสุดทันทีที่ตัวเลขเปลี่ยน โดยไม่ต้องโหลดหน้าใหม่
+// (เดิมอัปเดตแค่ตัวเลขอย่างเดียว ป้ายสียังค้างค่าตอนโหลดหน้าครั้งแรกอยู่ ทำให้ดูไม่ real-time)
+function updatePoolBadge(poolId, qty) {
+    const badge = document.getElementById('pool_badge_' + poolId);
+    if (!badge) return;
+    badge.classList.remove('bg-success', 'bg-danger', 'bg-warning', 'text-dark');
+    if (qty <= 0) {
+        badge.classList.add('bg-danger');
+        badge.textContent = 'ของหมด!';
+    } else if (qty <= 5) {
+        badge.classList.add('bg-warning', 'text-dark');
+        badge.textContent = 'ใกล้หมด';
+    } else {
+        badge.classList.add('bg-success');
+        badge.textContent = 'มีของพอใช้';
+    }
+    flashUpdate(badge);
+}
+
 function adjustPoolStock(poolId, change) {
     const display = document.getElementById('pool_stock_display_' + poolId);
     let current = parseInt(display.innerText) || 0;
-    display.innerText = Math.max(0, current + change);
+    const optimisticQty = Math.max(0, current + change);
+    display.innerText = optimisticQty;
+    flashUpdate(display);
+    updatePoolBadge(poolId, optimisticQty);
 
     const formData = new FormData();
     formData.append('action', 'quick_adjust_pool');
@@ -842,15 +1015,73 @@ function adjustPoolStock(poolId, change) {
         body: formData
     })
     .then(res => res.json())
-    .then(data => { if (data.success) display.innerText = data.new_qty; })
-    .catch(err => console.error(err));
+    .then(data => {
+        if (data.success) {
+            display.innerText = data.new_qty;
+            updatePoolBadge(poolId, data.new_qty);
+        } else {
+            // เซิร์ฟเวอร์ปฏิเสธ (เช่นค่าที่ปรับไม่ผ่านเงื่อนไข) ต้องเด้งตัวเลข/ป้ายกลับค่าเดิมก่อนกดคืน ไม่งั้นจะค้างค่าที่ผิดไว้บนจอ
+            display.innerText = current;
+            updatePoolBadge(poolId, current);
+        }
+    })
+    .catch(err => { console.error(err); display.innerText = current; updatePoolBadge(poolId, current); });
 }
+
+// หมวดหมู่วัตถุดิบที่ใช้บ่อย ช่วยให้เลือกแทนพิมพ์ชื่อกลุ่มซ้ำๆ เอง (เช่น "ไก่", "หมู" ที่ต้องพิมพ์ทุกครั้งที่สร้างกลุ่มใหม่)
+// เลือกหมวดหมู่ -> เลือกชนิด -> เติมชื่อกลุ่มให้อัตโนมัติ (ยังแก้ไขในช่องข้อความได้ตามปกติ ถ้าไม่มีในลิสต์ก็พิมพ์เองได้เหมือนเดิม)
+const POOL_CATEGORY_PRESETS = {
+    'เนื้อสัตว์': ['ไก่', 'หมู', 'หมูกรอบ', 'วัว', 'กุ้ง', 'ปลา', 'ปลาหมึก', 'ไข่'],
+    'ผัก': ['ผักกาด', 'กะหล่ำปลี', 'ต้นหอม', 'ผักบุ้ง', 'แครอท', 'พริก', 'มะเขือเทศ'],
+    'เส้น/แป้ง': ['เส้นหมี่', 'เส้นใหญ่', 'เส้นเล็ก', 'วุ้นเส้น', 'ข้าว'],
+    'เครื่องปรุง/ซอส': ['น้ำจิ้ม', 'ซอสพริก', 'ซีอิ๊ว', 'น้ำปลา', 'น้ำมันหอย'],
+};
+
+function initPoolCategoryPicker() {
+    const catSelect = document.getElementById('poolCategorySelect');
+    const subSelect = document.getElementById('poolSubCategorySelect');
+    Object.keys(POOL_CATEGORY_PRESETS).forEach(cat => {
+        const opt = document.createElement('option');
+        opt.value = cat;
+        opt.textContent = cat;
+        catSelect.appendChild(opt);
+    });
+
+    catSelect.addEventListener('change', function () {
+        subSelect.innerHTML = '<option value="">ชนิด...</option>';
+        const items = POOL_CATEGORY_PRESETS[this.value];
+        if (items && items.length) {
+            items.forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                subSelect.appendChild(opt);
+            });
+            subSelect.disabled = false;
+        } else {
+            subSelect.disabled = true;
+        }
+    });
+
+    subSelect.addEventListener('change', function () {
+        if (this.value) {
+            document.getElementById('pool_name').value = this.value;
+        }
+    });
+}
+initPoolCategoryPicker();
 
 function openPoolModal(poolId, poolName, stockQty) {
     const form = document.getElementById('poolForm');
     form.reset();
     form.classList.remove('was-validated');
     form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+
+    const catSelect = document.getElementById('poolCategorySelect');
+    const subSelect = document.getElementById('poolSubCategorySelect');
+    catSelect.value = '';
+    subSelect.innerHTML = '<option value="">ชนิด...</option>';
+    subSelect.disabled = true;
 
     const isEdit = !!poolId;
     document.getElementById('poolModalTitle').textContent = isEdit ? 'แก้ไขกลุ่มสต็อกร่วม' : 'สร้างกลุ่มสต็อกร่วมใหม่';
@@ -881,13 +1112,37 @@ document.getElementById('poolForm').addEventListener('submit', function (e) {
     })
     .then(res => res.json())
     .then(data => {
-        if (data.success) {
-            bootstrap.Modal.getInstance(document.getElementById('poolModal')).hide();
-            sessionStorage.setItem('stockActiveTab', 'pools');
-            ownerNotify('บันทึกกลุ่มสต็อกร่วมเรียบร้อยแล้ว');
-            setTimeout(() => window.location.reload(), 700);
-        } else {
+        if (!data.success) {
             ownerNotify(data.error || 'เกิดข้อผิดพลาด ไม่สามารถบันทึกได้', 'error');
+            return;
+        }
+        bootstrap.Modal.getInstance(document.getElementById('poolModal')).hide();
+        ownerNotify('บันทึกกลุ่มสต็อกร่วมเรียบร้อยแล้ว');
+
+        const existingCol = document.getElementById('pool-col-' + data.pool_id);
+        if (existingCol) {
+            // แก้ไขกลุ่มเดิม: แทนที่การ์ดเดิมด้วย HTML ที่เรนเดอร์ใหม่จากเซิร์ฟเวอร์ (ตรงกับความจริง 100% ไม่ต้องคำนวณเอง)
+            existingCol.outerHTML = data.card_html;
+            const flashEl = document.getElementById('pool-col-' + data.pool_id);
+            if (flashEl) {
+                const cardEl = flashEl.querySelector('.stock-card');
+                if (cardEl) { cardEl.classList.add('card-update-flash'); setTimeout(() => cardEl.classList.remove('card-update-flash'), 800); }
+            }
+        } else {
+            // สร้างกลุ่มใหม่: แทรกการ์ดใหม่เข้าไปในกริด (ถ้าเดิมว่างเปล่าอยู่ ให้สลับจากข้อความ "ยังไม่มีกลุ่ม" มาเป็นกริดจริงก่อน)
+            let grid = document.getElementById('poolsGridRow');
+            if (!grid) {
+                const emptyState = document.getElementById('poolsEmptyState');
+                if (emptyState) {
+                    emptyState.outerHTML = '<div class="row g-4" id="poolsGridRow"></div>';
+                    grid = document.getElementById('poolsGridRow');
+                }
+            }
+            if (grid) {
+                grid.insertAdjacentHTML('afterbegin', data.card_html);
+                const newCard = document.getElementById('pool-col-' + data.pool_id)?.querySelector('.stock-card');
+                if (newCard) { newCard.classList.add('card-update-flash'); setTimeout(() => newCard.classList.remove('card-update-flash'), 800); }
+            }
         }
     })
     .catch(() => ownerNotify('เกิดข้อผิดพลาด ไม่สามารถบันทึกได้', 'error'));
@@ -908,19 +1163,27 @@ function deletePool(poolId, poolName) {
         })
         .then(res => res.json())
         .then(data => {
-            if (data.success) {
-                sessionStorage.setItem('stockActiveTab', 'pools');
-                ownerNotify('ลบกลุ่มสต็อกร่วมเรียบร้อยแล้ว');
-                setTimeout(() => window.location.reload(), 700);
-            } else {
-                ownerNotify(data.error || 'ลบไม่สำเร็จ', 'error');
+            if (!data.success) { ownerNotify(data.error || 'ลบไม่สำเร็จ', 'error'); return; }
+            ownerNotify('ลบกลุ่มสต็อกร่วมเรียบร้อยแล้ว');
+            const col = document.getElementById('pool-col-' + poolId);
+            if (col) {
+                col.classList.add('card-col-removing');
+                setTimeout(() => {
+                    col.remove();
+                    const grid = document.getElementById('poolsGridRow');
+                    if (grid && !grid.children.length) {
+                        grid.outerHTML = '<div class="text-center py-5" id="poolsEmptyState">' +
+                            '<i class="bi bi-boxes display-1 text-muted opacity-25"></i>' +
+                            '<p class="mt-3 text-muted">ยังไม่มีกลุ่มสต็อกร่วมในระบบ</p></div>';
+                    }
+                }, 300);
             }
         })
         .catch(() => ownerNotify('เกิดข้อผิดพลาด ไม่สามารถลบได้', 'error'));
     });
 }
 
-// ผูก/ยกเลิกผูกเมนู-ท็อปปิ้งเข้ากับกลุ่มสต็อกร่วม (เลือกจาก dropdown ในการ์ดสต็อกแต่ละใบ)
+// ผูก/ยกเลิกผูกเมนู-ท็อปปิ้งเข้ากับกลุ่มสต็อกร่วม (เลือกจาก dropdown ในการ์ดสต็อกแต่ละใบ) — อัปเดตการ์ดทันทีไม่รีหน้า
 function linkItemPool(itemId, poolId) {
     const formData = new FormData();
     formData.append('action', 'link_item_pool');
@@ -931,12 +1194,28 @@ function linkItemPool(itemId, poolId) {
     fetch('manage_stock.php', { method: 'POST', body: formData })
         .then(res => res.json())
         .then(data => {
-            if (data.success) {
-                sessionStorage.setItem('stockActiveTab', 'items');
-                window.location.reload();
-            } else {
+            if (!data.success) {
                 ownerNotify('เกิดข้อผิดพลาด ไม่สามารถผูกกลุ่มสต็อกได้', 'error');
+                return;
             }
+            const pooledBox = document.getElementById('item_pooled_box_' + itemId);
+            const ownBox = document.getElementById('item_own_box_' + itemId);
+            const extraBtns = document.getElementById('item_stepper_extra_' + itemId);
+            if (data.is_pooled) {
+                document.getElementById('item_pool_name_' + itemId).textContent = data.pool_name;
+                document.getElementById('item_pool_qty_' + itemId).textContent = data.qty;
+                pooledBox.style.display = '';
+                ownBox.style.display = 'none';
+                extraBtns.style.display = 'none';
+                flashUpdate(pooledBox);
+            } else {
+                document.getElementById('stock_display_' + itemId).textContent = data.qty;
+                pooledBox.style.display = 'none';
+                ownBox.style.display = '';
+                extraBtns.style.display = '';
+                flashUpdate(ownBox);
+            }
+            updateItemBadge(itemId, data.qty);
         })
         .catch(() => ownerNotify('เกิดข้อผิดพลาด ไม่สามารถผูกกลุ่มสต็อกได้', 'error'));
 }
@@ -951,12 +1230,28 @@ function linkToppingPool(toppingId, poolId) {
     fetch('manage_stock.php', { method: 'POST', body: formData })
         .then(res => res.json())
         .then(data => {
-            if (data.success) {
-                sessionStorage.setItem('stockActiveTab', 'toppings');
-                window.location.reload();
-            } else {
+            if (!data.success) {
                 ownerNotify('เกิดข้อผิดพลาด ไม่สามารถผูกกลุ่มสต็อกได้', 'error');
+                return;
             }
+            const pooledBox = document.getElementById('top_pooled_box_' + toppingId);
+            const ownBox = document.getElementById('top_own_box_' + toppingId);
+            const extraBtns = document.getElementById('top_stepper_extra_' + toppingId);
+            if (data.is_pooled) {
+                document.getElementById('top_pool_name_' + toppingId).textContent = data.pool_name;
+                document.getElementById('top_pool_qty_' + toppingId).textContent = data.qty;
+                pooledBox.style.display = '';
+                ownBox.style.display = 'none';
+                extraBtns.style.display = 'none';
+                flashUpdate(pooledBox);
+            } else {
+                document.getElementById('top_stock_display_' + toppingId).textContent = data.qty;
+                pooledBox.style.display = 'none';
+                ownBox.style.display = '';
+                extraBtns.style.display = '';
+                flashUpdate(ownBox);
+            }
+            updateToppingBadge(toppingId, data.qty);
         })
         .catch(() => ownerNotify('เกิดข้อผิดพลาด ไม่สามารถผูกกลุ่มสต็อกได้', 'error'));
 }

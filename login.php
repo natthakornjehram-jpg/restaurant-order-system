@@ -8,6 +8,10 @@ require_once 'includes/csrf.php';
 // Do not restore a login from role/id cookies: they can be forged.
 
 $error = "";
+// ให้หน้านี้ตอบเป็น JSON แทนการรีโหลดทั้งหน้าได้ ถ้าคำขอมาจาก fetch() ของ JS (มี header นี้แนบมา)
+// ตรรกะตรวจสอบ/ป้องกันทั้งหมดด้านล่างเหมือนเดิมทุกตัวอักษร ไม่แตะเลย แค่เพิ่มทางตอบกลับแบบ JSON คู่ขนานไป
+// ถ้าไม่มี header นี้ (เช่น ปิด JS ไว้) หน้าเว็บจะยังทำงานแบบฟอร์มธรรมดา/รีโหลดได้ตามปกติเหมือนเดิมทุกอย่าง
+$is_ajax = isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ?? '')) {
     $error = "คำขอไม่ถูกต้อง (CSRF token ไม่ถูกต้อง) กรุณาลองใหม่อีกครั้ง";
@@ -69,6 +73,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
                     // ถ้าติ๊ก "จดจำฉัน 12 ชม." ให้สร้าง Cookie อายุ 12 ชั่วโมง (43,200 วินาที)
                     // The checkbox is retained in the UI but no longer creates an unsafe login cookie.
 
+                    if ($is_ajax) {
+                        header('Content-Type: application/json');
+                        echo json_encode(['success' => true, 'redirect' => 'owner/dashboard.php']);
+                        exit;
+                    }
                     header("Location: owner/dashboard.php");
                     exit;
                 }
@@ -92,6 +101,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
             }
         }
     }
+}
+
+// มาถึงตรงนี้ได้แปลว่าไม่สำเร็จ (สำเร็จแล้ว exit ไปตั้งแต่ใน branch ด้านบนแล้ว) - ตอบ error กลับเป็น JSON ถ้าเป็น AJAX
+if ($is_ajax && $_SERVER['REQUEST_METHOD'] == 'POST') {
+    header('Content-Type: application/json');
+    echo json_encode(['success' => false, 'error' => $error]);
+    exit;
 }
 ?>
 <!DOCTYPE html>
@@ -167,6 +183,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
             <h2>เข้าสู่ระบบจัดการร้าน</h2>
             <p class="text-center text-muted mb-4 small">สำหรับเจ้าของร้านและผู้ดูแลระบบ</p>
             
+            <div id="loginAlertBox">
             <?php if($error): ?>
                 <div class="alert alert-danger text-center rounded-4 border-0 mb-4 shadow-sm">
                     <i class="bi bi-exclamation-triangle-fill me-1"></i> <?= htmlspecialchars($error) ?>
@@ -179,8 +196,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
                 </div>
                 <?php unset($_SESSION['success_msg']); ?>
             <?php endif; ?>
+            </div>
 
-            <form method="POST">
+            <form method="POST" id="loginForm">
                 <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
                 <div class="mb-3">
                     <label>ชื่อผู้ใช้งาน (Username)</label>
@@ -206,7 +224,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
                     <a href="forgot_password.php" class="small text-decoration-none" style="color: #795548;">ลืมรหัสผ่าน?</a>
                 </div>
 
-                <button type="submit" class="btn-brown shadow">เข้าสู่ระบบจัดการร้าน</button>
+                <button type="submit" id="loginSubmitBtn" class="btn-brown shadow">เข้าสู่ระบบจัดการร้าน</button>
             </form>
         </div>
     </div>
@@ -225,6 +243,48 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
             void icon.offsetWidth; // บังคับ reflow ให้เล่นแอนิเมชันซ้ำได้ทุกครั้งแม้กดรัวๆ
             icon.classList.add('icon-pop');
         }
+
+        // ส่งฟอร์มล็อกอินแบบ AJAX แทนการรีโหลดทั้งหน้า - ตรรกะตรวจสอบฝั่งเซิร์ฟเวอร์ (CSRF, brute-force,
+        // รหัสผ่านผิด ฯลฯ) เหมือนเดิมทุกอย่าง แค่ไม่ต้องโหลดหน้าใหม่ทั้งหน้าตอนกรอกผิด ให้ผู้ใช้แก้แล้วลองใหม่ไว
+        const loginForm = document.getElementById('loginForm');
+        const loginSubmitBtn = document.getElementById('loginSubmitBtn');
+        const loginAlertBox = document.getElementById('loginAlertBox');
+
+        function showLoginAlert(message, type) {
+            loginAlertBox.innerHTML =
+                '<div class="alert alert-' + type + ' text-center rounded-4 border-0 mb-4 shadow-sm">' +
+                '<i class="bi bi-' + (type === 'danger' ? 'exclamation-triangle-fill' : 'check-circle-fill') + ' me-1"></i> ' +
+                message + '</div>';
+        }
+
+        loginForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            const originalBtnText = loginSubmitBtn.innerHTML;
+            loginSubmitBtn.disabled = true;
+            loginSubmitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>กำลังเข้าสู่ระบบ...';
+
+            fetch('login.php', {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                body: new FormData(loginForm)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    loginSubmitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>สำเร็จ กำลังพาไปหน้าแดชบอร์ด...';
+                    window.location.href = data.redirect;
+                    return;
+                }
+                showLoginAlert(data.error || 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง', 'danger');
+                loginSubmitBtn.disabled = false;
+                loginSubmitBtn.innerHTML = originalBtnText;
+            })
+            .catch(() => {
+                loginSubmitBtn.disabled = false;
+                loginSubmitBtn.innerHTML = originalBtnText;
+                showLoginAlert('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่อีกครั้ง', 'danger');
+            });
+        });
     </script>
 </body>
 </html>

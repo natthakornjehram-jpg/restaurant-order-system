@@ -5,8 +5,8 @@ require_once '../includes/db.php';
 require_once 'auth_owner.php';
 require_once '../includes/csrf.php';
 
-// การบันทึกเมนูและสลับสถานะแนะนำ แยกไปอยู่ที่ api_save_menu.php / api_toggle_featured.php แล้ว
-// (มีการ include upload_helper.php เฉพาะที่ api_save_menu.php ที่ต้องใช้)
+// การบันทึกเมนูแยกไปอยู่ที่ api_save_menu.php แล้ว (มีการ include upload_helper.php เฉพาะที่นั่นที่ต้องใช้)
+// ส่วนสลับสถานะแนะนำ (api_toggle_featured.php) ไม่ได้เรียกจากหน้านี้ - ปุ่ม ★ อยู่ที่หน้าจัดการคลังสินค้า (manage_stock.php) แทน
 
 // --- ลบเมนู ---
 // เดิมเป็นลิงก์ GET ธรรมดา (?delete_id=) ไม่มี CSRF token เลย ทำให้หน้าอื่นฝัง <img src="manage_menu.php?delete_id=..">

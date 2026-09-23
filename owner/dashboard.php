@@ -25,8 +25,8 @@ $sales_sql = "SELECT SUM(total_amount) as daily_total FROM orders WHERE payment_
 $sales_res = $conn->query($sales_sql);
 $daily_total = ($sales_res && $row = $sales_res->fetch_assoc()) ? floatval($row['daily_total'] ?? 0) : 0;
 
-// ออเดอร์ที่รอทำ
-$order_res = $conn->query("SELECT COUNT(*) as pending_orders FROM orders WHERE order_status = 'pending'");
+// ออเดอร์ที่รอทำ (ไม่นับออเดอร์กลับบ้านที่ยังไม่ผ่านการตรวจสลิป ยังไม่ถือเป็นคิวครัวจริง)
+$order_res = $conn->query("SELECT COUNT(*) as pending_orders FROM orders WHERE order_status = 'pending' AND (order_type = 'dine_in' OR payment_status = 'paid')");
 $pending_orders = ($order_res && $row = $order_res->fetch_assoc()) ? $row['pending_orders'] : 0;
 
 // ออเดอร์ที่ค้างชำระ
@@ -44,7 +44,7 @@ $pending_list_res = $conn->query($pending_list_sql);
 $max_queue = intval($store['max_queue'] ?? 0);
 $active_queue_count = 0;
 if ($max_queue > 0) {
-    $q_res = $conn->query("SELECT COUNT(*) AS c FROM orders WHERE order_status IN ('pending', 'cooking')");
+    $q_res = $conn->query("SELECT COUNT(*) AS c FROM orders WHERE order_status IN ('pending', 'cooking') AND (order_type = 'dine_in' OR payment_status = 'paid')");
     $active_queue_count = ($q_res && $q_row = $q_res->fetch_assoc()) ? intval($q_row['c']) : 0;
 }
 $queue_is_full = ($max_queue > 0 && $active_queue_count >= $max_queue);

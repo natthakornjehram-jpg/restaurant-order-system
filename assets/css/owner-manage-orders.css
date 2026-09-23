@@ -4,6 +4,8 @@ body, .main-content {
     font-family: 'Sarabun', sans-serif;
     min-height: 100vh;
 }
+
+/* .card-col-removing / .card-update-flash ตอนนี้อยู่ใน assets/css/owner.css ส่วนกลางแล้ว (ใช้ร่วมกันหลายหน้า) */
 .soft-card {
     background: #ffffff;
     border-radius: 15px;

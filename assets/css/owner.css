@@ -88,10 +88,21 @@ h1, h2, h3, h4, h5, .font-mitr {
         height: 100vh;
         overflow-y: auto;
     }
+    /* .owner-sidebar เองสูงแค่ 100vh (ตรึงไว้กับจอตอนเลื่อน) แต่หน้าที่เนื้อหายาวกว่าจอมาก (เช่นหน้าตัวเลือกเสริมที่มีหลาย
+       หมวดหมู่) จะทำให้ .owner-shell สูงกว่า 100vh ไปด้วย ถ้าไม่ใส่พื้นหลังเข้มไว้ที่ตัว .owner-shell เองด้วย ส่วนที่
+       เกิน 100vh แรกจะโป็นครีมโล่งๆ แทนที่จะเป็นสีเข้มต่อเนื่อง (สังเกตชัดตอนแคปภาพเต็มหน้าด้วยเครื่องมือ full-page
+       screenshot ที่ไม่รองรับ position:sticky ตอน composite ภาพ) ใส่สีพื้นหลังเข้มเดียวกันไว้ที่ตัวคอนเทนเนอร์เองด้วย
+       เพื่อให้แถบซ้ายเข้มต่อเนื่องตลอดความสูงจริงของหน้า ไม่ว่าจะดูแบบเลื่อนจอปกติหรือแคปภาพเต็มหน้าก็ตาม */
+    .owner-shell {
+        background-color: #212529;
+    }
 }
 
 .owner-main {
     min-width: 0; /* กัน flex item ดันความกว้างเกินจอตอนมีตาราง/เนื้อหากว้างๆ ข้างใน */
+    /* .owner-shell มีพื้นหลังเข้มของตัวเอง (ดูเหตุผลด้านบนที่ .owner-shell) ต้องใส่พื้นหลังครีมทึบให้ .owner-main
+       ทับไว้ด้วย ไม่งั้นสีเข้มของ .owner-shell จะโผล่ทะลุผ่านพื้นที่เนื้อหาหลักทั้งหมดแทนที่จะเห็นแค่แถบเมนูซ้าย */
+    background-color: var(--bg-body);
 }
 
 /* จอมือถือ (< lg) มี navbar แบบ fixed-top (สูง 56px) ทับอยู่ด้านบน ต้องใส่ padding-top บน body ให้เนื้อหาทั้งหมดอยู่ต่ำกว่าแถบดำ 100% */
@@ -158,6 +169,19 @@ h1, h2, h3, h4, h5, .font-mitr {
 .owner-nav-link:hover .owner-nav-icon {
     background-color: rgba(255, 255, 255, 0.15);
 }
+
+/* การ์ด/แถวที่ถูกเอาออกแบบเรียลไทม์ (ปิดออเดอร์/ปิดบิล/ยกเลิก ฯลฯ) ให้เฟดหายไปนุ่มๆ แทนที่จะหายวับไปทันที
+   ใช้ร่วมกันได้ทุกหน้าฝั่งเจ้าของร้าน (manage_orders, manage_payments, manage_tables ฯลฯ) แทนที่จะประกาศซ้ำทุกไฟล์ */
+.card-col-removing {
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    opacity: 0;
+    transform: scale(0.92);
+}
+@keyframes cardUpdateFlash {
+    0% { box-shadow: 0 0 0 4px rgba(25, 135, 84, 0.35); }
+    100% { box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05); }
+}
+.card-update-flash { animation: cardUpdateFlash 0.8s ease-out; }
 
 /* --- Responsive table & mobile cards for owner system --- */
 .table-responsive {

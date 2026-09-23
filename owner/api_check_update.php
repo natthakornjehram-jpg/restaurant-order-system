@@ -9,7 +9,8 @@ header('Content-Type: application/json');
 
 // เนื่องจากเป็นร้านเดี่ยว ทุกออเดอร์คือของร้านนี้อยู่แล้ว
 // ดึงจำนวนออเดอร์ที่มีสถานะ 'pending' จากตาราง orders ได้ตรงๆ เลย
-$order_stmt = $conn->prepare("SELECT COUNT(*) as count FROM orders WHERE order_status = 'pending'");
+// (ไม่นับออเดอร์กลับบ้านที่ยังไม่ผ่านการตรวจสลิป ยังไม่ถือเป็นคิวครัวจริง กันแจ้งเตือน/นับซ้ำก่อนเจ้าของร้านยืนยันเงิน)
+$order_stmt = $conn->prepare("SELECT COUNT(*) as count FROM orders WHERE order_status = 'pending' AND (order_type = 'dine_in' OR payment_status = 'paid')");
 $order_stmt->execute();
 $result = $order_stmt->get_result();
 $pending_count = ($result->num_rows > 0) ? $result->fetch_assoc()['count'] : 0;
@@ -31,7 +32,7 @@ $pay_stmt->close();
 
 // จำนวนคิวที่ยังไม่เสร็จ (pending+cooking) เทียบกับ max_queue ที่ตั้งไว้ - ให้ฝั่ง JS เตือนเจ้าของร้านตอนคิวเต็ม
 // (max_queue = 0 หมายถึงไม่จำกัด ไม่ต้องเตือน)
-$queue_stmt = $conn->prepare("SELECT COUNT(*) as count FROM orders WHERE order_status IN ('pending', 'cooking')");
+$queue_stmt = $conn->prepare("SELECT COUNT(*) as count FROM orders WHERE order_status IN ('pending', 'cooking') AND (order_type = 'dine_in' OR payment_status = 'paid')");
 $queue_stmt->execute();
 $queue_result = $queue_stmt->get_result();
 $active_queue_count = ($queue_result->num_rows > 0) ? $queue_result->fetch_assoc()['count'] : 0;

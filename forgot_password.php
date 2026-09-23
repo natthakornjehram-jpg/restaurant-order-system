@@ -8,6 +8,24 @@ require_once 'includes/send_email_otp.php';
 $step = isset($_SESSION['reset_step']) ? $_SESSION['reset_step'] : 1;
 $error = "";
 $success = "";
+// ให้หน้านี้ตอบเป็น JSON แทนการรีโหลดทั้งหน้าได้ ถ้าคำขอมาจาก fetch() ของ JS - ตรรกะ 3 สเต็ปด้านล่างเหมือนเดิมทุกอย่าง
+// เพิ่มแค่ทางตอบกลับแบบ JSON คู่ขนานไป ไม่แตะการตรวจสอบ/จำกัดจำนวนครั้ง/session ที่มีอยู่เดิมเลย
+$is_ajax = isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+
+// ใช้ร่วมกันทุกสเต็ป: สรุปสถานะปัจจุบัน (สเต็ปที่ควรแสดง + ข้อมูลประกอบ) ส่งกลับเป็น JSON ให้ฝั่งหน้าเว็บ
+// เรนเดอร์ UI ของสเต็ปนั้นเอง โดยไม่ต้องรีโหลดหน้าไปอ่านค่า session ใหม่
+function forgot_password_ajax_response($error) {
+    header('Content-Type: application/json');
+    echo json_encode([
+        'success' => $error === '',
+        'error' => $error ?: null,
+        'current_step' => $_SESSION['reset_step'] ?? 1,
+        'reset_email' => $_SESSION['reset_email'] ?? null,
+        'reset_phone' => $_SESSION['reset_phone'] ?? null,
+        'mock_otp' => isset($_SESSION['mock_otp']) ? (string) $_SESSION['mock_otp'] : null,
+    ]);
+    exit;
+}
 
 // กรณีต้องการยกเลิกและกลับไปเริ่มใหม่
 if (isset($_GET['cancel'])) {
@@ -84,6 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
                             $_SESSION['mock_otp'] = $otp;
                         }
 
+                        if ($is_ajax) { forgot_password_ajax_response(''); }
                         header("Location: forgot_password.php");
                         exit;
                     }
@@ -133,6 +152,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
                 $_SESSION['reset_step'] = 3;
                 $_SESSION['reset_id'] = (int) $reset_data['reset_id'];
                 unset($_SESSION['otp_attempts']);
+                if ($is_ajax) { forgot_password_ajax_response(''); }
                 header("Location: forgot_password.php");
                 exit;
             } else {
@@ -183,12 +203,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
             // 💡 สร้าง Session แจ้งเตือนสีเขียวเพื่อไปโชว์หน้า login.php
             $_SESSION['success_msg'] = "เปลี่ยนรหัสผ่านสำเร็จ! กรุณาล็อกอินด้วยรหัสผ่านใหม่ครับ";
 
+            if ($is_ajax) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => true, 'redirect' => 'login.php']);
+                exit;
+            }
             header("Location: login.php");
             exit;
         } else {
             $error = "รหัสผ่านใหม่ทั้งสองช่องไม่ตรงกันครับ";
         }
     }
+}
+
+// มาถึงตรงนี้ได้แปลว่าไม่สำเร็จ (สำเร็จแล้ว exit ไปแล้วด้านบนทุกเคส) - ตอบ error กลับเป็น JSON ถ้าเป็น AJAX
+// current_step ในนี้จะสะท้อนค่า session ล่าสุด (เช่น ถ้ากรอก OTP ผิดครบ 5 ครั้ง จะถูกรีเซ็ตกลับไปสเต็ป 1 แล้ว)
+if ($is_ajax && $_SERVER['REQUEST_METHOD'] == 'POST') {
+    forgot_password_ajax_response($error);
 }
 ?>
 
@@ -263,13 +294,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
             </div>
             <h2>ลืมรหัสผ่าน</h2>
             
+            <div id="fpAlertBox">
             <?php if($error): ?>
                 <div class="alert alert-danger text-center rounded-4 border-0 mb-4 shadow-sm py-2"><small><i class="bi bi-exclamation-triangle-fill"></i> <?= htmlspecialchars($error) ?></small></div>
             <?php endif; ?>
+            </div>
 
-            <?php if($step == 1): ?>
+            <div id="stepWrap1" class="step-wrap" style="<?= $step == 1 ? '' : 'display:none;' ?>">
                 <p class="text-center text-muted mb-4 small">กรุณากรอกเบอร์โทรศัพท์ที่ลงทะเบียนไว้<br>เพื่อรับรหัส OTP รีเซ็ตรหัสผ่าน</p>
-                <form method="POST">
+                <form method="POST" id="step1Form">
                     <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
                     <div class="mb-4">
                         <input type="text" name="phone" class="form-control" placeholder="เบอร์โทรศัพท์ (เช่น 0812345678)" required>
@@ -277,27 +310,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
                     <button type="submit" name="request_otp" class="btn-brown shadow">รับรหัส OTP</button>
                     <div class="text-center mt-3"><a href="?cancel=1" class="text-muted small text-decoration-none">ยกเลิก / กลับไปหน้าล็อกอิน</a></div>
                 </form>
-            <?php endif; ?>
+            </div>
 
-            <?php if($step == 2): ?>
-                <?php if (!empty($_SESSION['reset_email'])): ?>
-                    <p class="text-center text-muted mb-4 small">รหัส OTP 6 หลัก ถูกส่งไปที่อีเมล<br><strong class="text-dark"><?= htmlspecialchars($_SESSION['reset_email']) ?></strong></p>
-                <?php else: ?>
-                    <p class="text-center text-muted mb-4 small">รหัส OTP 6 หลัก สำหรับเบอร์<br><strong class="text-dark"><?= htmlspecialchars($_SESSION['reset_phone'] ?? '') ?></strong></p>
-                <?php endif; ?>
+            <div id="stepWrap2" class="step-wrap" style="<?= $step == 2 ? '' : 'display:none;' ?>">
+                <p class="text-center text-muted mb-4 small" id="otpSentToText">
+                    <?php if (!empty($_SESSION['reset_email'])): ?>
+                        รหัส OTP 6 หลัก ถูกส่งไปที่อีเมล<br><strong class="text-dark"><?= htmlspecialchars($_SESSION['reset_email']) ?></strong>
+                    <?php else: ?>
+                        รหัส OTP 6 หลัก สำหรับเบอร์<br><strong class="text-dark"><?= htmlspecialchars($_SESSION['reset_phone'] ?? '') ?></strong>
+                    <?php endif; ?>
+                </p>
 
-                <?php if(isset($_SESSION['mock_otp'])): ?>
-                    <!-- โหมดทดสอบ (localhost เท่านั้น): โชว์รหัส OTP ลงบนหน้าเว็บตรงๆ แทนการพึ่ง alert() อย่างเดียว
-                         เพราะเบราว์เซอร์/เว็บวิวหลายตัวบล็อก alert() ได้ (เช่น เปิดผ่านแอปในเครือข่ายสังคม, ตั้งค่า
-                         "block additional dialogs" ของ Chrome) ทำให้บางทีไม่เห็นรหัสเลยแม้ระบบจะสร้างให้แล้วก็ตาม -->
-                    <div class="alert alert-warning text-center rounded-4 border-0 mb-4 shadow-sm py-3">
-                        <div class="small fw-bold mb-1">📲 โหมดทดสอบ (localhost) — รหัส OTP ของคุณคือ</div>
-                        <div class="fw-bold" style="font-size: 1.8rem; letter-spacing: 4px;"><?= htmlspecialchars((string) $_SESSION['mock_otp']) ?></div>
-                        <div class="small text-muted mt-1">รหัสมีอายุ 5 นาที (โหมดนี้จะไม่โชว์บนโฮสต์จริงที่ตั้งค่าส่งอีเมลไว้แล้ว)</div>
-                    </div>
-                <?php endif; ?>
+                <!-- โหมดทดสอบ (localhost เท่านั้น): โชว์รหัส OTP ลงบนหน้าเว็บตรงๆ แทนการพึ่ง alert() อย่างเดียว
+                     เพราะเบราว์เซอร์/เว็บวิวหลายตัวบล็อก alert() ได้ (เช่น เปิดผ่านแอปในเครือข่ายสังคม, ตั้งค่า
+                     "block additional dialogs" ของ Chrome) ทำให้บางทีไม่เห็นรหัสเลยแม้ระบบจะสร้างให้แล้วก็ตาม -->
+                <div class="alert alert-warning text-center rounded-4 border-0 mb-4 shadow-sm py-3" id="mockOtpBanner" style="<?= isset($_SESSION['mock_otp']) ? '' : 'display:none;' ?>">
+                    <div class="small fw-bold mb-1">📲 โหมดทดสอบ (localhost) — รหัส OTP ของคุณคือ</div>
+                    <div class="fw-bold" style="font-size: 1.8rem; letter-spacing: 4px;" id="mockOtpValue"><?= htmlspecialchars((string) ($_SESSION['mock_otp'] ?? '')) ?></div>
+                    <div class="small text-muted mt-1">รหัสมีอายุ 5 นาที (โหมดนี้จะไม่โชว์บนโฮสต์จริงที่ตั้งค่าส่งอีเมลไว้แล้ว)</div>
+                </div>
 
-                <form method="POST">
+                <form method="POST" id="step2Form">
                     <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
                     <div class="mb-4">
                         <input type="text" name="otp" class="form-control fw-bold" placeholder="X X X X X X" maxlength="6" style="letter-spacing: 5px;" required>
@@ -305,11 +338,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
                     <button type="submit" name="verify_otp" class="btn-brown shadow">ยืนยันรหัส OTP</button>
                     <div class="text-center mt-3"><a href="?cancel=1" class="text-muted small text-decoration-none">ยกเลิกการทำรายการ</a></div>
                 </form>
-            <?php endif; ?>
+            </div>
 
-            <?php if($step == 3): ?>
+            <div id="stepWrap3" class="step-wrap" style="<?= $step == 3 ? '' : 'display:none;' ?>">
                 <p class="text-center text-success fw-bold mb-4 small"><i class="bi bi-check-circle-fill"></i> ยืนยันตัวตนสำเร็จ!<br>กรุณาตั้งรหัสผ่านใหม่ของคุณ</p>
-                <form method="POST">
+                <form method="POST" id="step3Form">
                     <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
                     <div class="mb-3">
                         <div class="position-relative">
@@ -329,7 +362,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
                     </div>
                     <button type="submit" name="reset_password" class="btn-brown shadow">บันทึกรหัสผ่านใหม่</button>
                 </form>
-            <?php endif; ?>
+            </div>
 
         </div>
     </div>
@@ -348,6 +381,91 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
             void icon.offsetWidth; // บังคับ reflow ให้เล่นแอนิเมชันซ้ำได้ทุกครั้งแม้กดรัวๆ
             icon.classList.add('icon-pop');
         }
+
+        // ส่งฟอร์มทั้ง 3 สเต็ปแบบ AJAX แทนการรีโหลดทั้งหน้า - ตรรกะตรวจสอบ/จำกัดจำนวนครั้งฝั่งเซิร์ฟเวอร์
+        // เหมือนเดิมทุกอย่าง ฝั่งนี้แค่เปลี่ยนว่าจะโชว์สเต็ปไหนตามค่า current_step ที่เซิร์ฟเวอร์ตอบกลับมา
+        const fpAlertBox = document.getElementById('fpAlertBox');
+
+        function showFpAlert(message) {
+            fpAlertBox.innerHTML = '<div class="alert alert-danger text-center rounded-4 border-0 mb-4 shadow-sm py-2">' +
+                '<small><i class="bi bi-exclamation-triangle-fill"></i> ' + message + '</small></div>';
+        }
+        function clearFpAlert() { fpAlertBox.innerHTML = ''; }
+
+        // แสดงสเต็ปตาม data ที่เซิร์ฟเวอร์ส่งกลับมา (เติมข้อความอีเมล/เบอร์/OTP โหมดทดสอบให้ตรงของจริงเสมอ)
+        function showFpStep(data) {
+            document.querySelectorAll('.step-wrap').forEach(el => { el.style.display = 'none'; });
+            document.getElementById('stepWrap' + data.current_step).style.display = '';
+
+            if (data.current_step === 2) {
+                const otpSentToText = document.getElementById('otpSentToText');
+                otpSentToText.innerHTML = data.reset_email
+                    ? 'รหัส OTP 6 หลัก ถูกส่งไปที่อีเมล<br><strong class="text-dark"></strong>'
+                    : 'รหัส OTP 6 หลัก สำหรับเบอร์<br><strong class="text-dark"></strong>';
+                otpSentToText.querySelector('strong').textContent = data.reset_email || data.reset_phone || '';
+
+                const mockBanner = document.getElementById('mockOtpBanner');
+                if (data.mock_otp) {
+                    document.getElementById('mockOtpValue').textContent = data.mock_otp;
+                    mockBanner.style.display = '';
+                } else {
+                    mockBanner.style.display = 'none';
+                }
+            }
+        }
+
+        function submitFpForm(form, onSuccessExtra) {
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalBtnText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>กำลังดำเนินการ...';
+
+            // new FormData(form) ไม่ใส่ name/value ของปุ่ม submit ที่กดให้อัตโนมัติ (ต่างจากการ submit ฟอร์มจริงทางเบราว์เซอร์)
+            // ฝั่ง PHP เช็คว่าเป็นสเต็ปไหนจาก isset($_POST['request_otp']/'verify_otp'/'reset_password') ซึ่งมาจากชื่อปุ่มนี้
+            // ต้องใส่เองตรงนี้ ไม่งั้นเซิร์ฟเวอร์จะไม่รู้ว่าต้องรันสเต็ปไหนเลย
+            const fd = new FormData(form);
+            if (submitBtn.name) { fd.append(submitBtn.name, submitBtn.value || '1'); }
+
+            fetch('forgot_password.php', {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                body: fd
+            })
+            .then(res => res.json())
+            .then(data => {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnText;
+
+                if (data.success && onSuccessExtra) { onSuccessExtra(data); return; }
+
+                if (!data.success) { showFpAlert(data.error || 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง'); }
+                else { clearFpAlert(); }
+                showFpStep(data); // ไม่ว่าสำเร็จหรือพลาด ให้ซิงก์สเต็ปที่แสดงตามเซิร์ฟเวอร์เสมอ (เช่น กรอก OTP ผิดครบ 5 ครั้ง จะถูกเด้งกลับไปสเต็ป 1)
+            })
+            .catch(() => {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnText;
+                showFpAlert('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่อีกครั้ง');
+            });
+        }
+
+        document.getElementById('step1Form').addEventListener('submit', function (e) {
+            e.preventDefault();
+            clearFpAlert();
+            submitFpForm(this);
+        });
+        document.getElementById('step2Form').addEventListener('submit', function (e) {
+            e.preventDefault();
+            clearFpAlert();
+            submitFpForm(this);
+        });
+        document.getElementById('step3Form').addEventListener('submit', function (e) {
+            e.preventDefault();
+            clearFpAlert();
+            submitFpForm(this, function (data) {
+                window.location.href = data.redirect; // สำเร็จสเต็ป 3 = ไปหน้า login.php เลย (มีข้อความแจ้งสำเร็จรอแสดงอยู่)
+            });
+        });
     </script>
 </body>
 </html>

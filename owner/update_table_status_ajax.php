@@ -21,7 +21,16 @@ if ($table_id > 0) {
     $stmt = $conn->prepare("UPDATE restauranttable SET status = 'available', join_code = NULL WHERE table_id = ?");
     $stmt->bind_param("i", $table_id);
     if ($stmt->execute()) {
-        echo json_encode(['success' => true]);
+        // ส่งเลขโต๊ะ/qr_token กลับไปด้วย ให้ฝั่งหน้าเว็บสร้างปุ่ม "พิมพ์ QR" ใหม่ได้ทันทีโดยไม่ต้องรีโหลดหน้า
+        $info_stmt = $conn->prepare("SELECT table_number, qr_token FROM restauranttable WHERE table_id = ?");
+        $info_stmt->bind_param("i", $table_id);
+        $info_stmt->execute();
+        $info = $info_stmt->get_result()->fetch_assoc() ?: [];
+        echo json_encode([
+            'success' => true,
+            'table_number' => $info['table_number'] ?? '',
+            'qr_token' => $info['qr_token'] ?? '',
+        ]);
     } else {
         echo json_encode(['success' => false, 'error' => 'เกิดข้อผิดพลาดในการอัปเดตสถานะโต๊ะ']);
     }

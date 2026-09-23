@@ -1,4 +1,5 @@
 body,.main-content { background-color: #f7f9fc; font-family: 'Sarabun', sans-serif; min-height: 100vh; }
+/* .card-col-removing / .card-update-flash ตอนนี้อยู่ใน assets/css/owner.css ส่วนกลางแล้ว (ใช้ร่วมกันหลายหน้า) */
 .soft-card { background: #ffffff; border-radius: 20px; border: none; box-shadow: 0 8px 25px rgba(0, 0, 0, 0.03); transition: 0.3s; }
 .soft-card:hover { transform: translateY(-5px); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.06); }
 .badge-soft-warning { background-color: #fffbeb; color: #b45309; padding: 8px 16px; border-radius: 50px; font-weight: bold; }
