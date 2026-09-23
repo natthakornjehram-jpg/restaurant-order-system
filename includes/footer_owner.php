@@ -233,6 +233,7 @@ function speakThai(text) {
  */
 let lastPendingCount = null;
 let lastPaymentsCount = null;
+let lastTablesState = null;
 
 // ดึงหน้าปัจจุบันซ้ำแบบเงียบๆ (fetch ธรรมดา ไม่ใช่ AJAX endpoint แยก) แล้วดึงเฉพาะส่วนที่ต้องการมาแทนที่ของเดิม
 // ใน DOM ตรงๆ แทนการรีโหลดทั้งหน้า (location.reload()) ที่ทำให้จอกะพริบ/เลื่อนกลับขึ้นบนสุด/ปิด modal ที่เปิดค้างอยู่
@@ -289,10 +290,27 @@ function checkNewOrders() {
             ownerSoftRefresh(['#pills-served', '#pills-online', '#servedCountBadge', '#onlineCountBadge']);
         }
 
+        // หน้าจัดการโต๊ะ: อัปเดตสถานะโต๊ะแบบเงียบๆ เมื่อมีโต๊ะเปลี่ยนสถานะ (ว่าง/ไม่ว่าง) จากที่อื่น เช่น
+        // อนุมัติออเดอร์จากหน้าจัดการออเดอร์ หรือเช็คบิลปิดโต๊ะจากเครื่อง/แท็บอื่น ระหว่างที่หน้านี้เปิดค้างอยู่
+        if (lastTablesState !== null && data.tables_state !== lastTablesState
+            && window.location.pathname.includes('manage_tables.php')) {
+            ownerSoftRefresh(['#table-grid']);
+        }
+
+        // หน้าแดชบอร์ด: อัปเดตการ์ดสถิติ + รายการออเดอร์ล่าสุดแบบเงียบๆ เมื่อมีอะไรเปลี่ยน (ออเดอร์ใหม่/สถานะเปลี่ยน/ชำระเงิน)
+        if (window.location.pathname.includes('dashboard.php') && (
+            (lastPendingCount !== null && data.pending_count !== lastPendingCount) ||
+            (lastPaymentsCount !== null && data.payments_count !== lastPaymentsCount) ||
+            (lastTablesState !== null && data.tables_state !== lastTablesState)
+        )) {
+            ownerSoftRefresh(['#dashboardStatsRow', '#dashboardOrdersList']);
+        }
+
         checkQueueFullWarning(data.active_queue_count, data.max_queue);
 
         lastPendingCount = data.pending_count;
         lastPaymentsCount = data.payments_count;
+        lastTablesState = data.tables_state;
     })
     .catch(err => console.error('API Error:', err));
 }

@@ -44,10 +44,19 @@ $max_result = $max_stmt->get_result();
 $max_queue = ($max_result->num_rows > 0) ? intval($max_result->fetch_assoc()['max_queue']) : 0;
 $max_stmt->close();
 
+// สถานะโต๊ะรวม (ใช้เทียบว่ามีอะไรเปลี่ยนไหม โดยไม่ต้องส่งรายละเอียดทุกโต๊ะมาเทียบทีละตัว) - รวมทั้งจำนวนโต๊ะ
+// ทั้งหมด (เผื่อเพิ่ม/ลบโต๊ะ) และจำนวนโต๊ะที่ไม่ว่าง เปลี่ยนได้จากทั้งตอนอนุมัติออเดอร์และตอนเช็คบิลปิดโต๊ะ
+$tbl_stmt = $conn->prepare("SELECT COUNT(*) as total, SUM(status != 'available') as busy FROM restauranttable");
+$tbl_stmt->execute();
+$tbl_row = $tbl_stmt->get_result()->fetch_assoc();
+$tables_state = intval($tbl_row['total']) . '-' . intval($tbl_row['busy']);
+$tbl_stmt->close();
+
 echo json_encode([
     'pending_count' => $pending_count,
     'payments_count' => $payments_count,
     'active_queue_count' => $active_queue_count,
     'max_queue' => $max_queue,
+    'tables_state' => $tables_state,
 ]);
 ?>

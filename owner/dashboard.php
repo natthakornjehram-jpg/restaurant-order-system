@@ -101,7 +101,7 @@ $takeaway_state = toggle_visual_state(!empty($store['is_takeaway_open']), $store
         </div>
     </div>
 
-    <div class="row g-4 mb-5 text-center">
+    <div class="row g-4 mb-5 text-center" id="dashboardStatsRow">
         <div class="col-md-4">
             <a href="reports.php" class="stat-link">
                 <div class="stat-card-top border-sales shadow-sm">
@@ -133,7 +133,7 @@ $takeaway_state = toggle_visual_state(!empty($store['is_takeaway_open']), $store
 
     <h3 class="fw-bold mb-4 text-dark">สถานะออเดอร์ล่าสุด</h3>
     
-    <div class="row g-3">
+    <div class="row g-3" id="dashboardOrdersList">
         <?php if ($pending_list_res && $pending_list_res->num_rows > 0): ?>
             <?php while($row = $pending_list_res->fetch_assoc()): 
                 $status = $row['order_status'];
