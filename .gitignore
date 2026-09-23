@@ -15,6 +15,13 @@
 # สำหรับวิธีตั้งค่า - ไฟล์นี้ต้องสร้างเองในเครื่อง/เซิร์ฟเวอร์ที่ deploy จริง ไม่ commit ไปกับโค้ด)
 includes/email_config.php
 
+# มีรหัสผ่านฐานข้อมูลจริงอยู่ข้างใน (ดู includes/db_config.example.php สำหรับวิธีตั้งค่า)
+includes/db_config.php
+
+# มี SlipOK API key/branchId ของจริงอยู่ข้างใน ห้าม commit เด็ดขาด (ดู includes/slipok_config.example.php
+# สำหรับวิธีตั้งค่า - ไฟล์นี้ต้องสร้างเองในเครื่อง/เซิร์ฟเวอร์ที่ deploy จริง ไม่ commit ไปกับโค้ด)
+includes/slipok_config.php
+
 # ไฟล์ของระบบปฏิบัติการ/เอดิเตอร์
 .DS_Store
 Thumbs.db
