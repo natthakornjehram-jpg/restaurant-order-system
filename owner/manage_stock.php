@@ -595,15 +595,10 @@ include '../includes/nav_owner.php';
     $res_pools_meta = $conn->query("SELECT pool_id AS id, sku, pool_name AS name, NULL AS price, reorder_point, stock_qty, pool_category AS category_name FROM stock_pool ORDER BY pool_name ASC");
     if ($res_pools_meta) { while ($r = $res_pools_meta->fetch_assoc()) { $r['type'] = 'pool'; $r['type_label'] = 'กลุ่มสต็อกร่วม'; $r['category_name'] = $r['category_name'] ?: 'ไม่มีหมวดหมู่'; $products[] = $r; } }
 
-    // ประวัติรับ-จ่ายสต็อกสำหรับแท็บ "บันทึกรับ-จ่าย" กรองตามช่วงวันที่ (ค่าเริ่มต้น = วันนี้)
-    $txn_date_from = $_GET['txn_from'] ?? date('Y-m-d');
-    $txn_date_to = $_GET['txn_to'] ?? date('Y-m-d');
-    $txn_stmt = $conn->prepare(
-        "SELECT * FROM stock_transactions WHERE DATE(occurred_at) BETWEEN ? AND ? ORDER BY occurred_at DESC, transaction_id DESC LIMIT 500"
-    );
-    $txn_stmt->bind_param("ss", $txn_date_from, $txn_date_to);
-    $txn_stmt->execute();
-    $transactions = $txn_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    // ประวัติรับ-จ่ายสต็อกสำหรับแท็บ "บันทึกรับ-จ่าย" กรองตามช่วงวันที่/เวลา ประเภท ทิศทาง และคำค้นหา
+    // (ตัวกรองชุดเดียวกันนี้ใช้ร่วมกับหน้าพิมพ์ PDF และหน้าส่งออก Excel/CSV ด้วย ดู includes/stock_log.php)
+    $txn_filters = get_stock_transaction_filters();
+    $transactions = query_stock_transactions($conn, $txn_filters);
     $txn_type_labels = ['item' => 'เมนูอาหาร', 'topping' => 'ท็อปปิ้ง/วัตถุดิบเสริม', 'pool' => 'กลุ่มสต็อกร่วม'];
     ?>
 
@@ -884,23 +879,59 @@ include '../includes/nav_owner.php';
         <div class="tab-pane fade" id="transactions-pane" role="tabpanel">
             <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center mb-3 gap-2">
                 <p class="text-muted small mb-0">ประวัติการเข้า-ออกของสต็อกทุกครั้ง ทั้งจากออเดอร์ลูกค้าและการปรับมือ</p>
-                <button type="button" class="btn btn-outline-secondary rounded-pill px-4 fw-bold shadow-sm flex-shrink-0" onclick="printTransactions()">
-                    <i class="bi bi-printer me-1"></i> พิมพ์รายการ
-                </button>
+                <div class="d-flex gap-2 flex-shrink-0">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4 fw-bold shadow-sm" onclick="downloadTransactions('pdf')">
+                        <i class="bi bi-file-earmark-pdf me-1"></i> PDF
+                    </button>
+                    <button type="button" class="btn btn-outline-success rounded-pill px-4 fw-bold shadow-sm" onclick="downloadTransactions('excel')">
+                        <i class="bi bi-file-earmark-excel me-1"></i> Excel
+                    </button>
+                </div>
             </div>
 
-            <form method="GET" id="txnFilterForm" class="d-flex flex-wrap gap-2 align-items-end mb-4">
-                <div>
+            <form method="GET" id="txnFilterForm" class="row g-2 align-items-end mb-4">
+                <div class="col-6 col-md-2">
                     <label class="small fw-bold mb-1 d-block">จากวันที่</label>
-                    <input type="date" name="txn_from" class="form-control rounded-3" value="<?= htmlspecialchars($txn_date_from) ?>">
+                    <input type="date" name="txn_from" class="form-control rounded-3" value="<?= htmlspecialchars($txn_filters['from']) ?>">
                 </div>
-                <div>
+                <div class="col-6 col-md-2">
+                    <label class="small fw-bold mb-1 d-block">เวลา</label>
+                    <input type="time" name="txn_from_time" class="form-control rounded-3" value="<?= htmlspecialchars($txn_filters['from_time']) ?>">
+                </div>
+                <div class="col-6 col-md-2">
                     <label class="small fw-bold mb-1 d-block">ถึงวันที่</label>
-                    <input type="date" name="txn_to" class="form-control rounded-3" value="<?= htmlspecialchars($txn_date_to) ?>">
+                    <input type="date" name="txn_to" class="form-control rounded-3" value="<?= htmlspecialchars($txn_filters['to']) ?>">
                 </div>
-                <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold">
-                    <i class="bi bi-search me-1"></i> ค้นหา
-                </button>
+                <div class="col-6 col-md-2">
+                    <label class="small fw-bold mb-1 d-block">เวลา</label>
+                    <input type="time" name="txn_to_time" class="form-control rounded-3" value="<?= htmlspecialchars($txn_filters['to_time']) ?>">
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="small fw-bold mb-1 d-block">ประเภท</label>
+                    <select name="txn_type" class="form-select rounded-3">
+                        <option value="all" <?= $txn_filters['type'] === 'all' ? 'selected' : '' ?>>ทั้งหมด</option>
+                        <option value="item" <?= $txn_filters['type'] === 'item' ? 'selected' : '' ?>>เมนูอาหาร</option>
+                        <option value="topping" <?= $txn_filters['type'] === 'topping' ? 'selected' : '' ?>>ท็อปปิ้ง/วัตถุดิบเสริม</option>
+                        <option value="pool" <?= $txn_filters['type'] === 'pool' ? 'selected' : '' ?>>กลุ่มสต็อกร่วม</option>
+                    </select>
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="small fw-bold mb-1 d-block">ทิศทาง</label>
+                    <select name="txn_direction" class="form-select rounded-3">
+                        <option value="all" <?= $txn_filters['direction'] === 'all' ? 'selected' : '' ?>>ทั้งหมด</option>
+                        <option value="in" <?= $txn_filters['direction'] === 'in' ? 'selected' : '' ?>>รับเข้า (In)</option>
+                        <option value="out" <?= $txn_filters['direction'] === 'out' ? 'selected' : '' ?>>จ่ายออก (Out)</option>
+                    </select>
+                </div>
+                <div class="col-12 col-md-8">
+                    <label class="small fw-bold mb-1 d-block">ค้นหาชื่อสินค้า/SKU</label>
+                    <input type="text" name="txn_q" class="form-control rounded-3" placeholder="เช่น ไก่ หรือ ITM-001" value="<?= htmlspecialchars($txn_filters['q']) ?>">
+                </div>
+                <div class="col-12 col-md-4">
+                    <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold w-100">
+                        <i class="bi bi-search me-1"></i> ค้นหา
+                    </button>
+                </div>
             </form>
 
             <?php if (empty($transactions)): ?>
@@ -1609,10 +1640,20 @@ document.getElementById('txnFilterForm').addEventListener('submit', function () 
     sessionStorage.setItem('stockActiveTab', 'transactions');
 });
 
-function printTransactions() {
-    const from = document.querySelector('input[name="txn_from"]').value;
-    const to = document.querySelector('input[name="txn_to"]').value;
-    window.open('print_stock_transactions.php?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to), '_blank', 'width=1000,height=700');
+// รวบรวมค่าตัวกรองปัจจุบันในฟอร์มทั้งหมด (วันที่/เวลา/ประเภท/ทิศทาง/คำค้นหา) ส่งต่อให้หน้าพิมพ์ PDF และ
+// ส่งออก Excel ให้ตรงกับสิ่งที่กำลังดูอยู่บนตารางเป๊ะๆ ไม่ต้องตั้งตัวกรองซ้ำสองที่
+function getTransactionFilterParams() {
+    const form = document.getElementById('txnFilterForm');
+    return new URLSearchParams(new FormData(form)).toString();
+}
+
+function downloadTransactions(format) {
+    const params = getTransactionFilterParams();
+    if (format === 'pdf') {
+        window.open('print_stock_transactions.php?' + params, '_blank', 'width=1000,height=700');
+    } else {
+        window.location.href = 'export_stock_transactions.php?' + params;
+    }
 }
 </script>
 

@@ -3,25 +3,16 @@
 session_start();
 include '../includes/db.php';
 require_once 'auth_owner.php';
+require_once '../includes/stock_log.php';
 
-$date_from = $_GET['from'] ?? date('Y-m-d');
-$date_to = $_GET['to'] ?? date('Y-m-d');
+$txn_filters = get_stock_transaction_filters();
+$transactions = query_stock_transactions($conn, $txn_filters);
 
 $stmt_rest = $conn->prepare("SELECT restaurant_name FROM owner WHERE owner_id = ? LIMIT 1");
 $stmt_rest->bind_param("i", $owner_id);
 $stmt_rest->execute();
 $rest_data = $stmt_rest->get_result()->fetch_assoc();
 $restaurant_name = !empty($rest_data['restaurant_name']) ? $rest_data['restaurant_name'] : 'ไม่ระบุชื่อร้าน';
-
-$stmt = $conn->prepare(
-    "SELECT * FROM stock_transactions
-     WHERE DATE(occurred_at) BETWEEN ? AND ?
-     ORDER BY occurred_at DESC, transaction_id DESC
-     LIMIT 500"
-);
-$stmt->bind_param("ss", $date_from, $date_to);
-$stmt->execute();
-$transactions = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
 $type_labels = ['item' => 'เมนูอาหาร', 'topping' => 'ท็อปปิ้ง/วัตถุดิบเสริม', 'pool' => 'กลุ่มสต็อกร่วม'];
 ?>
@@ -56,7 +47,7 @@ $type_labels = ['item' => 'เมนูอาหาร', 'topping' => 'ท็อ
         <div class="header">
             <div>
                 <h1>บันทึกรับ-จ่ายสต็อก</h1>
-                <p><?= htmlspecialchars($restaurant_name) ?> — ตั้งแต่ <?= date('d/m/Y', strtotime($date_from)) ?> ถึง <?= date('d/m/Y', strtotime($date_to)) ?></p>
+                <p><?= htmlspecialchars($restaurant_name) ?> — ตั้งแต่ <?= date('d/m/Y H:i', strtotime($txn_filters['from'] . ' ' . $txn_filters['from_time'])) ?> ถึง <?= date('d/m/Y H:i', strtotime($txn_filters['to'] . ' ' . $txn_filters['to_time'])) ?></p>
             </div>
             <p>ทั้งหมด <?= count($transactions) ?> รายการ</p>
         </div>
