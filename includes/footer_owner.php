@@ -234,6 +234,7 @@ function speakThai(text) {
 let lastPendingCount = null;
 let lastPaymentsCount = null;
 let lastTablesState = null;
+let lastStockTxnId = null;
 
 // ดึงหน้าปัจจุบันซ้ำแบบเงียบๆ (fetch ธรรมดา ไม่ใช่ AJAX endpoint แยก) แล้วดึงเฉพาะส่วนที่ต้องการมาแทนที่ของเดิม
 // ใน DOM ตรงๆ แทนการรีโหลดทั้งหน้า (location.reload()) ที่ทำให้จอกะพริบ/เลื่อนกลับขึ้นบนสุด/ปิด modal ที่เปิดค้างอยู่
@@ -306,11 +307,19 @@ function checkNewOrders() {
             ownerSoftRefresh(['#dashboardStatsRow', '#dashboardOrdersList']);
         }
 
+        // หน้าจัดการคลังสินค้า: อัปเดตแท็บ "บันทึกรับ-จ่าย" แบบเงียบๆ ทันทีที่มีรายการใหม่เข้ามา (ลูกค้าสั่งอาหาร
+        // ตัดสต็อกอัตโนมัติ หรือเจ้าของร้านปรับมือจากอีกแท็บ/อีกเครื่อง) ไม่ต้องกดรีเฟรชเองเหมือนหน้าอื่นๆ ข้างบน
+        if (lastStockTxnId !== null && data.latest_stock_txn_id !== lastStockTxnId
+            && window.location.pathname.includes('manage_stock.php')) {
+            ownerSoftRefresh(['#transactions-pane']);
+        }
+
         checkQueueFullWarning(data.active_queue_count, data.max_queue);
 
         lastPendingCount = data.pending_count;
         lastPaymentsCount = data.payments_count;
         lastTablesState = data.tables_state;
+        lastStockTxnId = data.latest_stock_txn_id;
     })
     .catch(err => console.error('API Error:', err));
 }

@@ -52,11 +52,17 @@ $tbl_row = $tbl_stmt->get_result()->fetch_assoc();
 $tables_state = intval($tbl_row['total']) . '-' . intval($tbl_row['busy']);
 $tbl_stmt->close();
 
+// เลข transaction_id ล่าสุดของบันทึกรับ-จ่ายสต็อก ใช้เทียบว่ามีรายการใหม่เข้ามาไหม (ตัดสต็อกจากออเดอร์/ปรับมือ)
+// เพื่อรีเฟรชแท็บ "บันทึกรับ-จ่าย" แบบเงียบๆ แบบเดียวกับที่ทำกับสถานะโต๊ะ/ออเดอร์ด้านบน
+$txn_stmt = $conn->query("SELECT MAX(transaction_id) AS latest FROM stock_transactions");
+$latest_stock_txn_id = $txn_stmt ? intval($txn_stmt->fetch_assoc()['latest'] ?? 0) : 0;
+
 echo json_encode([
     'pending_count' => $pending_count,
     'payments_count' => $payments_count,
     'active_queue_count' => $active_queue_count,
     'max_queue' => $max_queue,
     'tables_state' => $tables_state,
+    'latest_stock_txn_id' => $latest_stock_txn_id,
 ]);
 ?>
