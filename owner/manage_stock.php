@@ -252,6 +252,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         echo json_encode($resp);
         exit;
+    } elseif ($action === 'save_product_meta') {
+        // แก้ SKU/จุดสั่งซื้อซ้ำ จากแท็บ "รายการสินค้า" (ใช้ร่วมกันทั้งเมนู/ท็อปปิ้ง/กลุ่มสต็อกร่วม)
+        header('Content-Type: application/json');
+        $item_type = $_POST['item_type'] ?? '';
+        $item_id = intval($_POST['item_id'] ?? 0);
+        $sku = trim($_POST['sku'] ?? '');
+        $reorder_point = max(0, intval($_POST['reorder_point'] ?? 0));
+        $sku = $sku !== '' ? $sku : null;
+
+        $table_map = ['item' => ['item', 'item_id'], 'topping' => ['topping', 'topping_id'], 'pool' => ['stock_pool', 'pool_id']];
+        if (!isset($table_map[$item_type]) || $item_id <= 0) {
+            echo json_encode(['success' => false, 'error' => 'ข้อมูลไม่ถูกต้อง']);
+            exit;
+        }
+        [$table, $pk] = $table_map[$item_type];
+
+        // เช็ก SKU ซ้ำเอง (คนละข้อความจาก MySQL unique key error ให้เข้าใจง่ายกว่า)
+        if ($sku !== null) {
+            $dup_stmt = $conn->prepare("SELECT 1 FROM item WHERE sku = ? AND item_id != ? UNION SELECT 1 FROM topping WHERE sku = ? AND topping_id != ? UNION SELECT 1 FROM stock_pool WHERE sku = ? AND pool_id != ?");
+            $dummy_item_id = $item_type === 'item' ? $item_id : 0;
+            $dummy_topping_id = $item_type === 'topping' ? $item_id : 0;
+            $dummy_pool_id = $item_type === 'pool' ? $item_id : 0;
+            $dup_stmt->bind_param("sisisi", $sku, $dummy_item_id, $sku, $dummy_topping_id, $sku, $dummy_pool_id);
+            $dup_stmt->execute();
+            if ($dup_stmt->get_result()->num_rows > 0) {
+                echo json_encode(['success' => false, 'error' => 'SKU นี้ถูกใช้ไปแล้ว กรุณาตั้งชื่ออื่น']);
+                exit;
+            }
+        }
+
+        $stmt = $conn->prepare("UPDATE `$table` SET sku = ?, reorder_point = ? WHERE `$pk` = ?");
+        $stmt->bind_param("sii", $sku, $reorder_point, $item_id);
+        if ($stmt->execute()) {
+            echo json_encode(['success' => true]);
+        } else {
+            echo json_encode(['success' => false, 'error' => 'เกิดข้อผิดพลาด ไม่สามารถบันทึกได้']);
+        }
+        exit;
     }
 }
 
@@ -485,6 +523,12 @@ include '../includes/nav_owner.php';
     .stock-flash { animation: stockFlash 0.7s ease-out; border-radius: 8px; }
     .h2.fw-bold { transition: transform 0.15s ease; }
     .stock-pop { transform: scale(1.18); }
+
+    .product-table th { white-space: nowrap; font-size: 0.85rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.03em; }
+    .product-table td { vertical-align: middle; }
+    .sku-badge { font-family: 'Courier New', monospace; font-weight: bold; background: #f1f5f9; padding: 3px 10px; border-radius: 8px; font-size: 0.85rem; }
+    .qty-warn { color: #d97706; font-weight: bold; }
+    .qty-danger { color: #dc2626; font-weight: bold; }
 </style>
 
 <div class="main-content container-fluid pb-5 px-4 pt-3 text-dark">
@@ -524,6 +568,16 @@ include '../includes/nav_owner.php';
                 <i class="bi bi-boxes me-1"></i> กลุ่มสต็อกร่วม
             </button>
         </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-3 px-4 py-3 fw-bold shadow-sm" id="products-tab" data-bs-toggle="pill" data-bs-target="#products-pane" type="button" role="tab">
+                <i class="bi bi-upc-scan me-1"></i> รายการสินค้า
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-3 px-4 py-3 fw-bold shadow-sm" id="transactions-tab" data-bs-toggle="pill" data-bs-target="#transactions-pane" type="button" role="tab">
+                <i class="bi bi-clock-history me-1"></i> บันทึกรับ-จ่าย
+            </button>
+        </li>
     </ul>
 
     <?php
@@ -531,6 +585,26 @@ include '../includes/nav_owner.php';
     $all_pools = [];
     $pools_res = $conn->query("SELECT * FROM stock_pool ORDER BY pool_name ASC");
     if ($pools_res) { while ($p = $pools_res->fetch_assoc()) { $all_pools[] = $p; } }
+
+    // ดึงสินค้าทั้ง 3 ประเภทมารวมเป็นลิสต์เดียวสำหรับแท็บ "รายการสินค้า" (SKU/ราคา/จุดสั่งซื้อซ้ำ) เรียงตามชื่อ
+    $products = [];
+    $res_items = $conn->query("SELECT item_id AS id, sku, name, price, reorder_point, stock_qty, c.category_name FROM item i LEFT JOIN category c ON i.category_id = c.category_id WHERE i.use_stock = 1 ORDER BY i.name ASC");
+    if ($res_items) { while ($r = $res_items->fetch_assoc()) { $r['type'] = 'item'; $r['type_label'] = 'เมนูอาหาร'; $r['category_name'] = $r['category_name'] ?: 'ไม่มีหมวดหมู่'; $products[] = $r; } }
+    $res_toppings = $conn->query("SELECT t.topping_id AS id, t.sku, t.topping_name AS name, t.price, t.reorder_point, t.stock_qty, tc.topping_cat_name AS category_name FROM topping t LEFT JOIN topping_categories tc ON t.topping_cat_id = tc.topping_cat_id WHERE t.use_stock = 1 ORDER BY t.topping_name ASC");
+    if ($res_toppings) { while ($r = $res_toppings->fetch_assoc()) { $r['type'] = 'topping'; $r['type_label'] = 'ท็อปปิ้ง/วัตถุดิบเสริม'; $r['category_name'] = $r['category_name'] ?: 'ไม่มีหมวดหมู่'; $products[] = $r; } }
+    $res_pools_meta = $conn->query("SELECT pool_id AS id, sku, pool_name AS name, NULL AS price, reorder_point, stock_qty, pool_category AS category_name FROM stock_pool ORDER BY pool_name ASC");
+    if ($res_pools_meta) { while ($r = $res_pools_meta->fetch_assoc()) { $r['type'] = 'pool'; $r['type_label'] = 'กลุ่มสต็อกร่วม'; $r['category_name'] = $r['category_name'] ?: 'ไม่มีหมวดหมู่'; $products[] = $r; } }
+
+    // ประวัติรับ-จ่ายสต็อกสำหรับแท็บ "บันทึกรับ-จ่าย" กรองตามช่วงวันที่ (ค่าเริ่มต้น = วันนี้)
+    $txn_date_from = $_GET['txn_from'] ?? date('Y-m-d');
+    $txn_date_to = $_GET['txn_to'] ?? date('Y-m-d');
+    $txn_stmt = $conn->prepare(
+        "SELECT * FROM stock_transactions WHERE DATE(occurred_at) BETWEEN ? AND ? ORDER BY occurred_at DESC, transaction_id DESC LIMIT 500"
+    );
+    $txn_stmt->bind_param("ss", $txn_date_from, $txn_date_to);
+    $txn_stmt->execute();
+    $transactions = $txn_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $txn_type_labels = ['item' => 'เมนูอาหาร', 'topping' => 'ท็อปปิ้ง/วัตถุดิบเสริม', 'pool' => 'กลุ่มสต็อกร่วม'];
     ?>
 
     <div class="tab-content" id="stockTabsContent">
@@ -742,6 +816,163 @@ include '../includes/nav_owner.php';
                 </div>
             <?php endif; ?>
         </div>
+
+        <!-- 🟢 TAB 4: รายการสินค้า - SKU/ราคาขาย/จุดสั่งซื้อซ้ำของทุกรายการที่ติดตามคลังสินค้า ดูง่าย พิมพ์ได้ -->
+        <div class="tab-pane fade" id="products-pane" role="tabpanel">
+            <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center mb-3 gap-2">
+                <p class="text-muted small mb-0">SKU, ชื่อสินค้า, หมวดหมู่, ราคาขาย และจุดสั่งซื้อซ้ำของทุกรายการที่ติดตามคลังสินค้า</p>
+                <button type="button" class="btn btn-outline-secondary rounded-pill px-4 fw-bold shadow-sm flex-shrink-0" onclick="window.open('print_product_list.php', '_blank', 'width=900,height=700')">
+                    <i class="bi bi-printer me-1"></i> พิมพ์รายการ
+                </button>
+            </div>
+            <?php if (empty($products)): ?>
+                <div class="text-center py-5">
+                    <i class="bi bi-upc-scan display-1 text-muted opacity-25"></i>
+                    <p class="mt-3 text-muted">ยังไม่มีสินค้าที่ติดตามคลังสินค้าในระบบ</p>
+                </div>
+            <?php else: ?>
+            <div class="card border-0 shadow-sm rounded-4 p-3">
+                <div class="table-responsive">
+                    <table class="table product-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>SKU</th>
+                                <th>ชื่อสินค้า</th>
+                                <th>ประเภท</th>
+                                <th>หมวดหมู่</th>
+                                <th class="text-end">ราคาขาย</th>
+                                <th class="text-end">คงเหลือ</th>
+                                <th class="text-end">จุดสั่งซื้อซ้ำ</th>
+                                <th class="text-center">แก้ไข</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($products as $p):
+                                $qty = (int) $p['stock_qty'];
+                                $reorder = (int) $p['reorder_point'];
+                                $qty_class = $qty <= 0 ? 'qty-danger' : ($qty <= $reorder ? 'qty-warn' : '');
+                            ?>
+                            <tr>
+                                <td><span class="sku-badge"><?= htmlspecialchars($p['sku'] ?: '-') ?></span></td>
+                                <td class="fw-bold"><?= htmlspecialchars($p['name']) ?></td>
+                                <td><span class="badge bg-light text-dark rounded-pill"><?= htmlspecialchars($p['type_label']) ?></span></td>
+                                <td class="text-muted small"><?= htmlspecialchars($p['category_name']) ?></td>
+                                <td class="text-end"><?= $p['price'] !== null ? '฿' . number_format((float) $p['price'], 2) : '-' ?></td>
+                                <td class="text-end <?= $qty_class ?>"><?= $qty ?></td>
+                                <td class="text-end"><?= $reorder ?></td>
+                                <td class="text-center">
+                                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill" onclick='openEditProductModal(<?= json_encode([
+                                        'type' => $p['type'],
+                                        'id' => (int) $p['id'],
+                                        'name' => $p['name'],
+                                        'sku' => $p['sku'],
+                                        'reorder_point' => $reorder,
+                                    ], JSON_UNESCAPED_UNICODE) ?>)'>
+                                        <i class="bi bi-pencil-square"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <?php endif; ?>
+        </div>
+
+        <!-- 🟢 TAB 5: บันทึกรับ-จ่าย - ประวัติการเข้า-ออกของสต็อกทุกครั้ง ทั้งจากออเดอร์ลูกค้าและปรับมือ -->
+        <div class="tab-pane fade" id="transactions-pane" role="tabpanel">
+            <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center mb-3 gap-2">
+                <p class="text-muted small mb-0">ประวัติการเข้า-ออกของสต็อกทุกครั้ง ทั้งจากออเดอร์ลูกค้าและการปรับมือ</p>
+                <button type="button" class="btn btn-outline-secondary rounded-pill px-4 fw-bold shadow-sm flex-shrink-0" onclick="printTransactions()">
+                    <i class="bi bi-printer me-1"></i> พิมพ์รายการ
+                </button>
+            </div>
+
+            <form method="GET" id="txnFilterForm" class="d-flex flex-wrap gap-2 align-items-end mb-4">
+                <div>
+                    <label class="small fw-bold mb-1 d-block">จากวันที่</label>
+                    <input type="date" name="txn_from" class="form-control rounded-3" value="<?= htmlspecialchars($txn_date_from) ?>">
+                </div>
+                <div>
+                    <label class="small fw-bold mb-1 d-block">ถึงวันที่</label>
+                    <input type="date" name="txn_to" class="form-control rounded-3" value="<?= htmlspecialchars($txn_date_to) ?>">
+                </div>
+                <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold">
+                    <i class="bi bi-search me-1"></i> ค้นหา
+                </button>
+            </form>
+
+            <?php if (empty($transactions)): ?>
+                <div class="text-center py-5">
+                    <i class="bi bi-clock-history display-1 text-muted opacity-25"></i>
+                    <p class="mt-3 text-muted">ไม่มีรายการรับ-จ่ายในช่วงวันที่นี้</p>
+                </div>
+            <?php else: ?>
+            <div class="card border-0 shadow-sm rounded-4 p-3">
+                <div class="table-responsive">
+                    <table class="table product-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>วันที่เวลา</th>
+                                <th>SKU</th>
+                                <th>ชื่อสินค้า</th>
+                                <th>ประเภท</th>
+                                <th class="text-end">จำนวนเข้า (In)</th>
+                                <th class="text-end">จำนวนออก (Out)</th>
+                                <th class="text-end">คงเหลือ</th>
+                                <th>เอกสาร/ออเดอร์อ้างอิง</th>
+                                <th>ผู้ทำรายการ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($transactions as $t): ?>
+                            <tr>
+                                <td class="text-nowrap"><?= date('d/m/Y H:i', strtotime($t['occurred_at'])) ?></td>
+                                <td><span class="sku-badge"><?= htmlspecialchars($t['sku'] ?: '-') ?></span></td>
+                                <td class="fw-bold"><?= htmlspecialchars($t['item_name']) ?></td>
+                                <td><span class="badge bg-light text-dark rounded-pill"><?= htmlspecialchars($txn_type_labels[$t['item_type']] ?? $t['item_type']) ?></span></td>
+                                <td class="text-end qty-in" style="color:#16a34a;font-weight:bold;"><?= $t['qty_change'] > 0 ? '+' . $t['qty_change'] : '' ?></td>
+                                <td class="text-end qty-out" style="color:#dc2626;font-weight:bold;"><?= $t['qty_change'] < 0 ? $t['qty_change'] : '' ?></td>
+                                <td class="text-end fw-bold"><?= $t['qty_after'] ?></td>
+                                <td class="text-muted small"><?= htmlspecialchars($t['source_ref'] ?: ($t['note'] ?: '-')) ?></td>
+                                <td class="text-muted small"><?= htmlspecialchars($t['created_by'] ?: '-') ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: แก้ไขข้อมูลสินค้า (SKU / จุดสั่งซื้อซ้ำ) -->
+<div class="modal fade" id="editProductModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content border-0 rounded-4" id="editProductForm">
+            <div class="modal-header border-0 pt-4 px-4">
+                <h5 class="fw-bold m-0">แก้ไขข้อมูลสินค้า <span id="editProductName" class="text-primary"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body px-4">
+                <input type="hidden" id="editProductType" name="item_type">
+                <input type="hidden" id="editProductId" name="item_id">
+                <div class="mb-3">
+                    <label class="small fw-bold mb-2">SKU</label>
+                    <input type="text" id="editProductSku" name="sku" class="form-control rounded-3" placeholder="เช่น ITM-001">
+                </div>
+                <div class="mb-3">
+                    <label class="small fw-bold mb-2">จุดสั่งซื้อซ้ำ (แจ้งเตือน "ใกล้หมด" เมื่อคงเหลือถึงจำนวนนี้)</label>
+                    <input type="number" step="1" min="0" id="editProductReorder" name="reorder_point" class="form-control rounded-3" value="5" required>
+                </div>
+            </div>
+            <div class="modal-footer border-0 p-4 pt-0 d-flex justify-content-between">
+                <button type="button" class="btn btn-outline-secondary rounded-pill px-4 fw-bold" data-bs-dismiss="modal">ยกเลิก</button>
+                <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold">บันทึก</button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -1334,6 +1565,55 @@ document.getElementById('newToppingStockForm').addEventListener('submit', functi
     })
     .catch(() => ownerNotify('เกิดข้อผิดพลาด ไม่สามารถบันทึกได้', 'error'));
 });
+
+/*
+ * แท็บ "รายการสินค้า" - แก้ SKU/จุดสั่งซื้อซ้ำ
+ */
+function openEditProductModal(p) {
+    document.getElementById('editProductType').value = p.type;
+    document.getElementById('editProductId').value = p.id;
+    document.getElementById('editProductName').textContent = '"' + p.name + '"';
+    document.getElementById('editProductSku').value = p.sku || '';
+    document.getElementById('editProductReorder').value = p.reorder_point;
+    new bootstrap.Modal(document.getElementById('editProductModal')).show();
+}
+
+document.getElementById('editProductForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    formData.append('action', 'save_product_meta');
+    formData.append('csrf_token', CSRF_TOKEN);
+
+    fetch('manage_stock.php', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: formData
+    })
+        .then(res => res.json())
+        .then(data => {
+            if (!data.success) { ownerNotify(data.error || 'เกิดข้อผิดพลาด ไม่สามารถบันทึกได้', 'error'); return; }
+            bootstrap.Modal.getInstance(document.getElementById('editProductModal')).hide();
+            ownerNotify('บันทึกข้อมูลสินค้าเรียบร้อยแล้ว');
+            sessionStorage.setItem('stockActiveTab', 'products');
+            setTimeout(() => window.location.reload(), 600);
+        })
+        .catch(() => ownerNotify('เกิดข้อผิดพลาด ไม่สามารถบันทึกได้', 'error'));
+});
+
+/*
+ * แท็บ "บันทึกรับ-จ่าย"
+ */
+// รีโหลดหน้าตามช่วงวันที่ที่เลือก (ฟอร์ม GET ธรรมดา) แต่จำแท็บนี้ไว้ก่อนรีโหลด ไม่งั้นหลังค้นหาจะกระโดดกลับ
+// ไปแท็บ "เมนูอาหารหลัก" เหมือนโหลดหน้าใหม่ปกติ
+document.getElementById('txnFilterForm').addEventListener('submit', function () {
+    sessionStorage.setItem('stockActiveTab', 'transactions');
+});
+
+function printTransactions() {
+    const from = document.querySelector('input[name="txn_from"]').value;
+    const to = document.querySelector('input[name="txn_to"]').value;
+    window.open('print_stock_transactions.php?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to), '_blank', 'width=1000,height=700');
+}
 </script>
 
 <?php include '../includes/footer_owner.php'; ?>
