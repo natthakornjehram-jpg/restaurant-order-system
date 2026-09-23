@@ -99,6 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Content-Type: application/json');
         $pool_id = intval($_POST['pool_id'] ?? 0);
         $pool_name = trim($_POST['pool_name'] ?? '');
+        $pool_category = trim($_POST['pool_category'] ?? '') ?: null; // ว่าง = ไม่มีหมวดหมู่ (จัดกลุ่มรวมท้ายสุด)
         $pool_qty = max(0, intval($_POST['stock_qty'] ?? 0));
 
         if ($pool_name === '') {
@@ -107,36 +108,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($pool_id > 0) {
-            $stmt = $conn->prepare("UPDATE stock_pool SET pool_name = ?, stock_qty = ? WHERE pool_id = ?");
-            $stmt->bind_param("sii", $pool_name, $pool_qty, $pool_id);
+            $stmt = $conn->prepare("UPDATE stock_pool SET pool_name = ?, pool_category = ?, stock_qty = ? WHERE pool_id = ?");
+            $stmt->bind_param("ssii", $pool_name, $pool_category, $pool_qty, $pool_id);
         } else {
-            $stmt = $conn->prepare("INSERT INTO stock_pool (pool_name, stock_qty) VALUES (?, ?)");
-            $stmt->bind_param("si", $pool_name, $pool_qty);
+            $stmt = $conn->prepare("INSERT INTO stock_pool (pool_name, pool_category, stock_qty) VALUES (?, ?, ?)");
+            $stmt->bind_param("ssi", $pool_name, $pool_category, $pool_qty);
         }
 
+        // ไม่ต้อง render การ์ดกลับมาเองแล้ว (เดิมทำแบบนั้นตอนยังไม่มีหมวดหมู่) เพราะตอนนี้กลุ่มอาจย้ายไปอยู่คนละ
+        // หมวดหมู่กับที่โชว์อยู่บนจอ ให้ฝั่ง JS สั่ง soft-refresh ทั้งแท็บแทน จะได้จัดกลุ่มใหม่ถูกต้องเสมอ
         if ($stmt->execute()) {
-            $new_pool_id = $pool_id > 0 ? $pool_id : $conn->insert_id;
-
-            // หาชื่อเมนู/ท็อปปิ้งที่ผูกกับกลุ่มนี้ไว้อยู่แล้ว (กรณีแก้ไขกลุ่มเดิม) เพื่อ render การ์ดให้ตรงความจริง
-            $linked = [];
-            $li = $conn->prepare("SELECT name FROM item WHERE stock_pool_id = ?");
-            $li->bind_param("i", $new_pool_id);
-            $li->execute();
-            $lr = $li->get_result();
-            while ($r = $lr->fetch_assoc()) { $linked[] = $r['name']; }
-            $lt = $conn->prepare("SELECT topping_name AS name FROM topping WHERE stock_pool_id = ?");
-            $lt->bind_param("i", $new_pool_id);
-            $lt->execute();
-            $lr2 = $lt->get_result();
-            while ($r = $lr2->fetch_assoc()) { $linked[] = $r['name']; }
-
-            // render การ์ดนี้ใบเดียวด้วยฟังก์ชันเดียวกับตอนโหลดหน้าปกติ ส่ง HTML กลับไปแทรก/แทนที่ฝั่งหน้าเว็บได้เลย
-            // ไม่ต้องรีโหลดทั้งหน้า และไม่ต้องเขียนโครงสร้างการ์ดซ้ำสองที่ (PHP กับ JS)
-            ob_start();
-            render_stock_pool_card(['pool_id' => $new_pool_id, 'pool_name' => $pool_name, 'stock_qty' => $pool_qty], $linked);
-            $card_html = ob_get_clean();
-
-            echo json_encode(['success' => true, 'pool_id' => $new_pool_id, 'is_new' => $pool_id === 0, 'card_html' => $card_html]);
+            echo json_encode(['success' => true, 'pool_id' => $pool_id > 0 ? $pool_id : $conn->insert_id]);
         } else {
             echo json_encode(['success' => false, 'error' => 'เกิดข้อผิดพลาดในการบันทึกข้อมูล']);
         }
@@ -403,15 +385,16 @@ function render_stock_topping_card($top, $all_pools = []) {
     <?php
 }
 
-// การ์ดกลุ่มสต็อกร่วม 1 กลุ่ม - ทำเป็นแถวพับ/กางได้ (accordion) แบบเดียวกับแท็บเมนู/ท็อปปิ้ง แทนการ์ดกริดเดิม
-// เพราะดูง่ายกว่าเมื่อมีหลายกลุ่ม (เห็นชื่อ+จำนวนที่ผูกไว้ทีเดียวเป็นลิสต์ ไม่ต้องไล่สแกนการ์ดใหญ่ทีละใบ)
-function render_stock_pool_card($p, $linked_names) {
+// การ์ดกลุ่มสต็อกร่วม 1 กลุ่ม - ทำเป็นแถวพับ/กางได้ (accordion) แบบเดียวกับแท็บเมนู/ท็อปปิ้ง วางซ้อนอยู่ในหมวดหมู่
+// (accordion ของหมวดหมู่) อีกทีหนึ่ง $parent_sel คือ id ของ accordion หมวดหมู่ที่กลุ่มนี้อยู่ (ใช้ทำ data-bs-parent)
+function render_stock_pool_card($p, $linked_names, $parent_sel = 'poolsGridRow') {
     $p_id = $p['pool_id'];
     $qty = (int) $p['stock_qty'];
     $badge = "bg-success"; $text = "มีของพอใช้";
     if ($qty <= 0) { $badge = "bg-danger"; $text = "ของหมด!"; }
     elseif ($qty <= 5) { $badge = "bg-warning text-dark"; $text = "ใกล้หมด"; }
     $names_json = htmlspecialchars(json_encode($p['pool_name'], JSON_UNESCAPED_UNICODE), ENT_QUOTES);
+    $cat_json = htmlspecialchars(json_encode($p['pool_category'] ?? '', JSON_UNESCAPED_UNICODE), ENT_QUOTES);
     ?>
     <div class="accordion-item border-0 shadow-sm rounded-4 overflow-hidden mb-3" id="pool-col-<?= $p_id ?>">
         <h2 class="accordion-header">
@@ -422,7 +405,7 @@ function render_stock_pool_card($p, $linked_names) {
                 <span class="badge rounded-pill <?= $badge ?> ms-1" id="pool_badge_<?= $p_id ?>"><?= $text ?></span>
             </button>
         </h2>
-        <div id="poolCollapse<?= $p_id ?>" class="accordion-collapse collapse" data-bs-parent="#poolsGridRow">
+        <div id="poolCollapse<?= $p_id ?>" class="accordion-collapse collapse" data-bs-parent="#<?= $parent_sel ?>">
             <div class="accordion-body bg-white">
                 <div class="small text-muted mb-3">
                     <?= !empty($linked_names) ? 'ใช้ร่วมกับ: ' . htmlspecialchars(implode(', ', $linked_names)) : 'ยังไม่มีเมนู/ท็อปปิ้งผูกกับกลุ่มนี้' ?>
@@ -441,7 +424,7 @@ function render_stock_pool_card($p, $linked_names) {
                     <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill flex-grow-1" onclick="adjustPoolStock(<?= $p_id ?>, 50)">+50</button>
                 </div>
                 <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill flex-grow-1" onclick='openPoolModal(<?= $p_id ?>, <?= $names_json ?>, <?= $qty ?>)'><i class="bi bi-pencil-square"></i> แก้ไข</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill flex-grow-1" onclick='openPoolModal(<?= $p_id ?>, <?= $names_json ?>, <?= $qty ?>, <?= $cat_json ?>)'><i class="bi bi-pencil-square"></i> แก้ไข</button>
                     <button type="button" class="btn btn-sm btn-outline-danger rounded-pill flex-grow-1" onclick='deletePool(<?= $p_id ?>, <?= $names_json ?>)'><i class="bi bi-trash"></i> ลบ</button>
                 </div>
             </div>
@@ -679,9 +662,50 @@ include '../includes/nav_owner.php';
                 if ($link_items_res) { while ($r = $link_items_res->fetch_assoc()) { $pool_links[$r['stock_pool_id']][] = $r['name']; } }
                 $link_tops_res = $conn->query("SELECT stock_pool_id, topping_name AS name FROM topping WHERE stock_pool_id IS NOT NULL");
                 if ($link_tops_res) { while ($r = $link_tops_res->fetch_assoc()) { $pool_links[$r['stock_pool_id']][] = $r['name']; } }
+
+                // จัดกลุ่มสต็อกร่วมเป็นหมวดหมู่ (เลือกตอนสร้าง/แก้ไขกลุ่ม) แบบเดียวกับแท็บเมนู/ท็อปปิ้งข้างบน
+                // เรียงหมวดที่ใช้บ่อยตาม POOL_CATEGORY_PRESETS ก่อน หมวดอื่นเรียงตามตัวอักษรต่อท้าย และ
+                // "ไม่มีหมวดหมู่" (ยังไม่ได้เลือก/พิมพ์เองไม่ผ่านลิสต์) ไว้ท้ายสุดเสมอ
+                $pool_category_order = ['เนื้อสัตว์', 'ผัก', 'เส้น/แป้ง', 'เครื่องปรุง/ซอส'];
+                $pools_by_cat = [];
+                foreach ($all_pools as $p) {
+                    $cat = trim($p['pool_category'] ?? '');
+                    $pools_by_cat[$cat !== '' ? $cat : 'ไม่มีหมวดหมู่'][] = $p;
+                }
+                uksort($pools_by_cat, function ($a, $b) use ($pool_category_order) {
+                    if ($a === 'ไม่มีหมวดหมู่') return 1;
+                    if ($b === 'ไม่มีหมวดหมู่') return -1;
+                    $ia = array_search($a, $pool_category_order);
+                    $ib = array_search($b, $pool_category_order);
+                    if ($ia === false && $ib === false) return strcmp($a, $b);
+                    if ($ia === false) return 1;
+                    if ($ib === false) return -1;
+                    return $ia <=> $ib;
+                });
                 ?>
                 <div class="accordion" id="poolsGridRow">
-                    <?php foreach ($all_pools as $p) { render_stock_pool_card($p, $pool_links[$p['pool_id']] ?? []); } ?>
+                    <?php $cat_idx = 0; foreach ($pools_by_cat as $cat_name => $cat_pools):
+                        $cat_idx++;
+                        $cat_slug = 'poolCat' . $cat_idx;
+                        $is_uncat = ($cat_name === 'ไม่มีหมวดหมู่');
+                    ?>
+                    <div class="accordion-item border-0 shadow-sm rounded-4 overflow-hidden mb-3">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#<?= $cat_slug ?>">
+                                <i class="bi <?= $is_uncat ? 'bi-folder2 text-secondary' : 'bi-folder2-open text-primary' ?> me-2"></i>
+                                <?= htmlspecialchars($cat_name) ?>
+                                <span class="badge bg-light text-dark rounded-pill ms-2"><?= count($cat_pools) ?> กลุ่ม</span>
+                            </button>
+                        </h2>
+                        <div id="<?= $cat_slug ?>" class="accordion-collapse collapse" data-bs-parent="#poolsGridRow">
+                            <div class="accordion-body bg-white">
+                                <div class="accordion" id="<?= $cat_slug ?>Inner">
+                                    <?php foreach ($cat_pools as $p) { render_stock_pool_card($p, $pool_links[$p['pool_id']] ?? [], $cat_slug . 'Inner'); } ?>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
                 </div>
             <?php endif; ?>
         </div>
@@ -702,7 +726,7 @@ include '../includes/nav_owner.php';
                     <label class="small fw-bold mb-2">เลือกจากหมวดหมู่วัตถุดิบ <span class="text-muted fw-normal">(ไม่ต้องพิมพ์เอง ถ้ามีในลิสต์)</span></label>
                     <div class="row g-2">
                         <div class="col-6">
-                            <select id="poolCategorySelect" class="form-select rounded-3">
+                            <select id="poolCategorySelect" name="pool_category" class="form-select rounded-3">
                                 <option value="">หมวดหมู่...</option>
                             </select>
                         </div>
@@ -1076,7 +1100,7 @@ function initPoolCategoryPicker() {
 }
 initPoolCategoryPicker();
 
-function openPoolModal(poolId, poolName, stockQty) {
+function openPoolModal(poolId, poolName, stockQty, poolCategory) {
     const form = document.getElementById('poolForm');
     form.reset();
     form.classList.remove('was-validated');
@@ -1084,7 +1108,9 @@ function openPoolModal(poolId, poolName, stockQty) {
 
     const catSelect = document.getElementById('poolCategorySelect');
     const subSelect = document.getElementById('poolSubCategorySelect');
-    catSelect.value = '';
+    // ถ้าหมวดหมู่เดิมของกลุ่มนี้อยู่ในลิสต์พรีเซ็ต ให้เลือกไว้ให้เลย (ถ้าไม่มีในลิสต์ เช่น พิมพ์เองก่อนหน้า จะโชว์
+    // เป็น "หมวดหมู่..." เฉยๆ แต่ค่าเดิมจะไม่หายไปไหน เพราะไม่ได้แก้ชื่อกลุ่ม/หมวดหมู่จนกว่าจะกดบันทึกจริง)
+    catSelect.value = poolCategory || '';
     subSelect.innerHTML = '<option value="">ชนิด...</option>';
     subSelect.disabled = true;
 
@@ -1124,28 +1150,9 @@ document.getElementById('poolForm').addEventListener('submit', function (e) {
         bootstrap.Modal.getInstance(document.getElementById('poolModal')).hide();
         ownerNotify('บันทึกกลุ่มสต็อกร่วมเรียบร้อยแล้ว');
 
-        const existingCol = document.getElementById('pool-col-' + data.pool_id);
-        if (existingCol) {
-            // แก้ไขกลุ่มเดิม: แทนที่แถวเดิมด้วย HTML ที่เรนเดอร์ใหม่จากเซิร์ฟเวอร์ (ตรงกับความจริง 100% ไม่ต้องคำนวณเอง)
-            existingCol.outerHTML = data.card_html;
-            const flashEl = document.getElementById('pool-col-' + data.pool_id);
-            if (flashEl) { flashEl.classList.add('card-update-flash'); setTimeout(() => flashEl.classList.remove('card-update-flash'), 800); }
-        } else {
-            // สร้างกลุ่มใหม่: แทรกแถวใหม่เข้าไปใน accordion (ถ้าเดิมว่างเปล่าอยู่ ให้สลับจากข้อความ "ยังไม่มีกลุ่ม" มาเป็น accordion จริงก่อน)
-            let grid = document.getElementById('poolsGridRow');
-            if (!grid) {
-                const emptyState = document.getElementById('poolsEmptyState');
-                if (emptyState) {
-                    emptyState.outerHTML = '<div class="accordion" id="poolsGridRow"></div>';
-                    grid = document.getElementById('poolsGridRow');
-                }
-            }
-            if (grid) {
-                grid.insertAdjacentHTML('afterbegin', data.card_html);
-                const newCard = document.getElementById('pool-col-' + data.pool_id);
-                if (newCard) { newCard.classList.add('card-update-flash'); setTimeout(() => newCard.classList.remove('card-update-flash'), 800); }
-            }
-        }
+        // สั่ง soft-refresh ทั้งแท็บแทนการแทรก/แทนที่การ์ดเองด้วยมือ เพราะตอนนี้กลุ่มถูกจัดเรียงตามหมวดหมู่
+        // ด้วย (แก้ไขแล้วอาจย้ายไปอยู่คนละหมวดกับที่โชว์อยู่บนจอ) รีเฟรชจากเซิร์ฟเวอร์แม่นกว่าคำนวณเองฝั่ง JS
+        ownerSoftRefresh(['#pools-pane']);
     })
     .catch(() => ownerNotify('เกิดข้อผิดพลาด ไม่สามารถบันทึกได้', 'error'));
 });
@@ -1167,19 +1174,7 @@ function deletePool(poolId, poolName) {
         .then(data => {
             if (!data.success) { ownerNotify(data.error || 'ลบไม่สำเร็จ', 'error'); return; }
             ownerNotify('ลบกลุ่มสต็อกร่วมเรียบร้อยแล้ว');
-            const col = document.getElementById('pool-col-' + poolId);
-            if (col) {
-                col.classList.add('card-col-removing');
-                setTimeout(() => {
-                    col.remove();
-                    const grid = document.getElementById('poolsGridRow');
-                    if (grid && !grid.children.length) {
-                        grid.outerHTML = '<div class="text-center py-5" id="poolsEmptyState">' +
-                            '<i class="bi bi-boxes display-1 text-muted opacity-25"></i>' +
-                            '<p class="mt-3 text-muted">ยังไม่มีกลุ่มสต็อกร่วมในระบบ</p></div>';
-                    }
-                }, 300);
-            }
+            ownerSoftRefresh(['#pools-pane']);
         })
         .catch(() => ownerNotify('เกิดข้อผิดพลาด ไม่สามารถลบได้', 'error'));
     });

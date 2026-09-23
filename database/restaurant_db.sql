@@ -60,11 +60,14 @@ CREATE TABLE `item` (
   `stock_qty` int(11) NOT NULL DEFAULT 50,
   `use_stock` tinyint(1) NOT NULL DEFAULT 1,
   `is_featured` tinyint(1) NOT NULL DEFAULT 0,
+  `stock_pool_id` int(11) DEFAULT NULL,
   PRIMARY KEY (`item_id`),
   KEY `category_id` (`category_id`),
   KEY `subcategory_id` (`subcategory_id`),
+  KEY `fk_item_stock_pool` (`stock_pool_id`),
   CONSTRAINT `item_ibfk_1` FOREIGN KEY (`category_id`) REFERENCES `category` (`category_id`) ON DELETE SET NULL,
-  CONSTRAINT `item_ibfk_2` FOREIGN KEY (`subcategory_id`) REFERENCES `subcategory` (`subcategory_id`) ON DELETE SET NULL
+  CONSTRAINT `item_ibfk_2` FOREIGN KEY (`subcategory_id`) REFERENCES `subcategory` (`subcategory_id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_item_stock_pool` FOREIGN KEY (`stock_pool_id`) REFERENCES `stock_pool` (`pool_id`) ON DELETE SET NULL
 ) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -74,7 +77,7 @@ CREATE TABLE `item` (
 
 LOCK TABLES `item` WRITE;
 /*!40000 ALTER TABLE `item` DISABLE KEYS */;
-INSERT INTO `item` VALUES (1,'เมนูกระเพรา',35.00,2,NULL,NULL,'item_1787557931_6a8bf82bd689a.jpg',1,'2026-03-31 16:08:00',49,1,0),(2,'เมนูทอดกระเทียม',35.00,2,NULL,NULL,'item_1787557827_6a8bf7c3d5b30.jpg',1,'2026-08-24 14:50:27',50,1,0),(3,'เมนูข้าวผัด',35.00,2,NULL,NULL,'item_1787557920_6a8bf8202ebe4.jpg',1,'2026-08-24 14:52:00',49,1,0),(4,'สุกิ',35.00,3,NULL,NULL,'item_1787558229_6a8bf955d5847.jpg',1,'2026-08-24 14:56:15',50,1,0);
+INSERT INTO `item` VALUES (1,'เมนูกระเพรา',35.00,2,NULL,NULL,'item_1787557931_6a8bf82bd689a.jpg',1,'2026-03-31 16:08:00',49,1,0,NULL),(2,'เมนูทอดกระเทียม',35.00,2,NULL,NULL,'item_1787557827_6a8bf7c3d5b30.jpg',1,'2026-08-24 14:50:27',50,1,0,NULL),(3,'เมนูข้าวผัด',35.00,2,NULL,NULL,'item_1787557920_6a8bf8202ebe4.jpg',1,'2026-08-24 14:52:00',49,1,0,NULL),(4,'สุกิ',35.00,3,NULL,NULL,'item_1787558229_6a8bf955d5847.jpg',1,'2026-08-24 14:56:15',50,1,0,NULL);
 /*!40000 ALTER TABLE `item` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -445,6 +448,34 @@ INSERT INTO `restauranttable` VALUES (1,'A2','available','2026-03-31 04:40:10',N
 UNLOCK TABLES;
 
 --
+-- Table structure for table `stock_pool`
+-- "กลุ่มสต็อกร่วม" ให้หลายเมนู/ท็อปปิ้งที่ใช้วัตถุดิบตัวเดียวกันจริงหักสต็อกจากกองเดียวกัน (ดู owner/manage_stock.php)
+-- pool_category เป็นชื่อหมวดหมู่แบบข้อความอิสระ (ไม่ใช่ FK ไปตารางแยก) ใช้จัดกลุ่มแสดงผลเป็น accordion เท่านั้น
+--
+
+DROP TABLE IF EXISTS `stock_pool`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `stock_pool` (
+  `pool_id` int(11) NOT NULL AUTO_INCREMENT,
+  `pool_name` varchar(100) NOT NULL,
+  `pool_category` varchar(50) DEFAULT NULL,
+  `stock_qty` int(11) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`pool_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `stock_pool`
+--
+
+LOCK TABLES `stock_pool` WRITE;
+/*!40000 ALTER TABLE `stock_pool` DISABLE KEYS */;
+INSERT INTO `stock_pool` VALUES (3,'ไก่','เนื้อสัตว์',19),(5,'หมูกรอบ','เนื้อสัตว์',20),(6,'ไข่','เนื้อสัตว์',50),(7,'หมู','เนื้อสัตว์',20),(9,'กุ้ง','เนื้อสัตว์',20);
+/*!40000 ALTER TABLE `stock_pool` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `subcategory`
 --
 
@@ -486,9 +517,12 @@ CREATE TABLE `topping` (
   `created_at` datetime DEFAULT current_timestamp(),
   `stock_qty` int(11) NOT NULL DEFAULT 50,
   `use_stock` tinyint(1) NOT NULL DEFAULT 1,
+  `stock_pool_id` int(11) DEFAULT NULL,
   PRIMARY KEY (`topping_id`),
   KEY `FK_Topping_cat` (`topping_cat_id`),
-  CONSTRAINT `FK_Topping_cat` FOREIGN KEY (`topping_cat_id`) REFERENCES `topping_categories` (`topping_cat_id`)
+  KEY `fk_topping_stock_pool` (`stock_pool_id`),
+  CONSTRAINT `FK_Topping_cat` FOREIGN KEY (`topping_cat_id`) REFERENCES `topping_categories` (`topping_cat_id`),
+  CONSTRAINT `fk_topping_stock_pool` FOREIGN KEY (`stock_pool_id`) REFERENCES `stock_pool` (`pool_id`) ON DELETE SET NULL
 ) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -498,7 +532,7 @@ CREATE TABLE `topping` (
 
 LOCK TABLES `topping` WRITE;
 /*!40000 ALTER TABLE `topping` DISABLE KEYS */;
-INSERT INTO `topping` VALUES (1,'หมูกรอบ',10.00,1,1,'2026-03-31 13:48:18',50,1),(2,'ไก่สับ',0.00,1,1,'2026-03-31 13:51:29',50,1),(3,'หมูสับ',0.00,1,1,'2026-03-31 13:51:44',50,1),(4,'ทะเล',10.00,1,1,'2026-08-24 14:57:59',50,1),(5,'จานธรรมดาบ',0.00,2,1,'2026-08-24 14:58:34',50,1),(6,'จานพิเศษ',5.00,2,1,'2026-08-24 14:59:09',50,1);
+INSERT INTO `topping` VALUES (1,'หมูกรอบ',10.00,1,1,'2026-03-31 13:48:18',50,1,NULL),(2,'ไก่สับ',0.00,1,1,'2026-03-31 13:51:29',50,1,NULL),(3,'หมูสับ',0.00,1,1,'2026-03-31 13:51:44',50,1,NULL),(4,'ทะเล',10.00,1,1,'2026-08-24 14:57:59',50,1,NULL),(5,'จานธรรมดาบ',0.00,2,1,'2026-08-24 14:58:34',50,1,NULL),(6,'จานพิเศษ',5.00,2,1,'2026-08-24 14:59:09',50,1,NULL);
 /*!40000 ALTER TABLE `topping` ENABLE KEYS */;
 UNLOCK TABLES;
 
