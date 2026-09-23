@@ -5,6 +5,7 @@ require_once '../includes/db.php';
 require_once '../includes/csrf.php';
 require_once '../includes/upload_helper.php';
 require_once '../includes/verify_slip.php';
+require_once '../includes/stock_log.php';
 
 // ให้หน้านี้ตอบเป็น JSON แทนการรีโหลด/alert() แบบเดิมได้ ถ้าคำขอมาจาก fetch() ของ JS - ตรรกะตรวจสอบ/ตัดสต็อก/
 // สร้างออเดอร์ทั้งหมดด้านล่างเหมือนเดิมทุกอย่าง ไม่แตะเลย (ไฟล์นี้เกี่ยวกับเงิน/สต็อกโดยตรง ความเสี่ยงสูงถ้าแก้ผิด)
@@ -261,8 +262,9 @@ try {
 
     // เช็ก use_stock/stock_pool_id แยกก่อนตัดสต็อกจริง เพราะต้องรู้ว่าเมนู/ท็อปปิ้งนี้ผูกกับ "กลุ่มสต็อกร่วม"
     // (stock_pool) อยู่หรือเปล่า ถ้าผูกอยู่ต้องไปตัดที่กองกลาง ไม่ใช่ตัดที่ตัวเองเฉยๆ (ดูเหตุผลที่ includes/db.php)
-    $stmt_item_info = $conn->prepare("SELECT use_stock, stock_pool_id FROM item WHERE item_id = ?");
-    $stmt_topping_info = $conn->prepare("SELECT use_stock, stock_pool_id FROM topping WHERE topping_id = ?");
+    // ดึง name/sku มาด้วยเผื่อต้องบันทึกลง stock_transactions (log_stock_transaction ในไฟล์ includes/stock_log.php)
+    $stmt_item_info = $conn->prepare("SELECT name, sku, use_stock, stock_pool_id FROM item WHERE item_id = ?");
+    $stmt_topping_info = $conn->prepare("SELECT topping_name AS name, sku, use_stock, stock_pool_id FROM topping WHERE topping_id = ?");
 
     // เดิม GREATEST(0, ...) ปล่อยให้ตัดสต็อกติดลบไม่ได้แต่ก็ยังรับออเดอร์ผ่านอยู่ดีแม้ของจะไม่พอ
     // ใช้เงื่อนไข stock_qty >= ? ใน WHERE แทน ให้ UPDATE ล้มเหลว (affected_rows = 0) ถ้าของไม่พอ
@@ -270,19 +272,39 @@ try {
     $stmt_stock_item = $conn->prepare("UPDATE item SET stock_qty = stock_qty - ? WHERE item_id = ? AND stock_qty >= ?");
     $stmt_stock_topping = $conn->prepare("UPDATE topping SET stock_qty = stock_qty - ? WHERE topping_id = ? AND stock_qty >= ?");
     $stmt_stock_pool = $conn->prepare("UPDATE stock_pool SET stock_qty = stock_qty - ? WHERE pool_id = ? AND stock_qty >= ?");
+    // ดึงจำนวนคงเหลือ "หลัง" ตัดสต็อกจริงๆ ด้วยแถวที่เพิ่งอัปเดตไป (ไม่ใช่ค่าที่ดึงไว้ก่อนหน้า) กันค่าที่บันทึก
+    // ลง log คลาดเคลื่อนตอนมีออเดอร์อื่นแทรกกลางระหว่างที่ประมวลผลออเดอร์นี้อยู่พอดี
+    $stmt_qty_item = $conn->prepare("SELECT stock_qty FROM item WHERE item_id = ?");
+    $stmt_qty_topping = $conn->prepare("SELECT stock_qty FROM topping WHERE topping_id = ?");
+    $stmt_qty_pool = $conn->prepare("SELECT pool_name, sku, stock_qty FROM stock_pool WHERE pool_id = ?");
 
     // ตัดสต็อก 1 หน่วย (เมนู/ท็อปปิ้งที่ผูก pool ไว้) หรือของตัวเอง (ที่ไม่ได้ผูก pool) - throw ถ้าของไม่พอ
-    $deduct_stock = function ($qty, $use_stock, $pool_id, $own_stmt, $own_id) use ($stmt_stock_pool) {
-        if (intval($use_stock) !== 1) return; // ไม่ได้ติดตามคลังสินค้าตัวนี้ ไม่ต้องทำอะไร
+    // แล้วบันทึกประวัติการตัดสต็อกครั้งนี้ลง stock_transactions ทุกครั้งที่ตัดสำเร็จจริง
+    $deduct_stock = function ($qty, $info, $item_type, $own_id, $own_stmt, $stmt_qty_own) use ($conn, $stmt_stock_pool, $stmt_qty_pool, $daily_order_no) {
+        if (intval($info['use_stock'] ?? 0) !== 1) return; // ไม่ได้ติดตามคลังสินค้าตัวนี้ ไม่ต้องทำอะไร
+        $pool_id = $info['stock_pool_id'] ?? null;
+        $source_ref = 'ออเดอร์ #' . str_pad((string) $daily_order_no, 3, '0', STR_PAD_LEFT);
+
         if (!empty($pool_id)) {
             $stmt_stock_pool->bind_param("iii", $qty, $pool_id, $qty);
             $stmt_stock_pool->execute();
             if ($stmt_stock_pool->affected_rows === 0) throw new RuntimeException('stock_insufficient');
+
+            $stmt_qty_pool->bind_param("i", $pool_id);
+            $stmt_qty_pool->execute();
+            $pool_row = $stmt_qty_pool->get_result()->fetch_assoc();
+            log_stock_transaction($conn, 'pool', (int) $pool_id, $pool_row['sku'] ?? '', $pool_row['pool_name'] ?? '', -$qty, (int) ($pool_row['stock_qty'] ?? 0), 'order', $source_ref);
             return;
         }
+
         $own_stmt->bind_param("iii", $qty, $own_id, $qty);
         $own_stmt->execute();
         if ($own_stmt->affected_rows === 0) throw new RuntimeException('stock_insufficient');
+
+        $stmt_qty_own->bind_param("i", $own_id);
+        $stmt_qty_own->execute();
+        $qty_after = (int) ($stmt_qty_own->get_result()->fetch_assoc()['stock_qty'] ?? 0);
+        log_stock_transaction($conn, $item_type, (int) $own_id, $info['sku'] ?? '', $info['name'] ?? '', -$qty, $qty_after, 'order', $source_ref);
     };
 
     foreach ($validated_cart as $item) {
@@ -295,7 +317,7 @@ try {
         $stmt_item_info->bind_param("i", $item['item_id']);
         $stmt_item_info->execute();
         $item_info = $stmt_item_info->get_result()->fetch_assoc();
-        $deduct_stock($item['quantity'], $item_info['use_stock'] ?? 0, $item_info['stock_pool_id'] ?? null, $stmt_stock_item, $item['item_id']);
+        $deduct_stock($item['quantity'], $item_info, 'item', $item['item_id'], $stmt_stock_item, $stmt_qty_item);
 
         // บันทึก + ตัดสต็อกท็อปปิ้ง (ถ้ามี) - เดิมไม่เคยตัดสต็อกท็อปปิ้งเลยแม้จะติดตามคลังสินค้าไว้ก็ตาม
         foreach ($item['topping_ids'] as $tid) {
@@ -305,7 +327,7 @@ try {
             $stmt_topping_info->bind_param("i", $tid);
             $stmt_topping_info->execute();
             $topping_info = $stmt_topping_info->get_result()->fetch_assoc();
-            $deduct_stock($item['quantity'], $topping_info['use_stock'] ?? 0, $topping_info['stock_pool_id'] ?? null, $stmt_stock_topping, $tid);
+            $deduct_stock($item['quantity'], $topping_info, 'topping', $tid, $stmt_stock_topping, $stmt_qty_topping);
         }
     }
 

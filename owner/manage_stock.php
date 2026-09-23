@@ -4,6 +4,7 @@ session_start();
 include '../includes/db.php';
 require_once 'auth_owner.php';
 require_once '../includes/csrf.php';
+require_once '../includes/stock_log.php';
 
 $msg = "";
 
@@ -26,17 +27,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'quick_adjust') {
         $item_id = intval($_POST['item_id']);
         $change = intval($_POST['change']);
-        
+
+        // ดึงจำนวนก่อนปรับไว้ด้วย เพราะ GREATEST(0, ...) ด้านล่างอาจหักลบได้ไม่ครบตามที่ขอ (เช่น เหลือ 3 กด "-10"
+        // จะลบได้จริงแค่ 3) ต้องคำนวณส่วนต่างจริงจากเลขก่อน/หลัง ไม่ใช่เชื่อค่า $change ตรงๆ ตอนบันทึกลง log
+        $before_stmt = $conn->prepare("SELECT name, sku, stock_qty FROM item WHERE item_id = ?");
+        $before_stmt->bind_param("i", $item_id);
+        $before_stmt->execute();
+        $before_row = $before_stmt->get_result()->fetch_assoc();
+
         $stmt = $conn->prepare("UPDATE item SET stock_qty = GREATEST(0, stock_qty + ?) WHERE item_id = ?");
         $stmt->bind_param("ii", $change, $item_id);
         $stmt->execute();
-        
+
+        $qty_stmt = $conn->prepare("SELECT stock_qty FROM item WHERE item_id = ?");
+        $qty_stmt->bind_param("i", $item_id);
+        $qty_stmt->execute();
+        $new_qty = (int) ($qty_stmt->get_result()->fetch_assoc()['stock_qty'] ?? 0);
+        $actual_change = $new_qty - (int) ($before_row['stock_qty'] ?? 0);
+        if ($actual_change !== 0) {
+            log_stock_transaction($conn, 'item', $item_id, $before_row['sku'] ?? '', $before_row['name'] ?? '', $actual_change, $new_qty, 'manual', null, 'ปรับจำนวนด้วยตนเองในหน้าจัดการคลังสินค้า');
+        }
+
         if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
             header('Content-Type: application/json');
-            $qty_stmt = $conn->prepare("SELECT stock_qty FROM item WHERE item_id = ?");
-            $qty_stmt->bind_param("i", $item_id);
-            $qty_stmt->execute();
-            $new_qty = $qty_stmt->get_result()->fetch_assoc()['stock_qty'];
             echo json_encode(['success' => true, 'new_qty' => $new_qty]);
             exit;
         }
@@ -44,16 +57,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $topping_id = intval($_POST['topping_id']);
         $change = intval($_POST['change']);
 
+        $before_stmt = $conn->prepare("SELECT topping_name AS name, sku, stock_qty FROM topping WHERE topping_id = ?");
+        $before_stmt->bind_param("i", $topping_id);
+        $before_stmt->execute();
+        $before_row = $before_stmt->get_result()->fetch_assoc();
+
         $stmt = $conn->prepare("UPDATE topping SET stock_qty = GREATEST(0, stock_qty + ?) WHERE topping_id = ?");
         $stmt->bind_param("ii", $change, $topping_id);
         $stmt->execute();
 
+        $qty_stmt = $conn->prepare("SELECT stock_qty FROM topping WHERE topping_id = ?");
+        $qty_stmt->bind_param("i", $topping_id);
+        $qty_stmt->execute();
+        $new_qty = (int) ($qty_stmt->get_result()->fetch_assoc()['stock_qty'] ?? 0);
+        $actual_change = $new_qty - (int) ($before_row['stock_qty'] ?? 0);
+        if ($actual_change !== 0) {
+            log_stock_transaction($conn, 'topping', $topping_id, $before_row['sku'] ?? '', $before_row['name'] ?? '', $actual_change, $new_qty, 'manual', null, 'ปรับจำนวนด้วยตนเองในหน้าจัดการคลังสินค้า');
+        }
+
         if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
             header('Content-Type: application/json');
-            $qty_stmt = $conn->prepare("SELECT stock_qty FROM topping WHERE topping_id = ?");
-            $qty_stmt->bind_param("i", $topping_id);
-            $qty_stmt->execute();
-            $new_qty = $qty_stmt->get_result()->fetch_assoc()['stock_qty'];
             echo json_encode(['success' => true, 'new_qty' => $new_qty]);
             exit;
         }
@@ -152,16 +175,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pool_id = intval($_POST['pool_id']);
         $change = intval($_POST['change']);
 
+        $before_stmt = $conn->prepare("SELECT pool_name, sku, stock_qty FROM stock_pool WHERE pool_id = ?");
+        $before_stmt->bind_param("i", $pool_id);
+        $before_stmt->execute();
+        $before_row = $before_stmt->get_result()->fetch_assoc();
+
         $stmt = $conn->prepare("UPDATE stock_pool SET stock_qty = GREATEST(0, stock_qty + ?) WHERE pool_id = ?");
         $stmt->bind_param("ii", $change, $pool_id);
         $stmt->execute();
 
+        $qty_stmt = $conn->prepare("SELECT stock_qty FROM stock_pool WHERE pool_id = ?");
+        $qty_stmt->bind_param("i", $pool_id);
+        $qty_stmt->execute();
+        $new_qty = (int) ($qty_stmt->get_result()->fetch_assoc()['stock_qty'] ?? 0);
+        $actual_change = $new_qty - (int) ($before_row['stock_qty'] ?? 0);
+        if ($actual_change !== 0) {
+            log_stock_transaction($conn, 'pool', $pool_id, $before_row['sku'] ?? '', $before_row['pool_name'] ?? '', $actual_change, $new_qty, 'manual', null, 'ปรับจำนวนด้วยตนเองในหน้าจัดการคลังสินค้า');
+        }
+
         if ($is_ajax_stock) {
             header('Content-Type: application/json');
-            $qty_stmt = $conn->prepare("SELECT stock_qty FROM stock_pool WHERE pool_id = ?");
-            $qty_stmt->bind_param("i", $pool_id);
-            $qty_stmt->execute();
-            $new_qty = $qty_stmt->get_result()->fetch_assoc()['stock_qty'];
             echo json_encode(['success' => true, 'new_qty' => $new_qty]);
             exit;
         }

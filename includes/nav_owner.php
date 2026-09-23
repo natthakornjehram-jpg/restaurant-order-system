@@ -36,6 +36,8 @@ $owner_nav_items = [
     ['page' => 'manage_orders.php',    'icon' => 'bi-receipt-cutoff',    'label' => 'รายการออเดอร์เข้า'],
     ['page' => 'manage_payments.php',  'icon' => 'bi-wallet2',           'label' => 'จัดการชำระเงิน'],
     ['page' => 'manage_stock.php',     'icon' => 'bi-box-seam',          'label' => 'จัดการคลังสินค้า'],
+    ['page' => 'product_list.php',     'icon' => 'bi-upc-scan',          'label' => 'รายการสินค้า'],
+    ['page' => 'stock_transactions.php', 'icon' => 'bi-clock-history',   'label' => 'บันทึกรับ-จ่าย'],
     ['page' => 'manage_menu.php',      'icon' => 'bi-journal-text',      'label' => 'จัดการเมนูและหมวดหมู่'],
     ['page' => 'manage_toppings.php',  'icon' => 'bi-plus-circle-dotted','label' => 'จัดการตัวเลือกเสริม'],
     ['page' => 'manage_tables.php',    'icon' => 'bi-grid-3x3-gap',      'label' => 'จัดการโต๊ะอาหาร'],

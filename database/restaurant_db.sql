@@ -49,6 +49,7 @@ DROP TABLE IF EXISTS `item`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `item` (
   `item_id` int(11) NOT NULL AUTO_INCREMENT,
+  `sku` varchar(30) DEFAULT NULL,
   `name` varchar(150) NOT NULL,
   `price` decimal(10,2) NOT NULL DEFAULT 0.00,
   `category_id` int(11) DEFAULT NULL,
@@ -58,10 +59,12 @@ CREATE TABLE `item` (
   `is_active` tinyint(1) DEFAULT 1,
   `created_at` datetime DEFAULT current_timestamp(),
   `stock_qty` int(11) NOT NULL DEFAULT 50,
+  `reorder_point` int(11) NOT NULL DEFAULT 5,
   `use_stock` tinyint(1) NOT NULL DEFAULT 1,
   `is_featured` tinyint(1) NOT NULL DEFAULT 0,
   `stock_pool_id` int(11) DEFAULT NULL,
   PRIMARY KEY (`item_id`),
+  UNIQUE KEY `sku_unique` (`sku`),
   KEY `category_id` (`category_id`),
   KEY `subcategory_id` (`subcategory_id`),
   KEY `fk_item_stock_pool` (`stock_pool_id`),
@@ -77,7 +80,7 @@ CREATE TABLE `item` (
 
 LOCK TABLES `item` WRITE;
 /*!40000 ALTER TABLE `item` DISABLE KEYS */;
-INSERT INTO `item` VALUES (1,'เมนูกระเพรา',35.00,2,NULL,NULL,'item_1787557931_6a8bf82bd689a.jpg',1,'2026-03-31 16:08:00',49,1,0,NULL),(2,'เมนูทอดกระเทียม',35.00,2,NULL,NULL,'item_1787557827_6a8bf7c3d5b30.jpg',1,'2026-08-24 14:50:27',50,1,0,NULL),(3,'เมนูข้าวผัด',35.00,2,NULL,NULL,'item_1787557920_6a8bf8202ebe4.jpg',1,'2026-08-24 14:52:00',49,1,0,NULL),(4,'สุกิ',35.00,3,NULL,NULL,'item_1787558229_6a8bf955d5847.jpg',1,'2026-08-24 14:56:15',50,1,0,NULL);
+INSERT INTO `item` VALUES (1,'ITM-001','เมนูกระเพรา',35.00,2,NULL,NULL,'item_1787557931_6a8bf82bd689a.jpg',1,'2026-03-31 16:08:00',49,5,1,0,NULL),(2,'ITM-002','เมนูทอดกระเทียม',35.00,2,NULL,NULL,'item_1787557827_6a8bf7c3d5b30.jpg',1,'2026-08-24 14:50:27',50,5,1,0,NULL),(3,'ITM-003','เมนูข้าวผัด',35.00,2,NULL,NULL,'item_1787557920_6a8bf8202ebe4.jpg',1,'2026-08-24 14:52:00',49,5,1,0,NULL),(4,'ITM-004','สุกิ',35.00,3,NULL,NULL,'item_1787558229_6a8bf955d5847.jpg',1,'2026-08-24 14:56:15',50,5,1,0,NULL);
 /*!40000 ALTER TABLE `item` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -458,10 +461,13 @@ DROP TABLE IF EXISTS `stock_pool`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `stock_pool` (
   `pool_id` int(11) NOT NULL AUTO_INCREMENT,
+  `sku` varchar(30) DEFAULT NULL,
   `pool_name` varchar(100) NOT NULL,
   `pool_category` varchar(50) DEFAULT NULL,
   `stock_qty` int(11) NOT NULL DEFAULT 0,
-  PRIMARY KEY (`pool_id`)
+  `reorder_point` int(11) NOT NULL DEFAULT 5,
+  PRIMARY KEY (`pool_id`),
+  UNIQUE KEY `sku_unique` (`sku`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -471,9 +477,37 @@ CREATE TABLE `stock_pool` (
 
 LOCK TABLES `stock_pool` WRITE;
 /*!40000 ALTER TABLE `stock_pool` DISABLE KEYS */;
-INSERT INTO `stock_pool` VALUES (3,'ไก่','เนื้อสัตว์',19),(5,'หมูกรอบ','เนื้อสัตว์',20),(6,'ไข่','เนื้อสัตว์',50),(7,'หมู','เนื้อสัตว์',20),(9,'กุ้ง','เนื้อสัตว์',20);
+INSERT INTO `stock_pool` VALUES (3,'POOL-001','ไก่','เนื้อสัตว์',19,5),(5,'POOL-002','หมูกรอบ','เนื้อสัตว์',20,5),(6,'POOL-003','ไข่','เนื้อสัตว์',50,5),(7,'POOL-004','หมู','เนื้อสัตว์',20,5),(9,'POOL-005','กุ้ง','เนื้อสัตว์',20,5);
 /*!40000 ALTER TABLE `stock_pool` ENABLE KEYS */;
 UNLOCK TABLES;
+
+--
+-- Table structure for table `stock_transactions`
+-- บันทึกทุกครั้งที่จำนวนคงเหลือของเมนู/ท็อปปิ้ง/กลุ่มสต็อกร่วมเปลี่ยน (ตัดอัตโนมัติจากออเดอร์ หรือปรับมือ)
+-- ดู includes/stock_log.php ที่เขียนลงตารางนี้ และหน้า owner/stock_transactions.php ที่แสดงผล
+--
+
+DROP TABLE IF EXISTS `stock_transactions`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `stock_transactions` (
+  `transaction_id` int(11) NOT NULL AUTO_INCREMENT,
+  `occurred_at` datetime DEFAULT current_timestamp(),
+  `item_type` enum('item','topping','pool') NOT NULL,
+  `item_id` int(11) NOT NULL,
+  `sku` varchar(30) DEFAULT NULL,
+  `item_name` varchar(150) NOT NULL,
+  `qty_change` int(11) NOT NULL,
+  `qty_after` int(11) NOT NULL,
+  `source_type` enum('order','manual') NOT NULL,
+  `source_ref` varchar(50) DEFAULT NULL,
+  `note` varchar(255) DEFAULT NULL,
+  `created_by` varchar(50) DEFAULT NULL,
+  PRIMARY KEY (`transaction_id`),
+  KEY `occurred_at` (`occurred_at`),
+  KEY `item_type_id` (`item_type`,`item_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `subcategory`
@@ -510,15 +544,18 @@ DROP TABLE IF EXISTS `topping`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `topping` (
   `topping_id` int(11) NOT NULL AUTO_INCREMENT,
+  `sku` varchar(30) DEFAULT NULL,
   `topping_name` varchar(100) NOT NULL,
   `price` decimal(10,2) NOT NULL DEFAULT 0.00,
   `topping_cat_id` int(11) DEFAULT NULL,
   `is_active` tinyint(1) DEFAULT 1,
   `created_at` datetime DEFAULT current_timestamp(),
   `stock_qty` int(11) NOT NULL DEFAULT 50,
+  `reorder_point` int(11) NOT NULL DEFAULT 5,
   `use_stock` tinyint(1) NOT NULL DEFAULT 1,
   `stock_pool_id` int(11) DEFAULT NULL,
   PRIMARY KEY (`topping_id`),
+  UNIQUE KEY `sku_unique` (`sku`),
   KEY `FK_Topping_cat` (`topping_cat_id`),
   KEY `fk_topping_stock_pool` (`stock_pool_id`),
   CONSTRAINT `FK_Topping_cat` FOREIGN KEY (`topping_cat_id`) REFERENCES `topping_categories` (`topping_cat_id`),
@@ -532,7 +569,7 @@ CREATE TABLE `topping` (
 
 LOCK TABLES `topping` WRITE;
 /*!40000 ALTER TABLE `topping` DISABLE KEYS */;
-INSERT INTO `topping` VALUES (1,'หมูกรอบ',10.00,1,1,'2026-03-31 13:48:18',50,1,NULL),(2,'ไก่สับ',0.00,1,1,'2026-03-31 13:51:29',50,1,NULL),(3,'หมูสับ',0.00,1,1,'2026-03-31 13:51:44',50,1,NULL),(4,'ทะเล',10.00,1,1,'2026-08-24 14:57:59',50,1,NULL),(5,'จานธรรมดาบ',0.00,2,1,'2026-08-24 14:58:34',50,1,NULL),(6,'จานพิเศษ',5.00,2,1,'2026-08-24 14:59:09',50,1,NULL);
+INSERT INTO `topping` VALUES (1,'TOP-001','หมูกรอบ',10.00,1,1,'2026-03-31 13:48:18',50,5,1,NULL),(2,'TOP-002','ไก่สับ',0.00,1,1,'2026-03-31 13:51:29',50,5,1,NULL),(3,'TOP-003','หมูสับ',0.00,1,1,'2026-03-31 13:51:44',50,5,1,NULL),(4,'TOP-004','ทะเล',10.00,1,1,'2026-08-24 14:57:59',50,5,1,NULL),(5,'TOP-005','จานธรรมดาบ',0.00,2,1,'2026-08-24 14:58:34',50,5,1,NULL),(6,'TOP-006','จานพิเศษ',5.00,2,1,'2026-08-24 14:59:09',50,5,1,NULL);
 /*!40000 ALTER TABLE `topping` ENABLE KEYS */;
 UNLOCK TABLES;
 

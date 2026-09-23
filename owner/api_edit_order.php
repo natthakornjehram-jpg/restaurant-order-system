@@ -4,6 +4,7 @@ session_start();
 require_once '../includes/db.php';
 require_once 'auth_owner.php';
 require_once '../includes/csrf.php';
+require_once '../includes/stock_log.php';
 
 header('Content-Type: application/json');
 
@@ -31,47 +32,73 @@ if (!$order_id || !is_array($lines_raw) || empty($lines_raw)) {
 $conn->begin_transaction();
 try {
     // แก้ไขได้เฉพาะออเดอร์ที่ยังไม่เริ่มปรุง (pending) เท่านั้น กันแก้ทีหลังจากครัวเริ่มทำไปแล้ว
-    $ord_stmt = $conn->prepare("SELECT order_status FROM orders WHERE order_id = ? FOR UPDATE");
+    $ord_stmt = $conn->prepare("SELECT order_status, daily_order_no FROM orders WHERE order_id = ? FOR UPDATE");
     $ord_stmt->bind_param("i", $order_id);
     $ord_stmt->execute();
     $ord_row = $ord_stmt->get_result()->fetch_assoc();
     if (!$ord_row || $ord_row['order_status'] !== 'pending') {
         throw new RuntimeException('not_editable');
     }
+    $source_ref = 'แก้ไขออเดอร์ #' . str_pad((string) $ord_row['daily_order_no'], 3, '0', STR_PAD_LEFT);
 
-    $stmt_item_info = $conn->prepare("SELECT use_stock, stock_pool_id FROM item WHERE item_id = ?");
-    $stmt_topping_info = $conn->prepare("SELECT use_stock, stock_pool_id FROM topping WHERE topping_id = ?");
+    $stmt_item_info = $conn->prepare("SELECT name, sku, use_stock, stock_pool_id FROM item WHERE item_id = ?");
+    $stmt_topping_info = $conn->prepare("SELECT topping_name AS name, sku, use_stock, stock_pool_id FROM topping WHERE topping_id = ?");
     $stmt_stock_item_add = $conn->prepare("UPDATE item SET stock_qty = stock_qty + ? WHERE item_id = ?");
     $stmt_stock_topping_add = $conn->prepare("UPDATE topping SET stock_qty = stock_qty + ? WHERE topping_id = ?");
     $stmt_stock_pool_add = $conn->prepare("UPDATE stock_pool SET stock_qty = stock_qty + ? WHERE pool_id = ?");
     $stmt_stock_item_sub = $conn->prepare("UPDATE item SET stock_qty = stock_qty - ? WHERE item_id = ? AND stock_qty >= ?");
     $stmt_stock_topping_sub = $conn->prepare("UPDATE topping SET stock_qty = stock_qty - ? WHERE topping_id = ? AND stock_qty >= ?");
     $stmt_stock_pool_sub = $conn->prepare("UPDATE stock_pool SET stock_qty = stock_qty - ? WHERE pool_id = ? AND stock_qty >= ?");
+    $stmt_qty_item = $conn->prepare("SELECT stock_qty FROM item WHERE item_id = ?");
+    $stmt_qty_topping = $conn->prepare("SELECT stock_qty FROM topping WHERE topping_id = ?");
+    $stmt_qty_pool = $conn->prepare("SELECT pool_name, sku, stock_qty FROM stock_pool WHERE pool_id = ?");
 
     // ปรับสต็อกตามส่วนต่างจำนวน (delta) - delta บวก = สั่งเพิ่มต้องตัดสต็อกเพิ่ม (เช็คของพอไหมด้วย)
     // delta ลบ = ลดจำนวน/ลบรายการ ต้องคืนสต็อกกลับเข้าคลัง (คืนได้เสมอ ไม่ต้องเช็คเงื่อนไข)
-    $adjust_stock = function ($delta, $use_stock, $pool_id, $add_stmt, $sub_stmt, $own_id) use ($stmt_stock_pool_add, $stmt_stock_pool_sub) {
-        if (intval($use_stock) !== 1 || $delta === 0) return;
+    // ทุกครั้งที่ปรับสำเร็จ บันทึกลง stock_transactions ด้วย (qty_change ตรงกับทิศทางที่ปรับจริง)
+    $adjust_stock = function ($delta, $info, $item_type, $add_stmt, $sub_stmt, $own_id, $stmt_qty_own) use ($conn, $stmt_stock_pool_add, $stmt_stock_pool_sub, $stmt_qty_pool, $source_ref) {
+        if (intval($info['use_stock'] ?? 0) !== 1 || $delta === 0) return;
+        $pool_id = $info['stock_pool_id'] ?? null;
+        $sku = $info['sku'] ?? '';
+        $name = $info['name'] ?? '';
+
         if ($delta > 0) {
             if (!empty($pool_id)) {
                 $stmt_stock_pool_sub->bind_param("iii", $delta, $pool_id, $delta);
                 $stmt_stock_pool_sub->execute();
                 if ($stmt_stock_pool_sub->affected_rows === 0) throw new RuntimeException('stock_insufficient');
+                $stmt_qty_pool->bind_param("i", $pool_id);
+                $stmt_qty_pool->execute();
+                $pool_row = $stmt_qty_pool->get_result()->fetch_assoc();
+                log_stock_transaction($conn, 'pool', (int) $pool_id, $pool_row['sku'] ?? '', $pool_row['pool_name'] ?? '', -$delta, (int) ($pool_row['stock_qty'] ?? 0), 'order', $source_ref);
                 return;
             }
             $sub_stmt->bind_param("iii", $delta, $own_id, $delta);
             $sub_stmt->execute();
             if ($sub_stmt->affected_rows === 0) throw new RuntimeException('stock_insufficient');
+            $stmt_qty_own->bind_param("i", $own_id);
+            $stmt_qty_own->execute();
+            $qty_after = (int) ($stmt_qty_own->get_result()->fetch_assoc()['stock_qty'] ?? 0);
+            log_stock_transaction($conn, $item_type, (int) $own_id, $sku, $name, -$delta, $qty_after, 'order', $source_ref);
             return;
         }
+
         $restore = abs($delta);
         if (!empty($pool_id)) {
             $stmt_stock_pool_add->bind_param("ii", $restore, $pool_id);
             $stmt_stock_pool_add->execute();
+            $stmt_qty_pool->bind_param("i", $pool_id);
+            $stmt_qty_pool->execute();
+            $pool_row = $stmt_qty_pool->get_result()->fetch_assoc();
+            log_stock_transaction($conn, 'pool', (int) $pool_id, $pool_row['sku'] ?? '', $pool_row['pool_name'] ?? '', $restore, (int) ($pool_row['stock_qty'] ?? 0), 'order', $source_ref);
             return;
         }
         $add_stmt->bind_param("ii", $restore, $own_id);
         $add_stmt->execute();
+        $stmt_qty_own->bind_param("i", $own_id);
+        $stmt_qty_own->execute();
+        $qty_after = (int) ($stmt_qty_own->get_result()->fetch_assoc()['stock_qty'] ?? 0);
+        log_stock_transaction($conn, $item_type, (int) $own_id, $sku, $name, $restore, $qty_after, 'order', $source_ref);
     };
 
     $stmt_get_detail = $conn->prepare("SELECT item_id, quantity FROM orderdetail WHERE order_detail_id = ? AND order_id = ?");
@@ -103,13 +130,13 @@ try {
             $stmt_item_info->bind_param("i", $item_id);
             $stmt_item_info->execute();
             $ii = $stmt_item_info->get_result()->fetch_assoc();
-            $adjust_stock(-$old_qty, $ii['use_stock'] ?? 0, $ii['stock_pool_id'] ?? null, $stmt_stock_item_add, $stmt_stock_item_sub, $item_id);
+            $adjust_stock(-$old_qty, $ii, 'item', $stmt_stock_item_add, $stmt_stock_item_sub, $item_id, $stmt_qty_item);
 
             foreach ($topping_ids as $tid) {
                 $stmt_topping_info->bind_param("i", $tid);
                 $stmt_topping_info->execute();
                 $ti = $stmt_topping_info->get_result()->fetch_assoc();
-                $adjust_stock(-$old_qty, $ti['use_stock'] ?? 0, $ti['stock_pool_id'] ?? null, $stmt_stock_topping_add, $stmt_stock_topping_sub, $tid);
+                $adjust_stock(-$old_qty, $ti, 'topping', $stmt_stock_topping_add, $stmt_stock_topping_sub, $tid, $stmt_qty_topping);
             }
 
             $stmt_del_top->bind_param("i", $detail_id);
@@ -122,13 +149,13 @@ try {
             $stmt_item_info->bind_param("i", $item_id);
             $stmt_item_info->execute();
             $ii = $stmt_item_info->get_result()->fetch_assoc();
-            $adjust_stock($delta, $ii['use_stock'] ?? 0, $ii['stock_pool_id'] ?? null, $stmt_stock_item_add, $stmt_stock_item_sub, $item_id);
+            $adjust_stock($delta, $ii, 'item', $stmt_stock_item_add, $stmt_stock_item_sub, $item_id, $stmt_qty_item);
 
             foreach ($topping_ids as $tid) {
                 $stmt_topping_info->bind_param("i", $tid);
                 $stmt_topping_info->execute();
                 $ti = $stmt_topping_info->get_result()->fetch_assoc();
-                $adjust_stock($delta, $ti['use_stock'] ?? 0, $ti['stock_pool_id'] ?? null, $stmt_stock_topping_add, $stmt_stock_topping_sub, $tid);
+                $adjust_stock($delta, $ti, 'topping', $stmt_stock_topping_add, $stmt_stock_topping_sub, $tid, $stmt_qty_topping);
             }
 
             $stmt_upd_qty->bind_param("ii", $new_qty, $detail_id);
