@@ -3,6 +3,7 @@
 session_start();
 require_once 'includes/db.php';
 require_once 'includes/csrf.php';
+require_once 'includes/device_login_check.php';
 
 // --- 1. เช็ก Cookie ก่อนเลย (สำหรับระบบ "จดจำฉัน 12 ชม.") ---
 // Do not restore a login from role/id cookies: they can be forged.
@@ -36,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
         $count_as_fail = false; // นับเป็นความล้มเหลวสำหรับกันสุ่มรหัส เฉพาะกรอก username/password ผิดจริงเท่านั้น
 
         // --- ระบบร้านเดี่ยว: มีแต่บัญชีเจ้าของร้านเท่านั้น (ลูกค้าไม่ต้องสมัคร/ล็อกอิน) ---
-        $stmt_owner = $conn->prepare("SELECT owner_id, password, is_active FROM owner WHERE username = ? LIMIT 1");
+        $stmt_owner = $conn->prepare("SELECT owner_id, password, is_active, email, name FROM owner WHERE username = ? LIMIT 1");
         $stmt_owner->bind_param("s", $username);
         $stmt_owner->execute();
         $res_owner = $stmt_owner->get_result();
@@ -72,6 +73,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !csrf_verify($_POST['csrf_token'] ??
 
                     // ถ้าติ๊ก "จดจำฉัน 12 ชม." ให้สร้าง Cookie อายุ 12 ชั่วโมง (43,200 วินาที)
                     // The checkbox is retained in the UI but no longer creates an unsafe login cookie.
+
+                    // เช็ก/จดจำอุปกรณ์นี้ - ถ้าเป็นอุปกรณ์ใหม่ที่ไม่เคยล็อกอินสำเร็จมาก่อน จะส่งอีเมลแจ้งเจ้าของร้านทันที
+                    // กันกรณีมีคนอื่นที่รู้รหัสผ่าน (เช่น รหัสหลุด/เคยบอกพนักงานไว้) แอบล็อกอินจากเครื่องอื่น
+                    check_and_register_owner_device($conn, (int) $user_data['owner_id'], $user_data['email'] ?? '', $user_data['name'] ?? '');
 
                     if ($is_ajax) {
                         header('Content-Type: application/json');

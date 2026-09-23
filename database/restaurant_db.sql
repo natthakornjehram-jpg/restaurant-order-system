@@ -331,6 +331,30 @@ INSERT INTO `owner` VALUES (1,'admin','$2y$10$UiM54d5MG.AFw2QlFLxQNOOnqcebAq9LAS
 UNLOCK TABLES;
 
 --
+-- Table structure for table `owner_trusted_devices`
+-- เก็บอุปกรณ์ที่เจ้าของร้านเคยล็อกอินสำเร็จไว้ (ผูกกับ cookie ฝั่งเครื่องนั้น) ใช้แจ้งเตือนทางอีเมลเมื่อมีการ
+-- ล็อกอินสำเร็จจากอุปกรณ์ที่ไม่เคยเห็นมาก่อน (ดู includes/device_login_check.php) เผื่อรหัสผ่านหลุด/มีคนอื่นรู้รหัส
+--
+
+DROP TABLE IF EXISTS `owner_trusted_devices`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `owner_trusted_devices` (
+  `device_id` int(11) NOT NULL AUTO_INCREMENT,
+  `owner_id` int(11) NOT NULL,
+  `device_token` varchar(64) NOT NULL,
+  `user_agent` varchar(255) DEFAULT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `created_at` datetime DEFAULT current_timestamp(),
+  `last_seen_at` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`device_id`),
+  UNIQUE KEY `device_token` (`device_token`),
+  KEY `owner_id` (`owner_id`),
+  CONSTRAINT `owner_trusted_devices_ibfk_1` FOREIGN KEY (`owner_id`) REFERENCES `owner` (`owner_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `password_reset`
 --
 
