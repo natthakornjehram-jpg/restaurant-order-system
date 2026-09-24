@@ -527,8 +527,6 @@ include '../includes/nav_owner.php';
     .product-table th { white-space: nowrap; font-size: 0.85rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.03em; }
     .product-table td { vertical-align: middle; }
     .sku-badge { font-family: 'Courier New', monospace; font-weight: bold; background: #f1f5f9; padding: 3px 10px; border-radius: 8px; font-size: 0.85rem; }
-    .qty-warn { color: #d97706; font-weight: bold; }
-    .qty-danger { color: #dc2626; font-weight: bold; }
 </style>
 
 <div class="main-content container-fluid pb-5 px-4 pt-3 text-dark">
@@ -594,6 +592,17 @@ include '../includes/nav_owner.php';
     if ($res_toppings) { while ($r = $res_toppings->fetch_assoc()) { $r['type'] = 'topping'; $r['type_label'] = 'ท็อปปิ้ง/วัตถุดิบเสริม'; $r['category_name'] = $r['category_name'] ?: 'ไม่มีหมวดหมู่'; $products[] = $r; } }
     $res_pools_meta = $conn->query("SELECT pool_id AS id, sku, pool_name AS name, NULL AS price, reorder_point, stock_qty, pool_category AS category_name FROM stock_pool ORDER BY pool_name ASC");
     if ($res_pools_meta) { while ($r = $res_pools_meta->fetch_assoc()) { $r['type'] = 'pool'; $r['type_label'] = 'กลุ่มสต็อกร่วม'; $r['category_name'] = $r['category_name'] ?: 'ไม่มีหมวดหมู่'; $products[] = $r; } }
+
+    // ตัวกรองแท็บ "รายการสินค้า" - ค้นหาชื่อ/SKU, กรองประเภท, และตัวเลือกโชว์เฉพาะที่ใกล้หมด/หมดแล้ว
+    $prod_q = trim($_GET['prod_q'] ?? '');
+    $prod_type = in_array($_GET['prod_type'] ?? 'all', ['item', 'topping', 'pool'], true) ? $_GET['prod_type'] : 'all';
+    $prod_low_only = ($_GET['prod_low'] ?? '') === '1';
+    $products_filtered = array_values(array_filter($products, function ($p) use ($prod_q, $prod_type, $prod_low_only) {
+        if ($prod_type !== 'all' && $p['type'] !== $prod_type) return false;
+        if ($prod_q !== '' && stripos($p['name'], $prod_q) === false && stripos($p['sku'] ?? '', $prod_q) === false) return false;
+        if ($prod_low_only && (int) $p['stock_qty'] > (int) $p['reorder_point']) return false;
+        return true;
+    }));
 
     // ประวัติรับ-จ่ายสต็อกสำหรับแท็บ "บันทึกรับ-จ่าย" กรองตามช่วงวันที่/เวลา ประเภท ทิศทาง และคำค้นหา
     // (ตัวกรองชุดเดียวกันนี้ใช้ร่วมกับหน้าพิมพ์ PDF และหน้าส่งออก Excel/CSV ด้วย ดู includes/stock_log.php)
@@ -820,10 +829,37 @@ include '../includes/nav_owner.php';
                     <i class="bi bi-printer me-1"></i> พิมพ์รายการ
                 </button>
             </div>
-            <?php if (empty($products)): ?>
+            <form method="GET" id="prodFilterForm" class="row g-2 align-items-end mb-3">
+                <div class="col-12 col-md-5">
+                    <label class="small fw-bold mb-1 d-block">ค้นหาชื่อ/SKU</label>
+                    <input type="text" name="prod_q" class="form-control rounded-3" placeholder="เช่น ไก่ หรือ ITM-001" value="<?= htmlspecialchars($prod_q) ?>">
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="small fw-bold mb-1 d-block">ประเภท</label>
+                    <select name="prod_type" class="form-select rounded-3">
+                        <option value="all" <?= $prod_type === 'all' ? 'selected' : '' ?>>ทั้งหมด</option>
+                        <option value="item" <?= $prod_type === 'item' ? 'selected' : '' ?>>เมนูอาหาร</option>
+                        <option value="topping" <?= $prod_type === 'topping' ? 'selected' : '' ?>>ท็อปปิ้ง/วัตถุดิบเสริม</option>
+                        <option value="pool" <?= $prod_type === 'pool' ? 'selected' : '' ?>>กลุ่มสต็อกร่วม</option>
+                    </select>
+                </div>
+                <div class="col-6 col-md-2 d-flex align-items-center" style="height: 58px;">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="prodLowOnly" name="prod_low" value="1" <?= $prod_low_only ? 'checked' : '' ?>>
+                        <label class="form-check-label small" for="prodLowOnly">เฉพาะที่ใกล้หมด</label>
+                    </div>
+                </div>
+                <div class="col-12 col-md-2">
+                    <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold w-100">
+                        <i class="bi bi-search me-1"></i> ค้นหา
+                    </button>
+                </div>
+            </form>
+
+            <?php if (empty($products_filtered)): ?>
                 <div class="text-center py-5">
                     <i class="bi bi-upc-scan display-1 text-muted opacity-25"></i>
-                    <p class="mt-3 text-muted">ยังไม่มีสินค้าที่ติดตามคลังสินค้าในระบบ</p>
+                    <p class="mt-3 text-muted"><?= empty($products) ? 'ยังไม่มีสินค้าที่ติดตามคลังสินค้าในระบบ' : 'ไม่พบสินค้าตามตัวกรองนี้' ?></p>
                 </div>
             <?php else: ?>
             <div class="card border-0 shadow-sm rounded-4 p-3">
@@ -842,18 +878,25 @@ include '../includes/nav_owner.php';
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($products as $p):
+                            <?php foreach ($products_filtered as $p):
                                 $qty = (int) $p['stock_qty'];
                                 $reorder = (int) $p['reorder_point'];
-                                $qty_class = $qty <= 0 ? 'qty-danger' : ($qty <= $reorder ? 'qty-warn' : '');
+                                // หมดแล้ว = แถบสีเลือดหมู (#660033), ใกล้หมด = แถบสีอิฐ (#993300) แบบโปร่งแสง
+                                // อ่อนๆ (14%) ให้เห็นชัดกว่าแค่เปลี่ยนสีตัวเลขอย่างเดียว แต่ยังคงพื้นหลังตารางไว้แบบเดิม
+                                $row_style = '';
+                                if ($qty <= 0) {
+                                    $row_style = 'background: rgba(102,0,51,0.14); color: #660033;';
+                                } elseif ($qty <= $reorder) {
+                                    $row_style = 'background: rgba(153,51,0,0.14); color: #993300;';
+                                }
                             ?>
-                            <tr>
+                            <tr style="<?= $row_style ?>">
                                 <td><span class="sku-badge"><?= htmlspecialchars($p['sku'] ?: '-') ?></span></td>
                                 <td class="fw-bold"><?= htmlspecialchars($p['name']) ?></td>
                                 <td><span class="badge bg-light text-dark rounded-pill"><?= htmlspecialchars($p['type_label']) ?></span></td>
-                                <td class="text-muted small"><?= htmlspecialchars($p['category_name']) ?></td>
+                                <td class="<?= $row_style ? '' : 'text-muted' ?> small"><?= htmlspecialchars($p['category_name']) ?></td>
                                 <td class="text-end"><?= $p['price'] !== null ? '฿' . number_format((float) $p['price'], 2) : '-' ?></td>
-                                <td class="text-end <?= $qty_class ?>"><?= $qty ?></td>
+                                <td class="text-end fw-bold"><?= $qty ?></td>
                                 <td class="text-end"><?= $reorder ?></td>
                                 <td class="text-center">
                                     <button type="button" class="btn btn-sm btn-outline-primary rounded-pill" onclick='openEditProductModal(<?= json_encode([
@@ -870,6 +913,10 @@ include '../includes/nav_owner.php';
                             <?php endforeach; ?>
                         </tbody>
                     </table>
+                </div>
+                <div class="d-flex gap-3 small text-muted mt-2 px-1">
+                    <span><i class="bi bi-square-fill" style="color:#660033; font-size:10px;"></i> หมดแล้ว</span>
+                    <span><i class="bi bi-square-fill" style="color:#993300; font-size:10px;"></i> ใกล้หมด (≤ จุดสั่งซื้อซ้ำ)</span>
                 </div>
             </div>
             <?php endif; ?>
@@ -1629,6 +1676,13 @@ document.getElementById('editProductForm').addEventListener('submit', function (
             setTimeout(() => window.location.reload(), 600);
         })
         .catch(() => ownerNotify('เกิดข้อผิดพลาด ไม่สามารถบันทึกได้', 'error'));
+});
+
+/*
+ * แท็บ "รายการสินค้า" - ตัวกรอง (จำแท็บไว้ก่อนรีโหลดเหมือนแท็บอื่นๆ)
+ */
+document.getElementById('prodFilterForm').addEventListener('submit', function () {
+    sessionStorage.setItem('stockActiveTab', 'products');
 });
 
 /*
