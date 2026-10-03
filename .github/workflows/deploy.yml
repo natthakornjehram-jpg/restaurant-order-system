@@ -14,10 +14,10 @@ jobs:
       - name: Checkout โค้ด
         uses: actions/checkout@v4
 
-      - name: ftpupload.net
+      - name: อัปโหลดขึ้น InfinityFree ผ่าน FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: ${{ secrets.SERVER }}
+          server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           # โฟลเดอร์เว็บจริงบน InfinityFree ปกติคือ htdocs/ (เช็คชื่อโฟลเดอร์จริงจาก File Manager ในคอนโทรลพาเนลอีกที)
