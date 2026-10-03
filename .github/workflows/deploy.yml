@@ -17,7 +17,7 @@ jobs:
       - name: อัปโหลดขึ้น InfinityFree ผ่าน FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: 185.27.134.126
+          server: restaurant101.ct.ws
           username: if0_42979251
           password: eK5wfdW3qgd7
           # โฟลเดอร์เว็บจริงบน InfinityFree ปกติคือ htdocs/ (เช็คชื่อโฟลเดอร์จริงจาก File Manager ในคอนโทรลพาเนลอีกที)
